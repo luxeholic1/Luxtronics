@@ -1,6 +1,9 @@
+import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import Layout from "@/components/Layout";
 import { Package, Heart, MapPin, UserRound } from "lucide-react";
+import { toast } from "sonner";
+import { clearAuthToken, getAuthToken, getCurrentUser, logoutUser, type AccountUser } from "@/services/auth";
 
 const quickCards = [
   {
@@ -30,16 +33,91 @@ const quickCards = [
 ];
 
 const AccountDashboard = () => {
+  const [user, setUser] = useState<AccountUser | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const loadUser = async () => {
+      const token = getAuthToken();
+      if (!token) {
+        setLoading(false);
+        return;
+      }
+
+      try {
+        const me = await getCurrentUser(token);
+        setUser(me);
+      } catch (error) {
+        clearAuthToken();
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadUser();
+  }, []);
+
+  const handleLogout = async () => {
+    const token = getAuthToken();
+    if (token) {
+      try {
+        await logoutUser(token);
+      } catch {
+        // no-op
+      }
+    }
+
+    clearAuthToken();
+    setUser(null);
+    toast.success("Logged out");
+  };
+
+  if (loading) {
+    return (
+      <Layout>
+        <section className="container pt-32 pb-24">
+          <p className="text-muted-foreground">Loading account...</p>
+        </section>
+      </Layout>
+    );
+  }
+
+  if (!user) {
+    return (
+      <Layout>
+        <section className="container pt-32 pb-24 max-w-xl">
+          <h1 className="font-display font-bold text-4xl tracking-tight">Please sign in</h1>
+          <p className="mt-3 text-muted-foreground">You need an account to access your dashboard.</p>
+          <div className="mt-6 flex gap-3">
+            <Link to="/account/login" className="rounded-full bg-gradient-brand px-6 py-3 text-sm font-semibold text-primary-foreground shadow-glow">
+              Sign in
+            </Link>
+            <Link to="/account/register" className="rounded-full border border-border px-6 py-3 text-sm font-semibold hover:border-primary/40">
+              Create account
+            </Link>
+          </div>
+        </section>
+      </Layout>
+    );
+  }
+
   return (
     <Layout>
       <section className="container pt-32 pb-12">
         <p className="text-sm text-primary font-medium uppercase tracking-widest mb-3">My account</p>
         <h1 className="font-display font-bold text-5xl tracking-tight">
-          Hi, <span className="text-gradient">Asmit</span>
+          Hi, <span className="text-gradient">{user.firstName}</span>
         </h1>
         <p className="mt-4 text-muted-foreground max-w-2xl">
-          Manage your account settings, monitor orders, and keep your profile up to date.
+          {user.email}
         </p>
+        <button
+          type="button"
+          onClick={handleLogout}
+          className="mt-5 rounded-full border border-border px-5 py-2 text-sm font-medium hover:border-primary/40"
+        >
+          Logout
+        </button>
       </section>
 
       <section className="container pb-24 grid grid-cols-1 sm:grid-cols-2 gap-5">

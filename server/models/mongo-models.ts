@@ -105,6 +105,38 @@ export interface SyncStatus {
 }
 
 /**
+ * User document model
+ */
+export interface MongoUser {
+  _id?: ObjectId;
+  firstName: string;
+  lastName: string;
+  email: string;
+  passwordHash: string;
+  passwordSalt: string;
+  phone?: string;
+  orders?: Array<{
+    id: string;
+    date: string;
+    amount: string;
+    status: 'Processing' | 'Shipped' | 'Delivered' | 'Cancelled';
+  }>;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+/**
+ * User session model
+ */
+export interface UserSession {
+  _id?: ObjectId;
+  token: string;
+  userId: ObjectId;
+  createdAt: Date;
+  expiresAt: Date;
+}
+
+/**
  * Create Product Document from WooCommerce data
  */
 export function createProductDocument(wooProduct: any): MongoProduct {

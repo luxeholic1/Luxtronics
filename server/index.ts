@@ -11,6 +11,8 @@ import { existsSync } from 'fs';
 import { fileURLToPath } from 'url';
 import { initializeMongoDB, disconnectMongoDB } from './db/mongodb';
 import { createProductRoutes } from './routes/products';
+import { createUserRoutes } from './routes/users';
+import { globalRateLimiter, sanitizeRequestBody, securityHeaders } from './middleware/security';
 
 // Load environment variables
 dotenv.config();
@@ -22,16 +24,26 @@ interface ServerConfig {
 
 export async function setupServer(config: ServerConfig = {}): Promise<Express> {
   const port = config.port || parseInt(process.env.PORT || '3001');
-  const corsOrigin = config.corsOrigin || process.env.CORS_ORIGIN || 'http://localhost:5173';
+  const configuredOrigin = config.corsOrigin || process.env.CORS_ORIGIN || 'http://localhost:5173';
+  const corsOrigin = Array.isArray(configuredOrigin)
+    ? configuredOrigin
+    : String(configuredOrigin)
+        .split(',')
+        .map((origin) => origin.trim())
+        .filter(Boolean);
 
   const app = express();
+  app.set('trust proxy', 1);
 
   // Middleware
-  app.use(express.json({ limit: '10mb' }));
-  app.use(express.urlencoded({ limit: '10mb', extended: true }));
+  app.use(securityHeaders);
+  app.use(globalRateLimiter);
+  app.use(express.json({ limit: '1mb' }));
+  app.use(express.urlencoded({ limit: '1mb', extended: true }));
+  app.use(sanitizeRequestBody);
   app.use(
     cors({
-      origin: corsOrigin,
+      origin: corsOrigin.length > 0 ? corsOrigin : true,
       credentials: true,
     })
   );
@@ -49,14 +61,19 @@ export async function setupServer(config: ServerConfig = {}): Promise<Express> {
 
     // Register API routes
     const productRoutes = createProductRoutes(db);
+    const userRoutes = createUserRoutes(db);
     app.use('/api', productRoutes);
+    app.use('/api', userRoutes);
   } catch (error) {
     console.error('❌ Failed to initialize MongoDB:', error);
     throw error;
   }
 
-  // Serve frontend build in production when dist exists.
-  const clientDistPath = path.resolve(process.cwd(), 'dist');
+  // Serve frontend build in production.
+  const primaryBuildPath = path.resolve(process.cwd(), 'build');
+  const fallbackBuildPath = path.resolve(process.cwd(), 'dist');
+  const clientDistPath = existsSync(primaryBuildPath) ? primaryBuildPath : fallbackBuildPath;
+
   if (process.env.NODE_ENV === 'production' && existsSync(clientDistPath)) {
     app.use(express.static(clientDistPath));
 

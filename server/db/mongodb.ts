@@ -123,6 +123,16 @@ class MongoDBConnection {
       cacheCollection.createIndex({ expiresAt: 1 }, { expireAfterSeconds: 0 }), // TTL index
     ]);
 
+    // Users and sessions indexes
+    const usersCollection = db.collection('users');
+    await usersCollection.createIndex({ email: 1 }, { unique: true });
+
+    const sessionsCollection = db.collection('user_sessions');
+    await Promise.all([
+      sessionsCollection.createIndex({ token: 1 }, { unique: true }),
+      sessionsCollection.createIndex({ expiresAt: 1 }, { expireAfterSeconds: 0 }),
+    ]);
+
     console.log('✅ Indexes created successfully!');
   }
 }
