@@ -1,6 +1,34 @@
 import { Link } from "react-router-dom";
 import { Zap, Instagram, Twitter, Youtube, Github } from "lucide-react";
 
+const footerColumns = [
+  {
+    title: "Shop",
+    links: [
+      { label: "All Products", to: "/shop" },
+      { label: "Categories", to: "/categories" },
+      { label: "Cart", to: "/cart" },
+    ],
+  },
+  {
+    title: "Company",
+    links: [
+      { label: "About", to: "/about" },
+      { label: "Blog", to: "/blog" },
+      { label: "Contact", to: "/contact" },
+    ],
+  },
+  {
+    title: "Support",
+    links: [
+      { label: "FAQ", to: "/faq" },
+      { label: "Shipping & Returns", to: "/shipping-returns" },
+      { label: "Privacy", to: "/privacy" },
+      { label: "Terms", to: "/terms" },
+    ],
+  },
+];
+
 const Footer = () => {
   return (
     <footer className="relative border-t border-border mt-32">
@@ -33,21 +61,17 @@ const Footer = () => {
           </div>
         </div>
 
-        {[
-          { title: "Shop", links: ["Smartphones", "Audio", "Wearables", "Laptops", "Gaming"] },
-          { title: "Company", links: ["About", "Careers", "Press", "Contact", "Blog"] },
-          { title: "Support", links: ["Help Center", "Shipping", "Returns", "Warranty", "Track Order"] },
-        ].map((col) => (
+        {footerColumns.map((col) => (
           <div key={col.title}>
             <h4 className="font-display font-semibold mb-3 sm:mb-4 text-xs sm:text-sm uppercase tracking-wider">
               {col.title}
             </h4>
             <ul className="space-y-2 sm:space-y-3">
               {col.links.map((l) => (
-                <li key={l}>
-                  <a href="#" className="text-xs sm:text-sm text-muted-foreground hover:text-foreground transition-colors">
-                    {l}
-                  </a>
+                <li key={l.label}>
+                  <Link to={l.to} className="text-xs sm:text-sm text-muted-foreground hover:text-foreground transition-colors">
+                    {l.label}
+                  </Link>
                 </li>
               ))}
             </ul>
@@ -59,9 +83,9 @@ const Footer = () => {
         <div className="container py-4 sm:py-6 px-4 sm:px-6 lg:px-0 flex flex-col sm:flex-row items-center justify-between gap-3 sm:gap-4 text-[10px] sm:text-xs text-muted-foreground">
           <p>© {new Date().getFullYear()} Luxtronics. All rights reserved.</p>
           <div className="flex gap-4 sm:gap-6">
-            <a href="#" className="hover:text-foreground transition-colors">Privacy</a>
-            <a href="#" className="hover:text-foreground transition-colors">Terms</a>
-            <a href="#" className="hover:text-foreground transition-colors">Cookies</a>
+            <Link to="/privacy" className="hover:text-foreground transition-colors">Privacy</Link>
+            <Link to="/terms" className="hover:text-foreground transition-colors">Terms</Link>
+            <Link to="/faq" className="hover:text-foreground transition-colors">Help</Link>
           </div>
         </div>
       </div>

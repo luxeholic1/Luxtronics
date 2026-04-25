@@ -7,7 +7,9 @@ const links = [
   { to: "/", label: "Home" },
   { to: "/shop", label: "Shop" },
   { to: "/categories", label: "Categories" },
+  { to: "/about", label: "About" },
   { to: "/blog", label: "Blog" },
+  { to: "/account", label: "Account" },
   { to: "/contact", label: "Contact" },
 ];
 
@@ -93,12 +95,13 @@ const Navbar = () => {
               2
             </span>
           </Link>
-          <button
+          <Link
+            to="/account"
             aria-label="Account"
             className="hidden sm:flex h-9 w-9 sm:h-10 sm:w-10 rounded-full hover:bg-secondary items-center justify-center transition-colors"
           >
             <User className="h-4 w-4 sm:h-[18px] sm:w-[18px]" />
-          </button>
+          </Link>
           <button
             aria-label="Menu"
             onClick={() => setMobileOpen((v) => !v)}
