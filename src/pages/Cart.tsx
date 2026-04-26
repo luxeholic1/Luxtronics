@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { Minus, Plus, X, ArrowRight } from "lucide-react";
 import Layout from "@/components/Layout";
 import { products } from "@/data/products";
+import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious } from "@/components/ui/carousel";
 
 const Cart = () => {
   const [items, setItems] = useState([
@@ -24,9 +25,29 @@ const Cart = () => {
 
   const remove = (id: string) => setItems((prev) => prev.filter((i) => i.product.id !== id));
 
+  const addToCart = (productId: string) => {
+    const target = products.find((p) => p.id === productId);
+    if (!target) return;
+
+    setItems((prev) => {
+      const existing = prev.find((i) => i.product.id === productId);
+      if (existing) {
+        return prev.map((i) =>
+          i.product.id === productId ? { ...i, qty: i.qty + 1 } : i
+        );
+      }
+
+      return [...prev, { product: target, qty: 1 }];
+    });
+  };
+
+  const relatedProducts = products
+    .filter((p) => !items.some((item) => item.product.id === p.id))
+    .slice(0, 8);
+
   return (
     <Layout>
-      <section className="container pt-32 pb-24">
+      <section className="container pt-32 pb-16">
         <h1 className="font-display font-bold text-5xl sm:text-6xl tracking-tight mb-12">
           Your <span className="text-gradient">cart</span>
         </h1>
@@ -124,6 +145,62 @@ const Cart = () => {
             </aside>
           </div>
         )}
+      </section>
+
+      <section className="container pb-24">
+        <div className="mb-6 flex items-end justify-between gap-4">
+          <div>
+            <p className="text-sm text-primary font-medium uppercase tracking-widest mb-2">Recommended</p>
+            <h2 className="font-display font-bold text-3xl sm:text-4xl tracking-tight">
+              Related <span className="text-gradient">items</span>
+            </h2>
+          </div>
+        </div>
+
+        <Carousel
+          opts={{ align: "start", loop: false }}
+          className="w-full"
+        >
+          <CarouselContent>
+            {relatedProducts.map((product) => (
+              <CarouselItem key={product.id} className="basis-[84%] sm:basis-1/2 lg:basis-1/3 xl:basis-1/4">
+                <article className="h-full rounded-2xl border border-border bg-gradient-card p-4">
+                  <Link to={`/product/${product.slug}`} className="block">
+                    <div className="aspect-square rounded-xl bg-secondary/40 flex items-center justify-center overflow-hidden">
+                      <img
+                        src={product.image}
+                        alt={product.name}
+                        loading="lazy"
+                        width={240}
+                        height={240}
+                        className="h-3/4 w-3/4 object-contain"
+                      />
+                    </div>
+                    <p className="mt-4 text-xs uppercase tracking-wider text-muted-foreground">
+                      {product.category}
+                    </p>
+                    <h3 className="mt-1 font-display text-base font-semibold leading-tight line-clamp-2">
+                      {product.name}
+                    </h3>
+                  </Link>
+
+                  <div className="mt-4 flex items-center justify-between gap-3">
+                    <p className="font-display text-xl font-bold">${product.price}</p>
+                    <button
+                      type="button"
+                      onClick={() => addToCart(product.id)}
+                      className="inline-flex items-center rounded-full bg-gradient-brand px-4 py-2 text-xs font-semibold text-primary-foreground shadow-glow hover:shadow-glow-pink transition-all"
+                    >
+                      Add item
+                    </button>
+                  </div>
+                </article>
+              </CarouselItem>
+            ))}
+          </CarouselContent>
+          <CarouselPrevious className="-left-3 h-9 w-9 border-border bg-background/80 backdrop-blur" />
+          <CarouselNext className="-right-3 h-9 w-9 border-border bg-background/80 backdrop-blur" />
+        </Carousel>
       </section>
     </Layout>
   );

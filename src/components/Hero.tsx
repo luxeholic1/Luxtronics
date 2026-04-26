@@ -23,11 +23,6 @@ const categorySlides = [
     alt: "Audio category showcase",
     glow: "drop-shadow-[0_25px_60px_rgba(255,130,80,0.35)]",
   },
-  {
-    src: heroWatch,
-    alt: "Wearables category showcase",
-    glow: "drop-shadow-[0_25px_60px_rgba(255,80,140,0.35)]",
-  },
 ];
 
 const Hero = () => {

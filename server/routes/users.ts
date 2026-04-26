@@ -4,8 +4,20 @@ import { UserService } from '../services/user-service';
 import { authRateLimiter } from '../middleware/security';
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-const NAME_REGEX = /^[A-Za-z][A-Za-z\s'-]{0,49}$/;
-const PHONE_REGEX = /^[0-9+()\-\s]{6,20}$/;
+
+function isValidDisplayName(value: unknown): boolean {
+  const text = String(value || '').trim();
+  return text.length >= 1 && text.length <= 50;
+}
+
+function normalizePhone(value: unknown): string | undefined {
+  const text = String(value || '').trim();
+  if (!text) {
+    return undefined;
+  }
+
+  return text;
+}
 
 function getTokenFromRequest(req: Request): string | null {
   const authHeader = req.headers.authorization;
@@ -43,17 +55,10 @@ export function createUserRoutes(db: Db): Router {
         return res.status(400).json({ success: false, error: 'Invalid email format' });
       }
 
-      if (!NAME_REGEX.test(String(firstName)) || !NAME_REGEX.test(String(lastName))) {
+      if (!isValidDisplayName(firstName) || !isValidDisplayName(lastName)) {
         return res.status(400).json({
           success: false,
-          error: 'Name can contain only letters, spaces, apostrophes, and hyphens',
-        });
-      }
-
-      if (phone && !PHONE_REGEX.test(String(phone))) {
-        return res.status(400).json({
-          success: false,
-          error: 'Invalid phone format',
+          error: 'firstName and lastName must be non-empty strings',
         });
       }
 
@@ -62,7 +67,7 @@ export function createUserRoutes(db: Db): Router {
         lastName: String(lastName),
         email: String(email),
         password: String(password),
-        phone: phone ? String(phone) : undefined,
+        phone: normalizePhone(phone),
       });
 
       res.status(201).json({
@@ -127,31 +132,24 @@ export function createUserRoutes(db: Db): Router {
 
       const { firstName, lastName, phone } = req.body;
 
-      if (firstName !== undefined && !NAME_REGEX.test(String(firstName))) {
+      if (firstName !== undefined && !isValidDisplayName(firstName)) {
         return res.status(400).json({
           success: false,
-          error: 'Invalid first name format',
+          error: 'Invalid first name',
         });
       }
 
-      if (lastName !== undefined && !NAME_REGEX.test(String(lastName))) {
+      if (lastName !== undefined && !isValidDisplayName(lastName)) {
         return res.status(400).json({
           success: false,
-          error: 'Invalid last name format',
-        });
-      }
-
-      if (phone !== undefined && String(phone).length > 0 && !PHONE_REGEX.test(String(phone))) {
-        return res.status(400).json({
-          success: false,
-          error: 'Invalid phone format',
+          error: 'Invalid last name',
         });
       }
 
       const user = await userService.updateUserByToken(token, {
         firstName: firstName !== undefined ? String(firstName) : undefined,
         lastName: lastName !== undefined ? String(lastName) : undefined,
-        phone: phone !== undefined ? String(phone) : undefined,
+        phone: normalizePhone(phone),
       });
 
       res.json({ success: true, data: user });

@@ -1,32 +1,10 @@
-import { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link } from "react-router-dom";
 import Layout from "@/components/Layout";
-import { toast } from "sonner";
-import { loginUser, setAuthToken } from "@/services/auth";
+import { SignIn, UserButton, useUser } from "@clerk/react";
 
 const AccountLogin = () => {
-  const navigate = useNavigate();
-  const [loading, setLoading] = useState(false);
-
-  const onSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    const formData = new FormData(e.currentTarget);
-    const email = String(formData.get("email") || "").trim();
-    const password = String(formData.get("password") || "");
-
-    try {
-      setLoading(true);
-      const result = await loginUser({ email, password });
-      setAuthToken(result.token);
-      toast.success("Logged in successfully");
-      navigate("/account");
-    } catch (error) {
-      const message = error instanceof Error ? error.message : "Login failed";
-      toast.error(message);
-    } finally {
-      setLoading(false);
-    }
-  };
+  const { isLoaded, isSignedIn } = useUser();
+  const showSignedOutActions = !isLoaded || !isSignedIn;
 
   return (
     <Layout>
@@ -36,43 +14,31 @@ const AccountLogin = () => {
           Welcome <span className="text-gradient">back</span>
         </h1>
         <p className="mt-4 text-muted-foreground">
-          Sign in to access your orders, saved addresses, and account settings.
+          Sign in with Clerk to access your account.
         </p>
 
-        <form onSubmit={onSubmit} className="mt-8 rounded-3xl border border-border bg-gradient-card p-8 space-y-5">
-          <div>
-            <label className="text-xs uppercase tracking-wider text-muted-foreground">Email</label>
-            <input
-              name="email"
-              required
-              type="email"
-              className="mt-2 w-full h-12 rounded-xl border border-border bg-background px-4 text-sm focus:outline-none focus:border-primary"
-              placeholder="you@example.com"
-            />
-          </div>
-          <div>
-            <div className="flex items-center justify-between">
-              <label className="text-xs uppercase tracking-wider text-muted-foreground">Password</label>
-              <button type="button" className="text-xs text-primary hover:underline">
-                Forgot password?
-              </button>
+        <div className="mt-8 rounded-3xl border border-border bg-gradient-card p-8 space-y-5">
+          {showSignedOutActions ? (
+            <div className="flex justify-center">
+              <SignIn
+                routing="path"
+                path="/account/login"
+                signUpUrl="/account/register"
+                forceRedirectUrl="/account"
+              />
             </div>
-            <input
-              name="password"
-              required
-              type="password"
-              className="mt-2 w-full h-12 rounded-xl border border-border bg-background px-4 text-sm focus:outline-none focus:border-primary"
-              placeholder="Enter your password"
-            />
-          </div>
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full inline-flex items-center justify-center rounded-full bg-gradient-brand px-7 py-3.5 text-sm font-semibold text-primary-foreground shadow-glow hover:shadow-glow-pink transition-all"
-          >
-            {loading ? "Signing in..." : "Sign in"}
-          </button>
-        </form>
+          ) : (
+            <div className="flex items-center gap-4">
+              <UserButton />
+              <div>
+                <p className="font-medium">You’re already signed in.</p>
+                <Link to="/account" className="text-sm text-primary hover:underline">
+                  Go to dashboard
+                </Link>
+              </div>
+            </div>
+          )}
+        </div>
 
         <p className="mt-6 text-sm text-muted-foreground text-center">
           New here?{" "}

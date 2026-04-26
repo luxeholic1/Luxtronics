@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link, NavLink as RouterNavLink, useLocation } from "react-router-dom";
+import { UserButton, useUser } from "@clerk/react";
 import { Search, ShoppingBag, User, Menu, X, Zap } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -17,6 +18,8 @@ const Navbar = () => {
   const [scrolled, setScrolled] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const location = useLocation();
+  const { isLoaded, isSignedIn } = useUser();
+  const showSignedIn = isLoaded && isSignedIn;
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 20);
@@ -95,13 +98,33 @@ const Navbar = () => {
               2
             </span>
           </Link>
-          <Link
-            to="/account"
-            aria-label="Account"
-            className="hidden sm:flex h-9 w-9 sm:h-10 sm:w-10 rounded-full hover:bg-secondary items-center justify-center transition-colors"
-          >
-            <User className="h-4 w-4 sm:h-[18px] sm:w-[18px]" />
-          </Link>
+          {showSignedIn ? (
+            <div className="hidden sm:flex items-center justify-center">
+              <UserButton />
+            </div>
+          ) : (
+            <div className="hidden sm:flex items-center gap-2">
+              <Link
+                to="/account/login"
+                aria-label="Account"
+                className="h-9 w-9 sm:h-10 sm:w-10 rounded-full hover:bg-secondary flex items-center justify-center transition-colors"
+              >
+                <User className="h-4 w-4 sm:h-[18px] sm:w-[18px]" />
+              </Link>
+              <Link
+                to="/account/login"
+                className="h-9 inline-flex items-center rounded-full border border-border px-4 text-sm font-medium hover:border-primary/40 transition-colors"
+              >
+                Sign in
+              </Link>
+              <Link
+                to="/account/register"
+                className="h-9 inline-flex items-center rounded-full bg-gradient-brand px-4 text-sm font-semibold text-primary-foreground shadow-glow"
+              >
+                Sign up
+              </Link>
+            </div>
+          )}
           <button
             aria-label="Menu"
             onClick={() => setMobileOpen((v) => !v)}
@@ -133,6 +156,29 @@ const Navbar = () => {
                 {l.label}
               </RouterNavLink>
             ))}
+            <div className="mt-2 pt-2 border-t border-white/5 flex flex-col gap-2">
+              {showSignedIn && (
+                <div className="px-2 py-2">
+                  <UserButton />
+                </div>
+              )}
+              {!showSignedIn && (
+                <>
+                  <Link
+                    to="/account/login"
+                    className="w-full rounded-lg border border-border px-4 py-3 text-sm font-medium hover:border-primary/40 transition-colors text-center"
+                  >
+                    Sign in
+                  </Link>
+                  <Link
+                    to="/account/register"
+                    className="w-full rounded-lg bg-gradient-brand px-4 py-3 text-sm font-semibold text-primary-foreground shadow-glow text-center"
+                  >
+                    Sign up
+                  </Link>
+                </>
+              )}
+            </div>
           </div>
         </div>
       )}
