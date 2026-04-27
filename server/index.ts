@@ -70,8 +70,8 @@ export async function setupServer(config: ServerConfig = {}): Promise<Express> {
   }
 
   // Serve frontend build in production.
-  const primaryBuildPath = path.resolve(process.cwd(), 'build');
-  const fallbackBuildPath = path.resolve(process.cwd(), 'dist');
+  const primaryBuildPath = path.resolve(process.cwd(), 'dist');
+  const fallbackBuildPath = path.resolve(process.cwd(), 'build');
   const clientDistPath = existsSync(primaryBuildPath) ? primaryBuildPath : fallbackBuildPath;
 
   if (process.env.NODE_ENV === 'production' && existsSync(clientDistPath)) {

@@ -24,3 +24,8 @@ dist-ssr
 *.sln
 *.sw?
 .vercel
+
+# CI/CD — never commit secrets or deploy artifacts
+.env.local
+.env.production
+deploy.log

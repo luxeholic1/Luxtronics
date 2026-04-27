@@ -8,13 +8,16 @@
     "server:dev": "tsx watch server/index.ts",
     "sync:products": "tsx scripts/sync-products.ts",
     "sync:full": "tsx scripts/sync-full.ts",
-    "build": "vite build --outDir build",
+    "build": "vite build",
     "build:dev": "vite build --mode development",
     "start": "tsx server/index.ts",
     "lint": "eslint .",
     "preview": "vite preview",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "deploy": "npm run build && bash scripts/deploy.sh",
+    "deploy:dry": "echo 'Dry run — build only' && npm run build",
+    "ci": "npm ci && npm run lint && npm run build"
   },
   "dependencies": {
     "@clerk/react": "^6.4.5",
