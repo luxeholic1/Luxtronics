@@ -378,7 +378,7 @@ npm run server:dev
 # Server: http://localhost:3001
 
 # Terminal 3: Initial Sync
-npx ts-node scripts/sync-products.ts
+npx ts-node backend/scripts/sync-products.ts
 # Watch as products sync from WooCommerce to MongoDB
 ```
 

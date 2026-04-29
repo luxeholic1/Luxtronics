@@ -175,15 +175,9 @@ export function useProductSearch(debounceMs = 500) {
         // For better performance, implement server-side search
         // Or use Elasticsearch/Algolia for large datasets
         
+        // Use backend proxy to avoid CORS — no credentials needed in the browser
         const response = await fetch(
-          `${import.meta.env.VITE_WOOCOMMERCE_URL}/wp-json/wc/v3/products?search=${encodeURIComponent(term)}&per_page=50`,
-          {
-            headers: {
-              'Authorization': `Basic ${btoa(
-                `${import.meta.env.VITE_WOOCOMMERCE_KEY}:${import.meta.env.VITE_WOOCOMMERCE_SECRET}`
-              )}`,
-            },
-          }
+          `/api/woo/products?search=${encodeURIComponent(term)}&per_page=50`
         );
 
         const data: WooProduct[] = await response.json();

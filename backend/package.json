@@ -1,0 +1,12 @@
+{
+  "name": "luxtronics-backend",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "node ../node_modules/tsx/dist/cli.mjs watch server/index.ts",
+    "start": "node ../node_modules/tsx/dist/cli.mjs server/index.ts",
+    "sync:products": "node ../node_modules/tsx/dist/cli.mjs scripts/sync-products.ts",
+    "sync:full": "node ../node_modules/tsx/dist/cli.mjs scripts/sync-full.ts",
+    "sync:to-target": "node ../node_modules/tsx/dist/cli.mjs scripts/sync-to-target.ts"
+  }
+}

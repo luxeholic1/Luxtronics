@@ -12,10 +12,12 @@ import { fileURLToPath } from 'url';
 import { initializeMongoDB, disconnectMongoDB } from './db/mongodb';
 import { createProductRoutes } from './routes/products';
 import { createUserRoutes } from './routes/users';
+import { createWooCommerceProxyRoutes } from './routes/woocommerce-proxy';
 import { globalRateLimiter, sanitizeRequestBody, securityHeaders } from './middleware/security';
 
-// Load environment variables
-dotenv.config();
+// Load environment variables — .env first, then .env.local overrides
+dotenv.config({ path: '.env' });
+dotenv.config({ path: '.env.local', override: true });
 
 interface ServerConfig {
   port?: number;
@@ -53,6 +55,10 @@ export async function setupServer(config: ServerConfig = {}): Promise<Express> {
     res.json({ status: 'ok', timestamp: new Date().toISOString() });
   });
 
+  // Register WooCommerce proxy routes — independent of MongoDB
+  const wooProxyRoutes = createWooCommerceProxyRoutes();
+  app.use('/api', wooProxyRoutes);
+
   // Initialize MongoDB
   try {
     console.log('🔄 Initializing MongoDB...');
@@ -74,11 +80,43 @@ export async function setupServer(config: ServerConfig = {}): Promise<Express> {
   const fallbackBuildPath = path.resolve(process.cwd(), 'build');
   const clientDistPath = existsSync(primaryBuildPath) ? primaryBuildPath : fallbackBuildPath;
 
-  if (process.env.NODE_ENV === 'production' && existsSync(clientDistPath)) {
+  if (existsSync(clientDistPath)) {
     app.use(express.static(clientDistPath));
 
-    app.get('*', (req, res, next) => {
-      if (req.path.startsWith('/api') || req.path === '/health') {
+    app.use((req, res, next) => {
+      if (req.method !== 'GET' || req.path.startsWith('/api') || req.path === '/health') {
+        return next();
+      }
+
+      res.sendFile(path.join(clientDistPath, 'index.html'));
+    });
+  } else {
+    app.get('/', (req, res) => {
+      res.type('html').send(`
+        <html>
+          <head>
+            <meta charset="utf-8" />
+            <meta name="viewport" content="width=device-width, initial-scale=1" />
+            <title>Luxtronics API</title>
+            <style>
+              body { font-family: system-ui, sans-serif; padding: 32px; line-height: 1.5; }
+              code { background: #f3f4f6; padding: 2px 6px; border-radius: 4px; }
+            </style>
+          </head>
+          <body>
+            <h1>Luxtronics backend is running</h1>
+            <p>This port serves API routes only until the frontend build is present.</p>
+            <p>Open the frontend shop at <code>http://localhost:5173</code>.</p>
+            <p>Health check: <a href="/health">/health</a></p>
+          </body>
+        </html>
+      `);
+    });
+  }
+
+  if (process.env.NODE_ENV === 'production' && existsSync(clientDistPath)) {
+    app.use((req, res, next) => {
+      if (req.method !== 'GET' || req.path.startsWith('/api') || req.path === '/health') {
         return next();
       }
 

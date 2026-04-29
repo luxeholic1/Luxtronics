@@ -1,26 +1,80 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import Layout from "@/components/Layout";
 import ProductCard from "@/components/ProductCard";
-import { categories, products } from "@/data/products";
 import { cn } from "@/lib/utils";
+import { fetchStoreCategories, fetchStoreProducts, mapStoreProductToLocalProduct } from "@/services/store-api";
+import type { Product } from "@/data/products";
+
+type CategoryFilter = {
+  id: number;
+  name: string;
+  slug: string;
+  count: number;
+};
 
 const Shop = () => {
   const [params, setParams] = useSearchParams();
   const activeCat = params.get("cat") || "all";
   const [sort, setSort] = useState("featured");
+  const [categories, setCategories] = useState<CategoryFilter[]>([]);
+  const [products, setProducts] = useState<Product[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let mounted = true;
+
+    const load = async () => {
+      try {
+        setLoading(true);
+        const [categoryData, productData] = await Promise.all([
+          fetchStoreCategories(),
+          fetchStoreProducts(),
+        ]);
+
+        if (!mounted) {
+          return;
+        }
+
+        setCategories(categoryData);
+        setProducts(productData.map(mapStoreProductToLocalProduct));
+        setError(null);
+      } catch (loadError) {
+        if (!mounted) {
+          return;
+        }
+
+        setError(loadError instanceof Error ? loadError.message : "Failed to load products");
+        setCategories([]);
+        setProducts([]);
+      } finally {
+        if (mounted) {
+          setLoading(false);
+        }
+      }
+    };
+
+    load();
+
+    return () => {
+      mounted = false;
+    };
+  }, []);
 
   const list = useMemo(() => {
-    let p = products;
+    let p = [...products];
     if (activeCat !== "all") {
-      const catName = categories.find((c) => c.slug === activeCat)?.name;
-      p = p.filter((x) => x.category === catName);
+      const selectedCategory = categories.find((c) => c.slug === activeCat);
+      if (selectedCategory) {
+        p = p.filter((x) => x.category === selectedCategory.name);
+      }
     }
     if (sort === "low") p = [...p].sort((a, b) => a.price - b.price);
     if (sort === "high") p = [...p].sort((a, b) => b.price - a.price);
     if (sort === "rating") p = [...p].sort((a, b) => b.rating - a.rating);
     return p;
-  }, [activeCat, sort]);
+  }, [activeCat, sort, products, categories]);
 
   return (
     <Layout>
@@ -77,7 +131,16 @@ const Shop = () => {
           </select>
         </div>
 
-        {list.length === 0 ? (
+        {error && (
+          <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
+            <p className="font-bold">Error loading products</p>
+            <p>{error}</p>
+          </div>
+        )}
+
+        {loading ? (
+          <p className="text-center text-muted-foreground py-24">Loading products...</p>
+        ) : list.length === 0 ? (
           <p className="text-center text-muted-foreground py-24">No products found.</p>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
