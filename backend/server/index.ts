@@ -55,65 +55,78 @@ export async function setupServer(config: ServerConfig = {}): Promise<Express> {
     res.json({ status: 'ok', timestamp: new Date().toISOString() });
   });
 
-  // Register WooCommerce proxy routes — independent of MongoDB
-  const wooProxyRoutes = createWooCommerceProxyRoutes();
-  app.use('/api', wooProxyRoutes);
-
-  // Initialize MongoDB with diagnostic endpoint
-  let dbInitialized = false;
+  let mongoReady = false;
   let mongoError: string | null = null;
   let db: any = null;
 
-  try {
-    console.log('🔄 Initializing MongoDB...');
-    console.log('📋 MONGODB_URI exists:', !!process.env.MONGODB_URI);
-    console.log('📋 MONGODB_DB_NAME:', process.env.MONGODB_DB_NAME);
-    
-    db = await initializeMongoDB();
-    console.log('✅ MongoDB initialized successfully!');
-    dbInitialized = true;
+  app.get('/api/status', (req, res) => {
+    if (mongoReady) {
+      res.json({
+        success: true,
+        status: 'ready',
+        mongoReady: true,
+      });
+      return;
+    }
 
-    // Register API routes
-    const productRoutes = createProductRoutes(db);
-    const userRoutes = createUserRoutes(db);
-    app.use('/api', productRoutes);
-    app.use('/api', userRoutes);
-  } catch (error) {
-    const errorMsg = error instanceof Error ? error.message : String(error);
-    console.error('❌ Failed to initialize MongoDB:', errorMsg);
-    mongoError = errorMsg;
-    
-    // Add diagnostic endpoints even when MongoDB fails
-    app.get('/api/products', (req, res) => {
-      res.status(503).json({
+    res.status(503).json({
+      success: false,
+      error: 'MongoDB connection not ready',
+      details: mongoError,
+      mongoReady: false,
+    });
+  });
+
+  app.use((req, res, next) => {
+    if (!req.path.startsWith('/api')) {
+      return next();
+    }
+
+    if (mongoReady) {
+      return next();
+    }
+
+    if (req.method === 'GET' && (req.path === '/api/products' || req.path === '/api/categories')) {
+      return res.status(503).json({
         success: false,
         error: 'Database service unavailable',
         details: mongoError,
       });
-    });
+    }
 
-    app.get('/api/categories', (req, res) => {
-      res.status(503).json({
-        success: false,
-        error: 'Database service unavailable',
-        details: mongoError,
-      });
-    });
+    return next();
+  });
 
-    app.get('/api/status', (req, res) => {
-      res.status(503).json({
-        success: false,
-        error: 'MongoDB connection failed',
-        details: mongoError,
-        env: {
-          MONGODB_URI_SET: !!process.env.MONGODB_URI,
-          MONGODB_DB_NAME: process.env.MONGODB_DB_NAME,
-          NODE_ENV: process.env.NODE_ENV,
-          PORT: process.env.PORT,
-        },
-      });
-    });
-  }
+  // Start server immediately so Hostinger sees the app as healthy even while MongoDB connects.
+  const server = app.listen(port, () => {
+    console.log(`✅ Server running on http://localhost:${port}`);
+  });
+
+  void (async () => {
+    try {
+      console.log('🔄 Initializing MongoDB...');
+      console.log('📋 MONGODB_URI exists:', !!process.env.MONGODB_URI);
+      console.log('📋 MONGODB_DB_NAME:', process.env.MONGODB_DB_NAME);
+
+      db = await initializeMongoDB();
+      console.log('✅ MongoDB initialized successfully!');
+      mongoReady = true;
+
+      // Register API routes once the database is available.
+      const productRoutes = createProductRoutes(db);
+      const userRoutes = createUserRoutes(db);
+      app.use('/api', productRoutes);
+      app.use('/api', userRoutes);
+    } catch (error) {
+      const errorMsg = error instanceof Error ? error.message : String(error);
+      console.error('❌ Failed to initialize MongoDB:', errorMsg);
+      mongoError = errorMsg;
+    }
+  })();
+
+  // Register WooCommerce proxy routes — independent of MongoDB
+  const wooProxyRoutes = createWooCommerceProxyRoutes();
+  app.use('/api', wooProxyRoutes);
 
   // Serve frontend build in production.
   const primaryBuildPath = path.resolve(process.cwd(), 'dist');
@@ -183,18 +196,7 @@ export async function setupServer(config: ServerConfig = {}): Promise<Express> {
     });
   });
 
-  // Start server
-  return new Promise<Express>((resolve) => {
-    const server = app.listen(port, () => {
-      console.log(`✅ Server running on http://localhost:${port}`);
-      resolve(app);
-    });
-
-    server.on('error', (error: any) => {
-      console.error('Server listen error:', error);
-      resolve(app); // Still resolve so the app continues
-    });
-  });
+  return app;
 }
 
 // Start server if this file is run directly
