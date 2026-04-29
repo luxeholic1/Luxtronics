@@ -13,6 +13,7 @@ import { initializeMongoDB, disconnectMongoDB } from './db/mongodb';
 import { createProductRoutes } from './routes/products';
 import { createUserRoutes } from './routes/users';
 import { createWooCommerceProxyRoutes } from './routes/woocommerce-proxy';
+import { createProductDocument, createCategoryDocument } from './models/mongo-models';
 import { globalRateLimiter, sanitizeRequestBody, securityHeaders } from './middleware/security';
 
 // Load environment variables — .env first, then .env.local overrides
@@ -37,6 +38,64 @@ export async function setupServer(config: ServerConfig = {}): Promise<Express> {
   const app = express();
   app.set('trust proxy', 1);
 
+  const sourceUrl = process.env.VITE_WOOCOMMERCE_URL;
+  const consumerKey = process.env.VITE_WOOCOMMERCE_KEY;
+  const consumerSecret = process.env.VITE_WOOCOMMERCE_SECRET;
+
+  function getWooAuthHeader(): string {
+    if (!consumerKey || !consumerSecret) {
+      throw new Error('WooCommerce credentials are not configured');
+    }
+
+    return 'Basic ' + Buffer.from(`${consumerKey}:${consumerSecret}`).toString('base64');
+  }
+
+  async function fetchWooProducts(params: URLSearchParams): Promise<{ items: any[]; total: number; totalPages: number }> {
+    if (!sourceUrl) {
+      throw new Error('WooCommerce URL not configured');
+    }
+
+    const requestUrl = `${sourceUrl}/wp-json/wc/v3/products?${params}`;
+    const response = await fetch(requestUrl, {
+      headers: {
+        Authorization: getWooAuthHeader(),
+        'Content-Type': 'application/json',
+      },
+    });
+
+    if (!response.ok) {
+      const body = await response.text();
+      throw new Error(`WooCommerce API error ${response.status}: ${body}`);
+    }
+
+    const items = await response.json();
+    return {
+      items,
+      total: parseInt(response.headers.get('X-WP-Total') || '0', 10),
+      totalPages: parseInt(response.headers.get('X-WP-TotalPages') || '0', 10),
+    };
+  }
+
+  async function fetchWooCategories(): Promise<any[]> {
+    if (!sourceUrl) {
+      throw new Error('WooCommerce URL not configured');
+    }
+
+    const response = await fetch(`${sourceUrl}/wp-json/wc/v3/products/categories?per_page=100&hide_empty=true`, {
+      headers: {
+        Authorization: getWooAuthHeader(),
+        'Content-Type': 'application/json',
+      },
+    });
+
+    if (!response.ok) {
+      const body = await response.text();
+      throw new Error(`WooCommerce categories error ${response.status}: ${body}`);
+    }
+
+    return response.json();
+  }
+
   // Middleware
   app.use(securityHeaders);
   app.use(globalRateLimiter);
@@ -60,41 +119,129 @@ export async function setupServer(config: ServerConfig = {}): Promise<Express> {
   let db: any = null;
 
   app.get('/api/status', (req, res) => {
-    if (mongoReady) {
-      res.json({
-        success: true,
-        status: 'ready',
-        mongoReady: true,
-      });
-      return;
-    }
-
-    res.status(503).json({
-      success: false,
-      error: 'MongoDB connection not ready',
+    res.json({
+      success: true,
+      status: mongoReady ? 'ready' : 'degraded',
+      mongoReady,
+      fallback: mongoReady ? 'mongodb' : 'woocommerce',
       details: mongoError,
-      mongoReady: false,
     });
   });
 
-  app.use((req, res, next) => {
-    if (!req.path.startsWith('/api')) {
-      return next();
-    }
-
+  app.get('/api/products', async (req, res, next) => {
     if (mongoReady) {
       return next();
     }
 
-    if (req.method === 'GET' && (req.path === '/api/products' || req.path === '/api/categories')) {
-      return res.status(503).json({
+    try {
+      const page = parseInt(req.query.page as string) || 1;
+      const perPage = parseInt(req.query.per_page as string) || 50;
+      const params = new URLSearchParams({
+        page: String(page),
+        per_page: String(perPage),
+        status: 'publish',
+      });
+
+      const category = req.query.category as string;
+      const search = req.query.search as string;
+
+      if (category) params.set('category', category);
+      if (search) params.set('search', search);
+
+      const { items, total, totalPages } = await fetchWooProducts(params);
+      const products = items.map(createProductDocument);
+
+      res.set('Cache-Control', 'public, max-age=300');
+      res.json({
+        success: true,
+        data: products,
+        pagination: {
+          page,
+          perPage,
+          total,
+          totalPages,
+        },
+        source: 'woocommerce',
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      res.status(503).json({
         success: false,
-        error: 'Database service unavailable',
-        details: mongoError,
+        error: 'Unable to load products',
+        details: message,
+        mongoError,
       });
     }
+  });
 
-    return next();
+  app.get('/api/categories', async (req, res, next) => {
+    if (mongoReady) {
+      return next();
+    }
+
+    try {
+      const categories = (await fetchWooCategories()).map((category) => ({
+        ...createCategoryDocument(category),
+        image: category.image
+          ? {
+              id: category.image.id || category.id,
+              src: category.image.src,
+              alt: category.image.alt || '',
+            }
+          : undefined,
+      }));
+
+      res.set('Cache-Control', 'public, max-age=3600');
+      res.json({
+        success: true,
+        data: categories,
+        source: 'woocommerce',
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      res.status(503).json({
+        success: false,
+        error: 'Unable to load categories',
+        details: message,
+        mongoError,
+      });
+    }
+  });
+
+  app.get('/api/products/slug/:slug', async (req, res, next) => {
+    if (mongoReady) {
+      return next();
+    }
+
+    try {
+      const params = new URLSearchParams({
+        slug: req.params.slug,
+        per_page: '1',
+        status: 'publish',
+      });
+
+      const { items } = await fetchWooProducts(params);
+      const product = items[0];
+
+      if (!product) {
+        return res.status(404).json({ success: false, error: 'Product not found' });
+      }
+
+      res.set('Cache-Control', 'public, max-age=300');
+      res.json({
+        success: true,
+        data: createProductDocument(product),
+        source: 'woocommerce',
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      res.status(503).json({
+        success: false,
+        error: 'Unable to load product',
+        details: message,
+        mongoError,
+      });
+    }
   });
 
   // Start server immediately so Hostinger sees the app as healthy even while MongoDB connects.
