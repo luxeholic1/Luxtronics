@@ -26,8 +26,10 @@ let frontendPathResolved = null;
 
 function resolveClientDistPath() {
   const candidates = [
+    path.join(__dirname, 'frontend-build'),
     path.join(__dirname, 'dist'),
     path.join(__dirname, 'build'),
+    path.join(process.cwd(), 'frontend-build'),
     path.join(process.cwd(), 'dist'),
     path.join(process.cwd(), 'build'),
   ];
