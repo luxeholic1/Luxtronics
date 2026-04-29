@@ -21,6 +21,8 @@ const corsOrigins = (process.env.CORS_ORIGIN || '*')
   .split(',')
   .map((origin) => origin.trim())
   .filter(Boolean);
+let frontendBuildError = null;
+let frontendPathResolved = null;
 
 function resolveClientDistPath() {
   const candidates = [
@@ -38,6 +40,7 @@ function ensureFrontendBuild() {
   let clientPath = resolveClientDistPath();
 
   if (clientPath) {
+    frontendPathResolved = clientPath;
     return clientPath;
   }
 
@@ -49,16 +52,31 @@ function ensureFrontendBuild() {
   });
 
   if (buildResult.status !== 0) {
-    console.error('❌ Frontend build failed at startup');
-    return null;
+    console.error('❌ npm run build failed, trying direct Vite build...');
+
+    const viteCli = path.join(__dirname, 'node_modules', 'vite', 'bin', 'vite.js');
+    const viteFallback = spawnSync(process.execPath, [viteCli, 'build', '--config', path.join(__dirname, 'vite.config.ts')], {
+      cwd: __dirname,
+      env: process.env,
+      stdio: 'inherit',
+    });
+
+    if (viteFallback.status !== 0) {
+      frontendBuildError = 'Both npm build and direct Vite build failed';
+      console.error('❌ Frontend build failed at startup');
+      return null;
+    }
   }
 
   clientPath = resolveClientDistPath();
   if (!clientPath) {
+    frontendBuildError = 'Build command completed but dist/build index.html not found';
     console.error('❌ Build command finished but dist/build still missing');
     return null;
   }
 
+  frontendPathResolved = clientPath;
+  frontendBuildError = null;
   console.log('✅ Frontend build generated at:', clientPath);
   return clientPath;
 }
@@ -180,6 +198,8 @@ app.get('/api/status', (_req, res) => {
     status: 'ready',
     mongoReady: false,
     fallback: 'woocommerce',
+    frontendBuildPath: frontendPathResolved,
+    frontendBuildError,
   });
 });
 
@@ -297,7 +317,12 @@ if (clientDistPath) {
         <body style="font-family:system-ui,sans-serif;padding:32px">
           <h1>Luxtronics backend is running</h1>
           <p>Frontend build not found yet.</p>
+          <p>Build path: <code>${frontendPathResolved || 'not resolved'}</code></p>
+          <p>Build error: <code>${frontendBuildError || 'none'}</code></p>
+          <p>Working directory: <code>${process.cwd()}</code></p>
+          <p>Server directory: <code>${__dirname}</code></p>
           <p>Health check: <a href="/health">/health</a></p>
+          <p>Status: <a href="/api/status">/api/status</a></p>
         </body>
       </html>
     `);
