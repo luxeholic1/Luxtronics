@@ -30,21 +30,13 @@ import NotFound from "./pages/NotFound.tsx";
 const queryClient = new QueryClient();
 
 const App = () => {
-  const [showSplash, setShowSplash] = useState(false); // Temporarily disabled
-
-  const handleSplashEnter = (country: CountryInfo) => {
-    sessionStorage.setItem("lux_country", JSON.stringify(country));
-    setShowSplash(false);
-  };
-
   return (
     <QueryClientProvider client={queryClient}>
       <CurrencyProvider>
         <TooltipProvider>
           <Toaster />
           <Sonner />
-          {showSplash && <SplashScreen onEnter={handleSplashEnter} />}
-        <BrowserRouter>
+          <BrowserRouter>
           <Routes>
             <Route path="/" element={<Index />} />
             <Route path="/shop" element={<Shop />} />
