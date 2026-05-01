@@ -39,10 +39,10 @@ export const CurrencyProvider = ({ children }: { children: ReactNode }) => {
       const saved = sessionStorage.getItem("lux_country");
       if (saved) {
         const parsed = JSON.parse(saved);
-        return countries.find((c) => c.code === parsed.code) ?? countries[0];
+        return countries.find((c) => c.code === parsed.code) ?? countries[2]; // Default to India
       }
     } catch {}
-    return countries[0];
+    return countries[2]; // Default to India
   });
 
   const setCountry = (c: CountryInfo) => {
@@ -50,13 +50,12 @@ export const CurrencyProvider = ({ children }: { children: ReactNode }) => {
     setCountryState(c);
   };
 
-  const formatPrice = (usdPrice: number): string => {
-    const converted = usdPrice * country.exchangeRate;
+  const formatPrice = (inrPrice: number): string => {
+    // Convert INR to USD first, then to target currency
+    const usdPrice = inrPrice / countries[2].exchangeRate; // INR to USD
+    const converted = usdPrice * country.exchangeRate; // USD to target
     // JPY and KRW don't use decimals
     const noDecimals = ["JPY", "KRW"].includes(country.currency);
-    const formatted = noDecimals
-      ? Math.round(converted).toLocaleString()
-      : converted.toFixed(2).replace(/\.00$/, "").replace(/(\.\d)$/, "$10");
     return `${country.currencySymbol}${Number(noDecimals ? Math.round(converted) : converted.toFixed(2)).toLocaleString()}`;
   };
 

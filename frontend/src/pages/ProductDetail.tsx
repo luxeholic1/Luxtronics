@@ -17,6 +17,8 @@ const ProductDetail = () => {
   const [product, setProduct] = useState<Product | null>(fallbackProduct || null);
   const [relatedProducts, setRelatedProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(!fallbackProduct);
+  const [selectedVariation, setSelectedVariation] = useState<Product['variations']?.[0] | null>(null);
+  const [selectedAttributes, setSelectedAttributes] = useState<Record<string, string>>({});
 
   useEffect(() => {
     let mounted = true;
@@ -41,6 +43,17 @@ const ProductDetail = () => {
 
         setProduct(resolvedProduct);
         setRelatedProducts(resolvedRelated.length > 0 ? resolvedRelated : products.filter((item) => item.slug !== slug).slice(0, 4));
+
+        // Initialize selected variation if product has variations
+        if (resolvedProduct?.variations && resolvedProduct.variations.length > 0) {
+          setSelectedVariation(resolvedProduct.variations[0]);
+          // Initialize selected attributes
+          const initialAttrs: Record<string, string> = {};
+          resolvedProduct.variations[0].attributes.forEach(attr => {
+            initialAttrs[attr.name] = attr.option;
+          });
+          setSelectedAttributes(initialAttrs);
+        }
       } catch {
         if (!mounted) {
           return;
@@ -61,6 +74,29 @@ const ProductDetail = () => {
       mounted = false;
     };
   }, [slug]);
+
+  // Update selected variation when attributes change
+  useEffect(() => {
+    if (product?.variations) {
+      const matchingVariation = product.variations.find(variation =>
+        variation.attributes.every(attr =>
+          selectedAttributes[attr.name] === attr.option
+        )
+      );
+      setSelectedVariation(matchingVariation || null);
+    }
+  }, [selectedAttributes, product]);
+
+  const handleAttributeChange = (attributeName: string, option: string) => {
+    setSelectedAttributes(prev => ({
+      ...prev,
+      [attributeName]: option
+    }));
+  };
+
+  const currentPrice = selectedVariation?.price ?? product?.price ?? 0;
+  const currentOldPrice = selectedVariation?.oldPrice ?? product?.oldPrice;
+  const currentImage = selectedVariation?.image ?? product?.image;
 
   const related = useMemo(() => relatedProducts, [relatedProducts]);
 
@@ -97,7 +133,7 @@ const ProductDetail = () => {
           <div className="relative aspect-square rounded-3xl bg-gradient-card border border-border flex items-center justify-center overflow-hidden">
             <div className="absolute inset-0 bg-gradient-radial opacity-60" />
             <img
-              src={product.image}
+              src={currentImage}
               alt={product.name}
               width={800}
               height={800}
@@ -131,20 +167,54 @@ const ProductDetail = () => {
               dangerouslySetInnerHTML={{ __html: sanitizeHtml(product.description) }}
             />
 
+            {product.variations && product.variations.length > 0 && (
+              <div className="mt-6 space-y-4">
+                {Object.keys(selectedAttributes).map(attributeName => {
+                  const uniqueOptions = Array.from(
+                    new Set(
+                      product.variations
+                        ?.filter(v => v.attributes.some(a => a.name === attributeName))
+                        .map(v => v.attributes.find(a => a.name === attributeName)?.option)
+                        .filter(Boolean)
+                    )
+                  );
+
+                  return (
+                    <div key={attributeName} className="space-y-2">
+                      <label className="text-sm font-medium text-foreground">
+                        {attributeName}
+                      </label>
+                      <select
+                        value={selectedAttributes[attributeName] || ''}
+                        onChange={(e) => handleAttributeChange(attributeName, e.target.value)}
+                        className="w-full px-3 py-2 border border-border rounded-lg bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+                      >
+                        {uniqueOptions.map(option => (
+                          <option key={option} value={option}>
+                            {option}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
             <div className="flex items-baseline gap-3 mt-8">
               <span className="font-display font-bold text-5xl text-gradient">
-                {formatPrice(product.price)}
+                {formatPrice(currentPrice)}
               </span>
-              {product.oldPrice && (
+              {currentOldPrice && (
                 <span className="text-xl text-muted-foreground line-through">
-                  {formatPrice(product.oldPrice)}
+                  {formatPrice(currentOldPrice)}
                 </span>
               )}
             </div>
 
             <div className="mt-8 flex flex-col sm:flex-row gap-3">
               <button 
-                onClick={() => navigate("/checkout", { state: { product } })}
+                onClick={() => navigate("/checkout", { state: { product: { ...product, price: currentPrice, oldPrice: currentOldPrice, image: currentImage, selectedVariation } } })}
                 className="flex-1 inline-flex items-center justify-center gap-2 rounded-full bg-gradient-brand px-7 py-4 text-sm font-semibold text-primary-foreground shadow-glow hover:shadow-glow-pink transition-all hover:scale-[1.02]"
               >
                 <ShoppingBag className="h-4 w-4" />

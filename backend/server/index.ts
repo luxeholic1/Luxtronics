@@ -117,6 +117,7 @@ export async function setupServer(config: ServerConfig = {}): Promise<Express> {
   let mongoReady = false;
   let mongoError: string | null = null;
   let db: any = null;
+  let productService: any = null;
 
   app.get('/api/status', (req, res) => {
     res.json({
@@ -128,11 +129,45 @@ export async function setupServer(config: ServerConfig = {}): Promise<Express> {
     });
   });
 
-  app.get('/api/products', async (req, res, next) => {
-    if (mongoReady) {
-      return next();
-    }
+  app.get('/api/products', async (req, res) => {
+    if (mongoReady && productService) {
+      try {
+        const page = parseInt(req.query.page as string) || 1;
+        const perPage = parseInt(req.query.per_page as string) || 50;
+        const category = req.query.category as string;
 
+        let result;
+
+        if (category) {
+          result = await productService.getProductsByCategory(category, page, perPage);
+        } else {
+          result = await productService.getProducts(page, perPage);
+        }
+
+        // Set cache headers
+        res.set('Cache-Control', 'public, max-age=3600');
+
+        res.json({
+          success: true,
+          data: result.products,
+          pagination: {
+            page,
+            perPage,
+            total: result.total,
+            totalPages: Math.ceil(result.total / perPage),
+          },
+        });
+      } catch (error) {
+        console.error('Error fetching products from MongoDB:', error);
+        // Fallback to WooCommerce
+        return fallbackToWooCommerce(req, res);
+      }
+    } else {
+      return fallbackToWooCommerce(req, res);
+    }
+  });
+
+  async function fallbackToWooCommerce(req: any, res: any) {
     try {
       const page = parseInt(req.query.page as string) || 1;
       const perPage = parseInt(req.query.per_page as string) || 50;
@@ -172,7 +207,7 @@ export async function setupServer(config: ServerConfig = {}): Promise<Express> {
         mongoError,
       });
     }
-  });
+  }
 
   app.get('/api/categories', async (req, res, next) => {
     if (mongoReady) {
@@ -262,6 +297,7 @@ export async function setupServer(config: ServerConfig = {}): Promise<Express> {
       // Register API routes once the database is available.
       const productRoutes = createProductRoutes(db);
       const userRoutes = createUserRoutes(db);
+      productService = new (await import('./services/product-service')).ProductService(db);
       app.use('/api', productRoutes);
       app.use('/api', userRoutes);
     } catch (error) {

@@ -61,7 +61,20 @@ export class WooCommerceSync {
           if (products.length === 0) break;
 
           // Convert and save to MongoDB
-          const mongoProducts = products.map(createProductDocument);
+          const mongoProducts = [];
+          for (const product of products) {
+            let variations: any[] = [];
+            if (product.type === 'variable') {
+              try {
+                variations = await this.fetchVariationsFromWooCommerce(product.id);
+                console.log(`Fetched ${variations.length} variations for product ${product.id}`);
+              } catch (error) {
+                console.error(`Failed to fetch variations for product ${product.id}:`, error);
+                // Continue without variations
+              }
+            }
+            mongoProducts.push(createProductDocument(product, variations));
+          }
           const savedCount = await this.productService.saveProducts(mongoProducts);
 
           synced += savedCount;
@@ -305,6 +318,36 @@ export class WooCommerceSync {
 
     if (!response.ok) {
       throw new Error('Failed to fetch modified products');
+    }
+
+    return response.json();
+  }
+
+  /**
+   * Fetch variations for a variable product from WooCommerce
+   */
+  private async fetchVariationsFromWooCommerce(productId: number): Promise<any[]> {
+    const storeUrl = process.env.VITE_WOOCOMMERCE_URL;
+    const consumerKey = process.env.VITE_WOOCOMMERCE_KEY;
+    const consumerSecret = process.env.VITE_WOOCOMMERCE_SECRET;
+
+    if (!storeUrl || !consumerKey || !consumerSecret) {
+      throw new Error('WooCommerce credentials not configured');
+    }
+
+    const url = `${storeUrl}/wp-json/wc/v3/products/${productId}/variations?per_page=100`;
+    const auth = btoa(`${consumerKey}:${consumerSecret}`);
+
+    const response = await fetch(url, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Basic ${auth}`,
+        'Content-Type': 'application/json',
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to fetch variations for product ${productId}: ${response.statusText}`);
     }
 
     return response.json();

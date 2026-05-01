@@ -30,6 +30,20 @@ export interface StoreProduct {
   rating: number;
   reviewCount: number;
   stockStatus: 'instock' | 'outofstock' | 'onbackorder';
+  variations?: Array<{
+    id: number;
+    sku?: string;
+    price: number;
+    salePrice?: number;
+    regularPrice: number;
+    stockStatus: 'instock' | 'outofstock' | 'onbackorder';
+    stock?: number;
+    attributes: Array<{
+      name: string;
+      option: string;
+    }>;
+    image?: StoreImage;
+  }>;
 }
 
 interface ApiResponse<T> {
@@ -95,5 +109,14 @@ export function mapStoreProductToLocalProduct(product: StoreProduct): Product {
     reviews: product.reviewCount,
     description: product.description || product.shortDescription || '',
     badge: originalPrice > price ? '-20%' : undefined,
+    variations: product.variations?.map((variation) => ({
+      id: variation.id.toString(),
+      sku: variation.sku,
+      price: Math.round(variation.salePrice ?? variation.price),
+      oldPrice: variation.regularPrice > (variation.salePrice ?? variation.price) ? Math.round(variation.regularPrice) : undefined,
+      attributes: variation.attributes,
+      image: variation.image?.src,
+      stockStatus: variation.stockStatus,
+    })),
   };
 }

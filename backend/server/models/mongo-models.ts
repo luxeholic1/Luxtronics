@@ -40,6 +40,24 @@ export interface MongoProduct {
     name: string;
     value: string;
   }>;
+  variations?: Array<{
+    id: number;
+    sku?: string;
+    price: number;
+    salePrice?: number;
+    regularPrice: number;
+    stockStatus: 'instock' | 'outofstock' | 'onbackorder';
+    stock?: number;
+    attributes: Array<{
+      name: string;
+      option: string;
+    }>;
+    image?: {
+      id: number;
+      src: string;
+      alt: string;
+    };
+  }>;
   
   // Metadata
   syncedAt: Date;
@@ -139,7 +157,7 @@ export interface UserSession {
 /**
  * Create Product Document from WooCommerce data
  */
-export function createProductDocument(wooProduct: any): MongoProduct {
+export function createProductDocument(wooProduct: any, variations?: any[]): MongoProduct {
   return {
     id: wooProduct.id,
     slug: wooProduct.slug,
@@ -172,6 +190,24 @@ export function createProductDocument(wooProduct: any): MongoProduct {
     attributes: wooProduct.attributes?.map((attr: any) => ({
       name: attr.name,
       value: attr.options ? attr.options[0] : '',
+    })),
+    variations: variations?.map((variation: any) => ({
+      id: variation.id,
+      sku: variation.sku,
+      price: parseFloat(variation.price || 0),
+      salePrice: variation.sale_price ? parseFloat(variation.sale_price) : undefined,
+      regularPrice: parseFloat(variation.regular_price || variation.price || 0),
+      stockStatus: variation.stock_status || 'instock',
+      stock: variation.stock_quantity,
+      attributes: variation.attributes?.map((attr: any) => ({
+        name: attr.name,
+        option: attr.option,
+      })) || [],
+      image: variation.image ? {
+        id: variation.image.id,
+        src: variation.image.src,
+        alt: variation.image.alt || '',
+      } : undefined,
     })),
     syncedAt: new Date(),
     updatedAt: new Date(),

@@ -19,6 +19,18 @@ export type Product = {
   reviews: number;
   badge?: "New" | "Hot" | "-20%";
   description: string;
+  variations?: Array<{
+    id: string;
+    sku?: string;
+    price: number;
+    oldPrice?: number;
+    attributes: Array<{
+      name: string;
+      option: string;
+    }>;
+    image?: string;
+    stockStatus: 'instock' | 'outofstock' | 'onbackorder';
+  }>;
 };
 
 export const categories = [

@@ -30,9 +30,7 @@ import NotFound from "./pages/NotFound.tsx";
 const queryClient = new QueryClient();
 
 const App = () => {
-  const [showSplash, setShowSplash] = useState(
-    () => !sessionStorage.getItem("lux_country")
-  );
+  const [showSplash, setShowSplash] = useState(false); // Temporarily disabled
 
   const handleSplashEnter = (country: CountryInfo) => {
     sessionStorage.setItem("lux_country", JSON.stringify(country));
