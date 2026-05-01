@@ -243,11 +243,34 @@ export async function setupServer(config: ServerConfig = {}): Promise<Express> {
     }
   });
 
-  app.get('/api/products/slug/:slug', async (req, res, next) => {
-    if (mongoReady) {
-      return next();
-    }
+  app.get('/api/products/slug/:slug', async (req, res) => {
+    if (mongoReady && productService) {
+      try {
+        const product = await productService.getProductBySlug(req.params.slug);
 
+        if (!product) {
+          return res.status(404).json({
+            success: false,
+            error: 'Product not found',
+          });
+        }
+
+        res.set('Cache-Control', 'public, max-age=3600');
+        res.json({
+          success: true,
+          data: product,
+        });
+      } catch (error) {
+        console.error('Error fetching product by slug from MongoDB:', error);
+        // Fallback to WooCommerce
+        return fallbackToWooCommerceSlug(req, res);
+      }
+    } else {
+      return fallbackToWooCommerceSlug(req, res);
+    }
+  });
+
+  async function fallbackToWooCommerceSlug(req: any, res: any) {
     try {
       const params = new URLSearchParams({
         slug: req.params.slug,
@@ -277,7 +300,7 @@ export async function setupServer(config: ServerConfig = {}): Promise<Express> {
         mongoError,
       });
     }
-  });
+  }
 
   // Start server immediately so Hostinger sees the app as healthy even while MongoDB connects.
   const server = app.listen(port, () => {
