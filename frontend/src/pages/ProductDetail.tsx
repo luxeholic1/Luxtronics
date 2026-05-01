@@ -169,7 +169,11 @@ const ProductDetail = () => {
 
             {product.variations && product.variations.length > 0 && (
               <div className="mt-6 space-y-4">
-                {Object.keys(selectedAttributes).map(attributeName => {
+                {Array.from(
+                  new Set(
+                    product.variations.flatMap(v => v.attributes.map(a => a.name))
+                  )
+                ).map(attributeName => {
                   const uniqueOptions = Array.from(
                     new Set(
                       product.variations
@@ -189,6 +193,7 @@ const ProductDetail = () => {
                         onChange={(e) => handleAttributeChange(attributeName, e.target.value)}
                         className="w-full px-3 py-2 border border-border rounded-lg bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
                       >
+                        <option value="">Select {attributeName}</option>
                         {uniqueOptions.map(option => (
                           <option key={option} value={option}>
                             {option}
