@@ -8,5 +8,52 @@
       "source": "/(.*)",
       "destination": "/index.html"
     }
+  ],
+  "headers": [
+    {
+      "source": "/(.*)",
+      "headers": [
+        {
+          "key": "X-Frame-Options",
+          "value": "DENY"
+        },
+        {
+          "key": "X-Content-Type-Options",
+          "value": "nosniff"
+        },
+        {
+          "key": "Referrer-Policy",
+          "value": "strict-origin-when-cross-origin"
+        }
+      ]
+    }
+  ],
+  "redirects": [
+    {
+      "source": "/luxtronics.au",
+      "destination": "https://luxtronics.com.au",
+      "permanent": true
+    },
+    {
+      "source": "/luxtronics.nz",
+      "destination": "https://luxtronics.co.nz",
+      "permanent": true
+    },
+    {
+      "source": "/luxtronics.in.au",
+      "destination": "https://luxtronics.in.au",
+      "permanent": true
+    },
+    {
+      "source": "/luxtronics.in.nz",
+      "destination": "https://luxtronics.in.nz",
+      "permanent": true
+    }
+  ],
+  "rewrites": [
+    {
+      "source": "/api/:path*",
+      "destination": "https://luxtronics-backend.onrender.com/api/:path*"
+    }
   ]
 }

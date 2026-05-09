@@ -48,6 +48,8 @@
 ### Backend Features
 - 🗄️ **MongoDB Caching** - 10-50x faster than WooCommerce API
 - 🔗 **WooCommerce Sync** - Full and incremental sync
+- 🌐 **Multi-Domain Support** - Separate WooCommerce stores per domain
+- 👨‍💼 **Admin Dashboard** - Product management with CRUD operations
 - 📊 **Advanced Queries** - Text search, filtering, sorting
 - 🔐 **API Security** - Token-based authentication
 - 📈 **Batch Processing** - Efficient bulk operations
@@ -399,6 +401,83 @@ That's it! Your e-commerce site is running! 🎉
 
 ---
 
+## 👨‍💼 Admin Dashboard
+
+The platform includes a comprehensive admin dashboard for managing products across multiple WooCommerce stores.
+
+### Features
+- 📊 **Dashboard Overview** - Quick access to key management areas
+- 📦 **Product Management** - View, edit, create, and delete products
+- 🔄 **Real-time Updates** - Changes sync directly with WooCommerce
+- 🌐 **Multi-Domain Support** - Manage products per domain/store
+
+### Accessing Admin Dashboard
+
+1. Navigate to `/admin` in your browser
+2. Access product management at `/admin/products`
+3. Edit products directly in the interface
+
+### Admin API Endpoints
+
+```bash
+# Get products (admin view)
+GET /api/woo/products
+
+# Create product
+POST /api/woo/products
+
+# Update product
+PUT /api/woo/products/:id
+
+# Delete product
+DELETE /api/woo/products/:id
+```
+
+---
+
+## 🌐 Multi-Domain Setup
+
+The platform supports multiple WooCommerce stores, one per domain, enabling region-specific or brand-specific e-commerce sites.
+
+### Supported Domains
+- `luxtronics.com` - Main US store
+- `luxtronics.com.au` - Australian store
+- `luxtronics.co.nz` - New Zealand store
+
+### Environment Configuration
+
+Add domain-specific credentials to your `.env` file:
+
+```bash
+# US Store (luxtronics.com)
+VITE_WOOCOMMERCE_URL=https://luxtronics.com
+VITE_WOOCOMMERCE_KEY=ck_us_key
+VITE_WOOCOMMERCE_SECRET=cs_us_secret
+
+# Australian Store (luxtronics.com.au)
+WOOCOMMERCE_URL_AU=https://luxtronics.com.au
+WOOCOMMERCE_KEY_AU=ck_au_key
+WOOCOMMERCE_SECRET_AU=cs_au_secret
+
+# New Zealand Store (luxtronics.co.nz)
+WOOCOMMERCE_URL_NZ=https://luxtronics.co.nz
+WOOCOMMERCE_KEY_NZ=ck_nz_key
+WOOCOMMERCE_SECRET_NZ=cs_nz_secret
+```
+
+### How It Works
+
+- The backend automatically detects the request domain
+- Routes requests to the appropriate WooCommerce store
+- Admin operations work per-domain
+- Products are managed separately per store
+
+### Deployment
+
+Deploy the same codebase to multiple domains using the Hostinger multi-domain setup (see `HOSTINGER_MULTIDOMAIN.md`).
+
+---
+
 ## 📚 Complete Setup Guide
 
 ### Detailed WooCommerce Setup
@@ -583,6 +662,86 @@ npm run build
 npm run build
 # Push dist/ to gh-pages branch
 ```
+
+### Multi-Domain Deployment
+
+**Supported Domains:**
+- 🇺🇸 `luxtronics.com` - US (default)
+- 🇦🇺 `luxtronics.com.au` - Australia
+- 🇳🇿 `luxtronics.co.nz` - New Zealand
+- 🇮🇳 `luxtronics.in` - India
+- 🇦🇺🇮🇳 `luxtronics.in.au` - India-Australia
+- 🇳🇿🇮🇳 `luxtronics.in.nz` - India-New Zealand
+
+**How Multi-Domain Works with WooCommerce:**
+- **Single WooCommerce Store**: All products come from one source WooCommerce store
+- **Domain-Based Currency**: Frontend automatically detects domain and converts prices
+- **Same Product Catalog**: No need to duplicate products across domains
+- **Geo Redirects**: Users can be automatically redirected to regional domains
+
+**Deploy to Specific Domain:**
+
+**Vercel Deployment (Cloud):**
+```bash
+# Deploy to Australian domain on Vercel
+./scripts/deploy-multidomain.sh luxtronics.com.au vercel
+
+# Deploy to New Zealand domain on Vercel
+./scripts/deploy-multidomain.sh luxtronics.co.nz vercel
+```
+
+**Hostinger Deployment (FTP):**
+```bash
+# Deploy to Australian domain on Hostinger
+./scripts/deploy-multidomain.sh luxtronics.com.au hostinger
+
+# Deploy to New Zealand domain on Hostinger
+./scripts/deploy-multidomain.sh luxtronics.co.nz hostinger
+
+# Deploy to Indian domain on Hostinger
+./scripts/deploy-multidomain.sh luxtronics.in hostinger
+```
+
+**Hostinger Multi-Domain Setup:**
+1. **Separate Hosting Accounts** (Recommended):
+   - Create separate Hostinger accounts for each domain
+   - Configure FTP credentials in `.env.local` (see `.env.example`)
+   - Each domain gets its own `/public_html` directory
+
+2. **Addon Domains** (Alternative):
+   - Use one Hostinger account with addon domains
+   - Configure different `FTP_REMOTE_DIR` for each domain
+   - Example: `/public_html`, `/public_html/au`, `/public_html/nz`
+
+**Hostinger Multi-Domain Setup:**
+- See **[HOSTINGER_MULTIDOMAIN.md](HOSTINGER_MULTIDOMAIN.md)** for detailed Hostinger configuration
+- Supports both separate hosting accounts and addon domains
+- Automatic FTP deployment to multiple Hostinger accounts
+
+**Quick Hostinger FTP Setup:**
+```bash
+# Interactive setup for FTP credentials
+./scripts/setup-hostinger-ftp.sh
+```
+
+### Geo-Based Redirects (Optional)
+
+**Setup Geo-Redirects from Main Domain:**
+```bash
+# Run the geo-redirects setup script
+./scripts/setup-geo-redirects.sh
+
+# This creates middleware for automatic redirects:
+# luxtronics.com (AU visitors) → luxtronics.com.au
+# luxtronics.com (NZ visitors) → luxtronics.co.nz
+# luxtronics.com (IN visitors) → luxtronics.in
+```
+
+**Benefits:**
+- Users automatically land on their regional site
+- Better user experience with local currency
+- SEO benefits for regional domains
+- Single WooCommerce store powers all regions
 
 ### Backend Deployment
 

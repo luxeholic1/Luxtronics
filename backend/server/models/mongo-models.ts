@@ -39,6 +39,7 @@ export interface MongoProduct {
   attributes?: Array<{
     name: string;
     value: string;
+    options?: string[];
   }>;
   variations?: Array<{
     id: number;
@@ -189,7 +190,8 @@ export function createProductDocument(wooProduct: any, variations?: any[]): Mong
       : undefined,
     attributes: wooProduct.attributes?.map((attr: any) => ({
       name: attr.name,
-      value: attr.options ? attr.options[0] : '',
+      value: Array.isArray(attr.options) ? attr.options.join(' | ') : (attr.options || ''),
+      options: Array.isArray(attr.options) ? attr.options : [],
     })),
     variations: variations?.map((variation: any) => ({
       id: variation.id,

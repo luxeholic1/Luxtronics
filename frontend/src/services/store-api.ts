@@ -13,6 +13,8 @@ export interface StoreCategory {
   description?: string;
   image?: StoreImage;
   count: number;
+  productCount?: number;
+  sampleImage?: string | null;
 }
 
 export interface StoreProduct {
@@ -82,14 +84,25 @@ export async function fetchStoreProductBySlug(slug: string): Promise<StoreProduc
   }
 }
 
-export async function fetchStoreCategories(): Promise<StoreCategory[]> {
-  const response = await fetchJson<ApiResponse<StoreCategory[]>>('/api/categories');
+export async function fetchStoreCategories(page = 1, perPage = 20): Promise<{
+  data: StoreCategory[];
+  pagination: { page: number; perPage: number; total: number; totalPages: number };
+}> {
+  const response = await fetchJson<{
+    success: boolean;
+    data: StoreCategory[];
+    pagination?: { page: number; perPage: number; total: number; totalPages: number };
+    error?: string;
+  }>(`/api/categories?page=${page}&per_page=${perPage}`);
 
   if (!response.success) {
     throw new Error(response.error || 'Failed to load categories');
   }
 
-  return response.data;
+  return {
+    data: response.data,
+    pagination: response.pagination || { page, perPage, total: response.data.length, totalPages: 1 },
+  };
 }
 
 export function mapStoreProductToLocalProduct(product: StoreProduct): Product {

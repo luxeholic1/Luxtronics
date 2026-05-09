@@ -185,7 +185,20 @@ export class WooCommerceSync {
     const errors: string[] = [];
 
     try {
-      const mongoProducts = products.map(createProductDocument);
+      const mongoProducts = await Promise.all(
+        products.map(async (product: any) => {
+          let variations: any[] = [];
+          if (product.type === 'variable') {
+            try {
+              variations = await this.fetchVariationsFromWooCommerce(product.id);
+              console.log(`Fetched ${variations.length} variations for product ${product.id}`);
+            } catch {
+              // Continue without variations
+            }
+          }
+          return createProductDocument(product, variations);
+        })
+      );
       synced = await this.productService.saveProducts(mongoProducts);
 
       console.log(`✅ Incremental sync: ${synced} products updated`);

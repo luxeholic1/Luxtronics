@@ -1,4 +1,12 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from "react";
+import { getCountryFromDomain } from "@/lib/domain-config";
+
+// Country code to currency mapping for IP geolocation
+const COUNTRY_TO_CURRENCY: Record<string, string> = {
+  'US': 'US', 'CA': 'CA', 'GB': 'GB', 'AU': 'AU', 'NZ': 'NZ',
+  'IN': 'IN', 'DE': 'DE', 'FR': 'FR', 'JP': 'JP', 'KR': 'KR',
+  'AE': 'AE', 'SG': 'SG', 'BR': 'BR'
+};
 
 export type CountryInfo = {
   code: string;
@@ -17,7 +25,8 @@ export const countries: CountryInfo[] = [
   { code: "DE", name: "Germany", flag: "🇩🇪", currency: "EUR", currencySymbol: "€", exchangeRate: 0.92, domain: ".de" },
   { code: "FR", name: "France", flag: "🇫🇷", currency: "EUR", currencySymbol: "€", exchangeRate: 0.92, domain: ".fr" },
   { code: "JP", name: "Japan", flag: "🇯🇵", currency: "JPY", currencySymbol: "¥", exchangeRate: 149.5, domain: ".jp" },
-  { code: "AU", name: "Australia", flag: "🇦🇺", currency: "AUD", currencySymbol: "A$", exchangeRate: 1.53, domain: ".au" },
+  { code: "AU", name: "Australia", flag: "🇦🇺", currency: "AUD", currencySymbol: "A$", exchangeRate: 1.53, domain: ".com.au" },
+  { code: "NZ", name: "New Zealand", flag: "🇳🇿", currency: "NZD", currencySymbol: "NZ$", exchangeRate: 1.67, domain: ".co.nz" },
   { code: "CA", name: "Canada", flag: "🇨🇦", currency: "CAD", currencySymbol: "C$", exchangeRate: 1.36, domain: ".ca" },
   { code: "AE", name: "UAE", flag: "🇦🇪", currency: "AED", currencySymbol: "AED", exchangeRate: 3.67, domain: ".ae" },
   { code: "SG", name: "Singapore", flag: "🇸🇬", currency: "SGD", currencySymbol: "S$", exchangeRate: 1.34, domain: ".sg" },
@@ -25,10 +34,23 @@ export const countries: CountryInfo[] = [
   { code: "KR", name: "South Korea", flag: "🇰🇷", currency: "KRW", currencySymbol: "₩", exchangeRate: 1320, domain: ".kr" },
 ];
 
+// Geolocation function using IP-API (free service)
+async function detectUserCountry(): Promise<string | null> {
+  try {
+    const response = await fetch('http://ip-api.com/json/?fields=countryCode');
+    const data = await response.json();
+    return data.countryCode || null;
+  } catch (error) {
+    console.warn('Geolocation failed:', error);
+    return null;
+  }
+}
+
 type CurrencyContextType = {
   country: CountryInfo;
   setCountry: (c: CountryInfo) => void;
   formatPrice: (usdPrice: number) => string;
+  isLoadingLocation: boolean;
 };
 
 const CurrencyContext = createContext<CurrencyContextType | null>(null);
@@ -45,8 +67,60 @@ export const CurrencyProvider = ({ children }: { children: ReactNode }) => {
     return countries[2]; // Default to India
   });
 
+  const [isLoadingLocation, setIsLoadingLocation] = useState(false);
+
+  // Auto-detect location on first visit
+  useEffect(() => {
+    const initializeLocation = async () => {
+      // Check if user has already selected a country manually
+      const hasManualSelection = sessionStorage.getItem("lux_country_manual");
+      if (hasManualSelection) return;
+
+      // Check if we already detected location in this session
+      const hasDetectedLocation = sessionStorage.getItem("lux_location_detected");
+      if (hasDetectedLocation) return;
+
+      setIsLoadingLocation(true);
+      try {
+        // First, try domain-based detection
+        const hostname = window.location.hostname;
+        const domainCountryCode = getCountryFromDomain(hostname);
+
+        if (domainCountryCode) {
+          const detectedCountry = countries.find(c => c.code === domainCountryCode);
+          if (detectedCountry && detectedCountry.code !== country.code) {
+            setCountryState(detectedCountry);
+            sessionStorage.setItem("lux_country", JSON.stringify(detectedCountry));
+            sessionStorage.setItem("lux_location_detected", "true");
+            setIsLoadingLocation(false);
+            return;
+          }
+        }
+
+        // Fallback to IP geolocation
+        const ipCountryCode = await detectUserCountry();
+        if (ipCountryCode) {
+          const detectedCountry = countries.find(c => c.code === ipCountryCode);
+          if (detectedCountry && detectedCountry.code !== country.code) {
+            setCountryState(detectedCountry);
+            sessionStorage.setItem("lux_country", JSON.stringify(detectedCountry));
+          }
+        }
+
+        sessionStorage.setItem("lux_location_detected", "true");
+      } catch (error) {
+        console.warn('Failed to detect location:', error);
+      } finally {
+        setIsLoadingLocation(false);
+      }
+    };
+
+    initializeLocation();
+  }, []);
+
   const setCountry = (c: CountryInfo) => {
     sessionStorage.setItem("lux_country", JSON.stringify(c));
+    sessionStorage.setItem("lux_country_manual", "true"); // Mark as manual selection
     setCountryState(c);
   };
 
@@ -60,7 +134,7 @@ export const CurrencyProvider = ({ children }: { children: ReactNode }) => {
   };
 
   return (
-    <CurrencyContext.Provider value={{ country, setCountry, formatPrice }}>
+    <CurrencyContext.Provider value={{ country, setCountry, formatPrice, isLoadingLocation }}>
       {children}
     </CurrencyContext.Provider>
   );

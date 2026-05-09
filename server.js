@@ -91,7 +91,7 @@ function getWooAuthHeader() {
   return 'Basic ' + Buffer.from(`${consumerKey}:${consumerSecret}`).toString('base64');
 }
 
-function normalizeWooProduct(product) {
+function normalizeWooProduct(product, variations) {
   const regularPrice = parseFloat(product.regular_price || product.price || '0');
   const salePrice = product.sale_price ? parseFloat(product.sale_price) : undefined;
   const price = salePrice ?? parseFloat(product.price || '0');
@@ -115,7 +115,46 @@ function normalizeWooProduct(product) {
     rating: parseFloat(product.average_rating || 0),
     reviewCount: product.rating_count || 0,
     stockStatus: product.stock_status || 'instock',
+    attributes: product.attributes?.map((attr) => ({
+      name: attr.name,
+      value: Array.isArray(attr.options) ? attr.options.join(' | ') : (attr.options || ''),
+      options: Array.isArray(attr.options) ? attr.options : [],
+    })),
+    variations: variations?.map((v) => ({
+      id: v.id,
+      sku: v.sku,
+      price: parseFloat(v.price || 0),
+      salePrice: v.sale_price ? parseFloat(v.sale_price) : undefined,
+      regularPrice: parseFloat(v.regular_price || v.price || 0),
+      stockStatus: v.stock_status || 'instock',
+      stock: v.stock_quantity,
+      attributes: v.attributes?.map((a) => ({
+        name: a.name,
+        option: a.option,
+      })) || [],
+      image: v.image ? {
+        id: v.image.id,
+        src: v.image.src,
+        alt: v.image.alt || '',
+      } : undefined,
+    })),
   };
+}
+
+async function fetchWooVariations(productId) {
+  if (!sourceUrl) return [];
+  try {
+    const response = await fetch(`${sourceUrl}/wp-json/wc/v3/products/${productId}/variations?per_page=100`, {
+      headers: {
+        Authorization: getWooAuthHeader(),
+        'Content-Type': 'application/json',
+      },
+    });
+    if (!response.ok) return [];
+    return response.json();
+  } catch {
+    return [];
+  }
 }
 
 function normalizeWooCategory(category) {
@@ -223,10 +262,21 @@ app.get('/api/products', async (req, res) => {
 
     const { items, total, totalPages } = await fetchWooProducts(params);
 
+    // Fetch variations for variable products in parallel
+    const productsWithVariations = await Promise.all(
+      items.map(async (product) => {
+        let variations = undefined;
+        if (product.type === 'variable') {
+          variations = await fetchWooVariations(product.id);
+        }
+        return normalizeWooProduct(product, variations);
+      })
+    );
+
     res.set('Cache-Control', 'public, max-age=300');
     res.json({
       success: true,
-      data: items.map(normalizeWooProduct),
+      data: productsWithVariations,
       pagination: { page, perPage, total, totalPages },
       source: 'woocommerce',
     });
@@ -251,10 +301,16 @@ app.get('/api/products/slug/:slug', async (req, res) => {
       return res.status(404).json({ success: false, error: 'Product not found' });
     }
 
+    // Fetch variations if this is a variable product
+    let variations = undefined;
+    if (product.type === 'variable') {
+      variations = await fetchWooVariations(product.id);
+    }
+
     res.set('Cache-Control', 'public, max-age=300');
     res.json({
       success: true,
-      data: normalizeWooProduct(product),
+      data: normalizeWooProduct(product, variations),
       source: 'woocommerce',
     });
   } catch (error) {

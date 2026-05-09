@@ -39,6 +39,7 @@ class MongoDBConnection {
       }
 
       console.log('🔗 Connecting to MongoDB...');
+      console.log('📋 Connection URI starts with:', this.uri.substring(0, 20) + '...');
 
       this.client = new MongoClient(this.uri, {
         retryWrites: true,
@@ -46,12 +47,21 @@ class MongoDBConnection {
         journal: true,
         serverSelectionTimeoutMS: 5000,
         socketTimeoutMS: 45000,
+        ssl: true,
+        tls: true,
+        tlsAllowInvalidCertificates: false,
+        tlsAllowInvalidHostnames: false,
+        maxPoolSize: 10,
+        minPoolSize: 5,
       });
 
+      console.log('🔄 Attempting to connect...');
       await this.client.connect();
+      console.log('✅ MongoDB client connected, testing connection...');
 
-      // Verify connection
+      // Verify connection with ping
       await this.client.db('admin').command({ ping: 1 });
+      console.log('✅ MongoDB ping successful!');
 
       this.db = this.client.db(this.dbName);
       this.isConnected = true;

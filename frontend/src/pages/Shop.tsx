@@ -28,8 +28,8 @@ const Shop = () => {
     const load = async () => {
       try {
         setLoading(true);
-        const [categoryData, productData] = await Promise.all([
-          fetchStoreCategories(),
+        const [categoryResult, productData] = await Promise.all([
+          fetchStoreCategories(1, 100), // get all for filter bar
           fetchStoreProducts(),
         ]);
 
@@ -37,7 +37,7 @@ const Shop = () => {
           return;
         }
 
-        setCategories(categoryData);
+        setCategories(categoryResult.data);
         setProducts(productData.map(mapStoreProductToLocalProduct));
         setError(null);
       } catch (loadError) {

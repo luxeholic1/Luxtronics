@@ -93,14 +93,17 @@ export class ProductService {
   }
 
   /**
-   * Get products by category
+   * Get products by category — matches by name OR slug (case-insensitive)
    */
   async getProductsByCategory(
     category: string,
     page: number = 1,
     perPage: number = 50
   ): Promise<{ products: MongoProduct[]; total: number }> {
-    return this.getProducts(page, perPage, { category });
+    const regex = new RegExp(category.replace(/-/g, '[\\s-]'), 'i');
+    return this.getProducts(page, perPage, {
+      $or: [{ category: regex }, { categorySlug: category }],
+    } as any);
   }
 
   /**
@@ -227,6 +230,33 @@ export class ProductService {
       .find({})
       .sort({ name: 1 })
       .toArray() as Promise<MongoCategory[]>;
+  }
+
+  /**
+   * Get categories enriched with live product counts + sample image
+   */
+  async getAllCategoriesWithCount(): Promise<Array<MongoCategory & { productCount: number; sampleImage?: string }>> {
+    const catCollection = this.db.collection(this.CATEGORIES_COLLECTION);
+    const prodCollection = this.db.collection(this.PRODUCTS_COLLECTION);
+
+    const categories = await catCollection.find({}).sort({ name: 1 }).toArray() as MongoCategory[];
+
+    const enriched = await Promise.all(
+      categories.map(async (cat) => {
+        const regex = new RegExp(cat.slug.replace(/-/g, '[\\s-]'), 'i');
+        const [productCount, sampleProduct] = await Promise.all([
+          prodCollection.countDocuments({ $or: [{ category: new RegExp(cat.name, 'i') }, { categorySlug: cat.slug }] }),
+          prodCollection.findOne(
+            { $or: [{ category: new RegExp(cat.name, 'i') }, { categorySlug: cat.slug }] },
+            { projection: { images: 1 } }
+          ) as Promise<any>,
+        ]);
+        const sampleImage = sampleProduct?.images?.[0]?.src || null;
+        return { ...cat, productCount, sampleImage };
+      })
+    );
+
+    return enriched;
   }
 
   /**
