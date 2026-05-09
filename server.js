@@ -6,95 +6,82 @@ import { existsSync } from 'fs';
 import { spawnSync } from 'child_process';
 import { fileURLToPath } from 'url';
 
-dotenv.config({ path: '.env' });
-dotenv.config({ path: '.env.local', override: true });
-
-const app = express();
+// ── Load env — absolute paths so it always works regardless of CWD ────────────
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-const port = parseInt(process.env.PORT || '3001', 10);
+dotenv.config({ path: path.join(__dirname, '.env') });
+dotenv.config({ path: path.join(__dirname, '.env.local'), override: true });
+dotenv.config({ path: path.join(__dirname, '.env.production'), override: true });
 
-const sourceUrl = process.env.VITE_WOOCOMMERCE_URL;
-const consumerKey = process.env.VITE_WOOCOMMERCE_KEY;
-const consumerSecret = process.env.VITE_WOOCOMMERCE_SECRET;
-const corsOrigins = (process.env.CORS_ORIGIN || '*')
-  .split(',')
-  .map((origin) => origin.trim())
-  .filter(Boolean);
-let frontendBuildError = null;
+// ── Read creds at CALL TIME so they're never stale ───────────────────────────
+const wooUrl    = () => process.env.VITE_WOOCOMMERCE_URL    || '';
+const wooKey    = () => process.env.VITE_WOOCOMMERCE_KEY    || '';
+const wooSecret = () => process.env.VITE_WOOCOMMERCE_SECRET || '';
+
+function wooAuth() {
+  const k = wooKey(), s = wooSecret();
+  if (!k || !s) throw new Error('WooCommerce credentials not configured');
+  return 'Basic ' + Buffer.from(`${k}:${s}`).toString('base64');
+}
+
+const app = express();
+const port = parseInt(process.env.PORT || '3001', 10);
+const corsOrigins = (process.env.CORS_ORIGIN || '*').split(',').map(o => o.trim()).filter(Boolean);
+
+// ── Frontend build resolver ──────────────────────────────────────────────────
 let frontendPathResolved = null;
+let frontendBuildError   = null;
 
 function resolveClientDistPath() {
   const candidates = [
-    path.join(__dirname, 'frontend-build'),
     path.join(__dirname, 'dist'),
     path.join(__dirname, 'build'),
-    path.join(process.cwd(), 'frontend-build'),
     path.join(process.cwd(), 'dist'),
     path.join(process.cwd(), 'build'),
+    path.join(__dirname, 'frontend-build'),
+    path.join(process.cwd(), 'frontend-build'),
   ];
-
-  const found = candidates.find((candidate) => existsSync(path.join(candidate, 'index.html')));
-  return found || null;
+  return candidates.find(c => existsSync(path.join(c, 'index.html'))) || null;
 }
 
 function ensureFrontendBuild() {
   let clientPath = resolveClientDistPath();
-
   if (clientPath) {
     frontendPathResolved = clientPath;
+    console.log('✅ Serving frontend from:', clientPath);
     return clientPath;
   }
 
-  console.log('⚠️ Frontend build not found. Running npm run build...');
-  const buildResult = spawnSync('npm', ['run', 'build'], {
-    cwd: process.cwd(),
-    env: process.env,
+  console.log('⚠️  No dist/ found — running npm run build...');
+  const result = spawnSync('npm', ['run', 'build'], {
+    cwd: __dirname,
+    env: { ...process.env, NODE_ENV: 'production' },
     stdio: 'inherit',
   });
 
-  if (buildResult.status !== 0) {
-    console.error('❌ npm run build failed, trying direct Vite build...');
-
-    const viteCli = path.join(__dirname, 'node_modules', 'vite', 'bin', 'vite.js');
-    const viteFallback = spawnSync(process.execPath, [viteCli, 'build', '--config', path.join(__dirname, 'vite.config.ts')], {
-      cwd: __dirname,
-      env: process.env,
-      stdio: 'inherit',
-    });
-
-    if (viteFallback.status !== 0) {
-      frontendBuildError = 'Both npm build and direct Vite build failed';
-      console.error('❌ Frontend build failed at startup');
-      return null;
-    }
+  if (result.status !== 0) {
+    frontendBuildError = 'npm run build failed on server';
+    console.error('❌ Build failed');
+    return null;
   }
 
   clientPath = resolveClientDistPath();
   if (!clientPath) {
-    frontendBuildError = 'Build command completed but dist/build index.html not found';
-    console.error('❌ Build command finished but dist/build still missing');
+    frontendBuildError = 'Build ran but dist/index.html still not found';
+    console.error('❌', frontendBuildError);
     return null;
   }
 
   frontendPathResolved = clientPath;
-  frontendBuildError = null;
-  console.log('✅ Frontend build generated at:', clientPath);
+  console.log('✅ Built & serving from:', clientPath);
   return clientPath;
 }
 
-function getWooAuthHeader() {
-  if (!consumerKey || !consumerSecret) {
-    throw new Error('WooCommerce credentials are not configured');
-  }
-
-  return 'Basic ' + Buffer.from(`${consumerKey}:${consumerSecret}`).toString('base64');
-}
-
+// ── WooCommerce helpers ───────────────────────────────────────────────────────
 function normalizeWooProduct(product, variations) {
   const regularPrice = parseFloat(product.regular_price || product.price || '0');
-  const salePrice = product.sale_price ? parseFloat(product.sale_price) : undefined;
-  const price = salePrice ?? parseFloat(product.price || '0');
+  const salePrice    = product.sale_price ? parseFloat(product.sale_price) : undefined;
+  const price        = salePrice ?? parseFloat(product.price || '0');
 
   return {
     id: product.id,
@@ -104,23 +91,20 @@ function normalizeWooProduct(product, variations) {
     shortDescription: product.short_description || '',
     category: product.categories?.[0]?.name || 'Uncategorized',
     categoryId: product.categories?.[0]?.id,
+    categorySlug: product.categories?.[0]?.slug,
     price,
     salePrice,
     regularPrice,
-    images: (product.images || []).map((image) => ({
-      id: image.id,
-      src: image.src,
-      alt: image.alt || '',
-    })),
+    images: (product.images || []).map(img => ({ id: img.id, src: img.src, alt: img.alt || '' })),
     rating: parseFloat(product.average_rating || 0),
     reviewCount: product.rating_count || 0,
     stockStatus: product.stock_status || 'instock',
-    attributes: product.attributes?.map((attr) => ({
+    attributes: product.attributes?.map(attr => ({
       name: attr.name,
       value: Array.isArray(attr.options) ? attr.options.join(' | ') : (attr.options || ''),
       options: Array.isArray(attr.options) ? attr.options : [],
     })),
-    variations: variations?.map((v) => ({
+    variations: variations?.map(v => ({
       id: v.id,
       sku: v.sku,
       price: parseFloat(v.price || 0),
@@ -128,282 +112,222 @@ function normalizeWooProduct(product, variations) {
       regularPrice: parseFloat(v.regular_price || v.price || 0),
       stockStatus: v.stock_status || 'instock',
       stock: v.stock_quantity,
-      attributes: v.attributes?.map((a) => ({
-        name: a.name,
-        option: a.option,
-      })) || [],
-      image: v.image ? {
-        id: v.image.id,
-        src: v.image.src,
-        alt: v.image.alt || '',
-      } : undefined,
+      attributes: v.attributes?.map(a => ({ name: a.name, option: a.option })) || [],
+      image: v.image ? { id: v.image.id, src: v.image.src, alt: v.image.alt || '' } : undefined,
     })),
   };
 }
 
 async function fetchWooVariations(productId) {
-  if (!sourceUrl) return [];
+  const base = wooUrl();
+  if (!base) return [];
   try {
-    const response = await fetch(`${sourceUrl}/wp-json/wc/v3/products/${productId}/variations?per_page=100`, {
-      headers: {
-        Authorization: getWooAuthHeader(),
-        'Content-Type': 'application/json',
-      },
+    const r = await fetch(`${base}/wp-json/wc/v3/products/${productId}/variations?per_page=100`, {
+      headers: { Authorization: wooAuth(), 'Content-Type': 'application/json' },
     });
-    if (!response.ok) return [];
-    return response.json();
-  } catch {
-    return [];
-  }
+    if (!r.ok) return [];
+    return r.json();
+  } catch { return []; }
 }
 
-function normalizeWooCategory(category) {
-  return {
-    id: category.id,
-    name: category.name,
-    slug: category.slug,
-    description: category.description || '',
-    image: category.image
-      ? {
-          id: category.image.id || category.id,
-          src: category.image.src,
-          alt: category.image.alt || '',
-        }
-      : undefined,
-    count: category.count || 0,
-  };
-}
-
-async function fetchWooProducts(params) {
-  if (!sourceUrl) {
-    throw new Error('WooCommerce URL not configured');
-  }
-
-  const requestUrl = `${sourceUrl}/wp-json/wc/v3/products?${params}`;
-  const response = await fetch(requestUrl, {
-    headers: {
-      Authorization: getWooAuthHeader(),
-      'Content-Type': 'application/json',
-    },
+async function fetchWooRaw(endpoint) {
+  const base = wooUrl();
+  if (!base) throw new Error('WooCommerce URL not configured');
+  const r = await fetch(`${base}/wp-json/wc/v3/${endpoint}`, {
+    headers: { Authorization: wooAuth(), 'Content-Type': 'application/json' },
   });
-
-  if (!response.ok) {
-    const body = await response.text();
-    throw new Error(`WooCommerce API error ${response.status}: ${body}`);
-  }
-
-  return {
-    items: await response.json(),
-    total: parseInt(response.headers.get('X-WP-Total') || '0', 10),
-    totalPages: parseInt(response.headers.get('X-WP-TotalPages') || '0', 10),
-  };
+  if (!r.ok) throw new Error(`WooCommerce ${r.status}: ${await r.text()}`);
+  return { json: await r.json(), headers: r.headers };
 }
 
-async function fetchWooCategories() {
-  if (!sourceUrl) {
-    throw new Error('WooCommerce URL not configured');
-  }
-
-  const response = await fetch(`${sourceUrl}/wp-json/wc/v3/products/categories?per_page=100&hide_empty=true`, {
-    headers: {
-      Authorization: getWooAuthHeader(),
-      'Content-Type': 'application/json',
-    },
-  });
-
-  if (!response.ok) {
-    const body = await response.text();
-    throw new Error(`WooCommerce categories error ${response.status}: ${body}`);
-  }
-
-  return response.json();
-}
-
+// ── Express setup ─────────────────────────────────────────────────────────────
 app.set('trust proxy', 1);
 app.use(express.json({ limit: '1mb' }));
 app.use(express.urlencoded({ extended: true, limit: '1mb' }));
-app.use(
-  cors({
-    origin: corsOrigins.includes('*') ? true : corsOrigins,
-    credentials: true,
-  })
-);
+app.use(cors({ origin: corsOrigins.includes('*') ? true : corsOrigins, credentials: true }));
 
+// ── Routes ────────────────────────────────────────────────────────────────────
 app.get('/health', (_req, res) => {
-  res.json({ status: 'ok', timestamp: new Date().toISOString() });
+  res.json({
+    status: 'ok',
+    timestamp: new Date().toISOString(),
+    wooConfigured: !!(wooUrl() && wooKey() && wooSecret()),
+    frontendPath: frontendPathResolved,
+  });
 });
 
 app.get('/api/status', (_req, res) => {
   res.json({
     success: true,
     status: 'ready',
-    mongoReady: false,
-    fallback: 'woocommerce',
+    source: 'woocommerce',
+    wooConfigured: !!(wooUrl() && wooKey() && wooSecret()),
+    wooUrl: wooUrl() || 'NOT SET',
     frontendBuildPath: frontendPathResolved,
     frontendBuildError,
   });
 });
 
+// GET /api/products
 app.get('/api/products', async (req, res) => {
   try {
-    const page = parseInt(req.query.page || '1', 10) || 1;
+    const page    = parseInt(req.query.page    || '1',  10) || 1;
     const perPage = parseInt(req.query.per_page || '50', 10) || 50;
-    const params = new URLSearchParams({
-      page: String(page),
-      per_page: String(perPage),
-      status: 'publish',
-    });
+    const params  = new URLSearchParams({ page: String(page), per_page: String(perPage), status: 'publish' });
+    if (req.query.category) params.set('category', String(req.query.category));
+    if (req.query.search)   params.set('search',   String(req.query.search));
 
-    const category = req.query.category;
-    const search = req.query.search;
+    const { json: items, headers } = await fetchWooRaw(`products?${params}`);
+    const total      = parseInt(headers.get('X-WP-Total')      || '0', 10);
+    const totalPages = parseInt(headers.get('X-WP-TotalPages') || '0', 10);
 
-    if (category) params.set('category', String(category));
-    if (search) params.set('search', String(search));
-
-    const { items, total, totalPages } = await fetchWooProducts(params);
-
-    // Fetch variations for variable products in parallel
-    const productsWithVariations = await Promise.all(
-      items.map(async (product) => {
-        let variations = undefined;
-        if (product.type === 'variable') {
-          variations = await fetchWooVariations(product.id);
-        }
-        return normalizeWooProduct(product, variations);
+    const data = await Promise.all(
+      items.map(async p => {
+        const vars = p.type === 'variable' ? await fetchWooVariations(p.id) : undefined;
+        return normalizeWooProduct(p, vars);
       })
     );
 
     res.set('Cache-Control', 'public, max-age=300');
-    res.json({
-      success: true,
-      data: productsWithVariations,
-      pagination: { page, perPage, total, totalPages },
-      source: 'woocommerce',
-    });
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    res.status(503).json({ success: false, error: 'Unable to load products', details: message });
+    res.json({ success: true, data, pagination: { page, perPage, total, totalPages }, source: 'woocommerce' });
+  } catch (err) {
+    res.status(503).json({ success: false, error: 'Unable to load products', details: err.message });
   }
 });
 
+// GET /api/products/slug/:slug
 app.get('/api/products/slug/:slug', async (req, res) => {
   try {
-    const params = new URLSearchParams({
-      slug: req.params.slug,
-      per_page: '1',
-      status: 'publish',
-    });
-
-    const { items } = await fetchWooProducts(params);
+    const params = new URLSearchParams({ slug: req.params.slug, per_page: '1', status: 'publish' });
+    const { json: items } = await fetchWooRaw(`products?${params}`);
     const product = items[0];
+    if (!product) return res.status(404).json({ success: false, error: 'Product not found' });
 
-    if (!product) {
-      return res.status(404).json({ success: false, error: 'Product not found' });
-    }
-
-    // Fetch variations if this is a variable product
-    let variations = undefined;
-    if (product.type === 'variable') {
-      variations = await fetchWooVariations(product.id);
-    }
-
+    const variations = product.type === 'variable' ? await fetchWooVariations(product.id) : undefined;
     res.set('Cache-Control', 'public, max-age=300');
-    res.json({
-      success: true,
-      data: normalizeWooProduct(product, variations),
-      source: 'woocommerce',
-    });
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    res.status(503).json({ success: false, error: 'Unable to load product', details: message });
+    res.json({ success: true, data: normalizeWooProduct(product, variations), source: 'woocommerce' });
+  } catch (err) {
+    res.status(503).json({ success: false, error: 'Unable to load product', details: err.message });
   }
 });
 
-app.get('/api/categories', async (_req, res) => {
+// GET /api/products/:id
+app.get('/api/products/:id', async (req, res) => {
+  const id = parseInt(req.params.id);
+  if (isNaN(id)) return res.status(400).json({ success: false, error: 'Invalid product ID' });
   try {
-    const categories = (await fetchWooCategories()).map(normalizeWooCategory);
-    res.set('Cache-Control', 'public, max-age=3600');
-    res.json({ success: true, data: categories, source: 'woocommerce' });
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    res.status(503).json({ success: false, error: 'Unable to load categories', details: message });
+    const { json: product } = await fetchWooRaw(`products/${id}`);
+    const variations = product.type === 'variable' ? await fetchWooVariations(id) : undefined;
+    res.set('Cache-Control', 'public, max-age=300');
+    res.json({ success: true, data: normalizeWooProduct(product, variations), source: 'woocommerce' });
+  } catch (err) {
+    res.status(503).json({ success: false, error: 'Product not found', details: err.message });
   }
 });
 
-app.get('/api/woo/status', async (_req, res) => {
+// GET /api/categories  (with pagination)
+app.get('/api/categories', async (req, res) => {
   try {
-    if (!sourceUrl || !consumerKey || !consumerSecret) {
-      return res.json({
-        connected: false,
-        error: 'WooCommerce credentials missing in environment',
-        sourceUrl: sourceUrl || 'not set',
-      });
-    }
-
-    const response = await fetch(`${sourceUrl}/wp-json/wc/v3/products?per_page=1`, {
-      headers: { Authorization: getWooAuthHeader() },
+    const page    = parseInt(req.query.page    || '1',  10) || 1;
+    const perPage = parseInt(req.query.per_page || '20', 10) || 20;
+    const params  = new URLSearchParams({
+      per_page: String(perPage),
+      page: String(page),
+      hide_empty: 'false',
+      orderby: 'count',
+      order: 'desc',
     });
 
-    res.json({
-      connected: response.ok,
-      status: response.status,
-      sourceUrl,
-      totalProducts: parseInt(response.headers.get('X-WP-Total') || '0', 10),
-    });
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    res.json({ connected: false, error: message, sourceUrl: sourceUrl || 'not set' });
+    const { json: raw, headers } = await fetchWooRaw(`products/categories?${params}`);
+    const total      = parseInt(headers.get('X-WP-Total')      || '0', 10);
+    const totalPages = parseInt(headers.get('X-WP-TotalPages') || '0', 10);
+
+    const data = raw.map(c => ({
+      id: c.id,
+      name: c.name,
+      slug: c.slug,
+      description: c.description || '',
+      count: c.count || 0,
+      productCount: c.count || 0,
+      image: c.image ? { id: c.image.id, src: c.image.src, alt: c.image.alt || '' } : null,
+      sampleImage: c.image?.src || null,
+    }));
+
+    res.set('Cache-Control', 'public, max-age=1800');
+    res.json({ success: true, data, pagination: { page, perPage, total, totalPages }, source: 'woocommerce' });
+  } catch (err) {
+    res.status(503).json({ success: false, error: 'Unable to load categories', details: err.message });
   }
 });
 
+// POST /api/orders
+app.post('/api/orders', async (req, res) => {
+  const { line_items, billing, shipping } = req.body;
+  if (!line_items || !Array.isArray(line_items)) {
+    return res.status(400).json({ success: false, error: 'line_items required' });
+  }
+  try {
+    const base = wooUrl();
+    if (!base) throw new Error('WooCommerce not configured');
+    const orderData = {
+      payment_method: 'cod',
+      payment_method_title: 'Cash on Delivery',
+      set_paid: false,
+      billing: billing || {},
+      shipping: shipping || {},
+      line_items: line_items.map(i => ({ product_id: i.product_id, variation_id: i.variation_id || 0, quantity: i.quantity })),
+      shipping_lines: [{ method_id: 'flat_rate', method_title: 'Flat Rate', total: '0.00' }],
+    };
+    const r = await fetch(`${base}/wp-json/wc/v3/orders`, {
+      method: 'POST',
+      headers: { Authorization: wooAuth(), 'Content-Type': 'application/json' },
+      body: JSON.stringify(orderData),
+    });
+    if (!r.ok) throw new Error(`Order failed: ${r.status} ${await r.text()}`);
+    res.json({ success: true, data: await r.json() });
+  } catch (err) {
+    res.status(500).json({ success: false, error: 'Failed to create order', details: err.message });
+  }
+});
+
+// ── Serve frontend ────────────────────────────────────────────────────────────
 const clientDistPath = ensureFrontendBuild();
 
 if (clientDistPath) {
-  app.use(express.static(clientDistPath));
+  app.use(express.static(clientDistPath, { maxAge: '1d', etag: true }));
   app.use((req, res, next) => {
-    if (req.method !== 'GET' || req.path.startsWith('/api') || req.path === '/health') {
-      return next();
-    }
-
-    return res.sendFile(path.join(clientDistPath, 'index.html'));
+    if (req.method !== 'GET' || req.path.startsWith('/api') || req.path === '/health') return next();
+    res.sendFile(path.join(clientDistPath, 'index.html'));
   });
 } else {
-  app.get('/', (_req, res) => {
+  app.get('*', (_req, res) => {
     res.type('html').send(`
-      <html>
-        <head><meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" /></head>
-        <body style="font-family:system-ui,sans-serif;padding:32px">
-          <h1>Luxtronics backend is running</h1>
-          <p>Frontend build not found yet.</p>
-          <p>Build path: <code>${frontendPathResolved || 'not resolved'}</code></p>
-          <p>Build error: <code>${frontendBuildError || 'none'}</code></p>
-          <p>Working directory: <code>${process.cwd()}</code></p>
-          <p>Server directory: <code>${__dirname}</code></p>
-          <p>Health check: <a href="/health">/health</a></p>
-          <p>Status: <a href="/api/status">/api/status</a></p>
-        </body>
-      </html>
+      <html><head><meta charset="utf-8"/><title>Luxtronics</title></head>
+      <body style="font-family:system-ui;padding:32px">
+        <h1>Luxtronics backend running</h1>
+        <p>Frontend build not found.</p>
+        <p>CWD: <code>${process.cwd()}</code></p>
+        <p>Server dir: <code>${__dirname}</code></p>
+        <p>Error: <code>${frontendBuildError || 'none'}</code></p>
+        <p>WooCommerce URL: <code>${wooUrl() || 'NOT SET'}</code></p>
+        <p><a href="/health">/health</a> · <a href="/api/status">/api/status</a></p>
+      </body></html>
     `);
   });
 }
 
+// ── Error handler ────────────────────────────────────────────────────────────
 app.use((err, _req, res, _next) => {
   console.error('Server error:', err);
   res.status(500).json({ success: false, error: 'Internal Server Error' });
 });
 
 app.listen(port, () => {
-  console.log('🚀 Luxtronics standalone server started');
-  console.log('📍 Port:', port);
-  console.log('🌍 NODE_ENV:', process.env.NODE_ENV || 'undefined');
-  console.log('🧪 WooCommerce URL set:', !!sourceUrl);
-  console.log('🧪 MongoDB URI set:', !!process.env.MONGODB_URI);
+  console.log(`✅ Luxtronics server on port ${port}`);
+  console.log(`📁 Frontend: ${frontendPathResolved || 'NOT FOUND'}`);
+  console.log(`🌐 WooCommerce: ${wooUrl() || 'NOT SET'}`);
+  console.log(`🌍 NODE_ENV: ${process.env.NODE_ENV || 'undefined'}`);
 });
 
-process.on('uncaughtException', (error) => {
-  console.error('❌ Uncaught exception:', error);
-});
-
-process.on('unhandledRejection', (reason) => {
-  console.error('❌ Unhandled rejection:', reason);
-});
+process.on('uncaughtException',  err => console.error('❌ Uncaught:', err));
+process.on('unhandledRejection', err => console.error('❌ Rejection:', err));
