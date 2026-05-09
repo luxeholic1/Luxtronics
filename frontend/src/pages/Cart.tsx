@@ -1,11 +1,14 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
-import { Minus, Plus, X, ArrowRight } from "lucide-react";
+import { Minus, Plus, X, ArrowRight, ExternalLink } from "lucide-react";
 import Layout from "@/components/Layout";
 import { products } from "@/data/products";
 import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious } from "@/components/ui/carousel";
+import { useCurrency } from "@/context/CurrencyContext";
+import { redirectToWooCheckout } from "@/lib/woo-checkout";
 
 const Cart = () => {
+  const { formatPrice, country } = useCurrency();
   const [items, setItems] = useState([
     { product: products[0], qty: 1 },
     { product: products[2], qty: 2 },
@@ -36,9 +39,20 @@ const Cart = () => {
           i.product.id === productId ? { ...i, qty: i.qty + 1 } : i
         );
       }
-
       return [...prev, { product: target, qty: 1 }];
     });
+  };
+
+  const handleWooCheckout = () => {
+    const lineItems = items.map((i) => ({
+      product_id: Number(i.product.id),
+      quantity: i.qty,
+    }));
+    redirectToWooCheckout(
+      lineItems,
+      window.location.hostname,
+      country.currency
+    );
   };
 
   const relatedProducts = products
@@ -105,7 +119,7 @@ const Cart = () => {
                         </button>
                       </div>
                       <p className="font-display font-bold text-lg">
-                        ${(product.price * qty).toLocaleString()}
+                        {formatPrice(product.price * qty)}
                       </p>
                     </div>
                   </div>
@@ -125,20 +139,26 @@ const Cart = () => {
               <div className="space-y-3 text-sm">
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Subtotal</span>
-                  <span>${subtotal.toLocaleString()}</span>
+                  <span>{formatPrice(subtotal)}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Shipping</span>
-                  <span>{shipping === 0 ? "Free" : `$${shipping}`}</span>
+                  <span>{shipping === 0 ? "Free" : formatPrice(shipping)}</span>
                 </div>
                 <div className="border-t border-border pt-3 flex justify-between font-display font-bold text-lg">
                   <span>Total</span>
-                  <span className="text-gradient">${total.toLocaleString()}</span>
+                  <span className="text-gradient">{formatPrice(total)}</span>
                 </div>
               </div>
-              <Link to="/checkout" className="mt-6 w-full inline-flex items-center justify-center gap-2 rounded-full bg-gradient-brand px-7 py-3.5 text-sm font-semibold text-primary-foreground shadow-glow hover:shadow-glow-pink transition-all">
-                Checkout <ArrowRight className="h-4 w-4" />
-              </Link>
+              <button
+                onClick={handleWooCheckout}
+                className="mt-6 w-full inline-flex items-center justify-center gap-2 rounded-full bg-gradient-brand px-7 py-3.5 text-sm font-semibold text-primary-foreground shadow-glow hover:shadow-glow-pink transition-all"
+              >
+                Proceed to Checkout <ExternalLink className="h-4 w-4" />
+              </button>
+              <p className="text-xs text-muted-foreground text-center mt-3">
+                You'll be taken to our secure WooCommerce checkout
+              </p>
               <p className="text-xs text-muted-foreground text-center mt-4">
                 Free shipping on orders over $200
               </p>

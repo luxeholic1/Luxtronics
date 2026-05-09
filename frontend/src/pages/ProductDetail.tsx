@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { useParams, Link, useNavigate } from "react-router-dom";
+import { useParams, Link } from "react-router-dom";
 import { Star, ShoppingBag, Heart, Truck, Shield, RotateCcw, ChevronLeft, ChevronRight, Check, AlertCircle } from "lucide-react";
 import Layout from "@/components/Layout";
 import { getProduct, products } from "@/data/products";
@@ -7,14 +7,14 @@ import ProductCard from "@/components/ProductCard";
 import { useCurrency } from "@/context/CurrencyContext";
 import { fetchStoreProductBySlug, fetchStoreProducts, mapStoreProductToLocalProduct } from "@/services/store-api";
 import { sanitizeHtml } from "@/lib/sanitize";
+import { redirectToWooCheckout } from "@/lib/woo-checkout";
 import type { Product } from "@/data/products";
 
 type Variation = NonNullable<Product["variations"]>[0];
 
 const ProductDetail = () => {
   const { slug = "" } = useParams();
-  const navigate = useNavigate();
-  const { formatPrice } = useCurrency();
+  const { formatPrice, country } = useCurrency();
   const fallbackProduct = getProduct(slug);
 
   const [product, setProduct] = useState<Product | null>(fallbackProduct || null);
@@ -408,20 +408,17 @@ const ProductDetail = () => {
             {/* CTA Buttons */}
             <div className="mt-6 flex flex-col sm:flex-row gap-3">
               <button
-                onClick={() =>
-                  navigate("/checkout", {
-                    state: {
-                      product: {
-                        ...product,
-                        price: currentPrice,
-                        oldPrice: currentOldPrice,
-                        image: displayImage,
-                        selectedVariation,
-                        qty,
-                      },
-                    },
-                  })
-                }
+                onClick={() => {
+                  redirectToWooCheckout(
+                    [{
+                      product_id: Number(product.id),
+                      quantity: qty,
+                      variation_id: selectedVariation ? Number(selectedVariation.id) : undefined,
+                    }],
+                    window.location.hostname,
+                    country.currency
+                  );
+                }}
                 disabled={!inStock || (attributeNames.length > 0 && !selectedVariation)}
                 className="flex-1 inline-flex items-center justify-center gap-2 rounded-full bg-gradient-brand px-7 py-4 text-sm font-semibold text-primary-foreground shadow-glow hover:shadow-glow-pink transition-all hover:scale-[1.02] disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
               >
