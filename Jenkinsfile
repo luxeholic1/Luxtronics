@@ -88,33 +88,39 @@ pipeline {
         }
 
         // ─────────────────────────────────────────────
-        stage('🚀 Deploy → Hostinger FTP') {
+        stage('🚀 Deploy') {
         // ─────────────────────────────────────────────
             when {
-                // Only deploy from main/master branch
                 anyOf {
                     branch 'main'
                     branch 'master'
+                    branch 'staging'
                 }
             }
             steps {
-                sh '''
-                    echo "📤 Deploying to Hostinger via FTP…"
+                script {
+                    def remoteDir = (env.BRANCH_NAME == 'main' || env.BRANCH_NAME == 'master') 
+                        ? FTP_REMOTE_DIR 
+                        : "/public_html/staging" // Default staging dir, user can adjust
 
-                    lftp -c "
-                        set ftp:ssl-allow yes;
-                        set ssl:verify-certificate no;
-                        set ftp:passive-mode yes;
-                        open ftp://$FTP_USER:$FTP_PASS@$FTP_HOST;
-                        mirror --reverse --delete --verbose \
-                               --exclude-glob .DS_Store \
-                               --exclude-glob *.map \
-                               ${BUILD_DIR}/ ${FTP_REMOTE_DIR}/;
-                        quit
-                    "
+                    sh """
+                        echo "📤 Deploying ${env.BRANCH_NAME} to Hostinger via FTP (${remoteDir})…"
 
-                    echo "✅ Deploy complete!"
-                '''
+                        lftp -c "
+                            set ftp:ssl-allow yes;
+                            set ssl:verify-certificate no;
+                            set ftp:passive-mode yes;
+                            open ftp://$FTP_USER:$FTP_PASS@$FTP_HOST;
+                            mirror --reverse --delete --verbose \
+                                   --exclude-glob .DS_Store \
+                                   --exclude-glob *.map \
+                                   ${BUILD_DIR}/ ${remoteDir}/;
+                            quit
+                        "
+
+                        echo "✅ Deploy to ${env.BRANCH_NAME} complete!"
+                    """
+                }
             }
         }
     }
