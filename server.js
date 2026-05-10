@@ -12,8 +12,6 @@ dotenv.config({ path: path.join(__dirname, '.env') });
 
 const app = express();
 const port = parseInt(process.env.PORT || '3001', 10);
-
-// ✅ Updated folder name
 const BUILD_DIR = path.join(__dirname, 'build');
 
 function mask(str) {
@@ -43,7 +41,7 @@ app.get('/debug', (req, res) => {
   });
 });
 
-// ── WooCommerce API ───────────────────────────────────────────────────────────
+// ── WOOCOMMERCE API ───────────────────────────────────────────────────────────
 app.get('/api/products', async (req, res) => {
   try {
     const url = `${process.env.VITE_WOOCOMMERCE_URL}/wp-json/wc/v3/products?${new URLSearchParams(req.query)}`;
@@ -74,7 +72,33 @@ app.get('/api/products', async (req, res) => {
   }
 });
 
-// ── WooCommerce connection test ───────────────────────────────────────────────
+app.get('/api/categories', async (req, res) => {
+  try {
+    const url = `${process.env.VITE_WOOCOMMERCE_URL}/wp-json/wc/v3/products/categories?${new URLSearchParams(req.query)}`;
+    const auth = 'Basic ' + Buffer.from(
+      `${process.env.VITE_WOOCOMMERCE_KEY}:${process.env.VITE_WOOCOMMERCE_SECRET}`
+    ).toString('base64');
+
+    const r = await fetch(url, {
+      headers: {
+        'Authorization': auth,
+        'User-Agent': 'LuxtronicsServer/1.0',
+        'Accept': 'application/json',
+      },
+    });
+
+    if (!r.ok) {
+      const errText = await r.text();
+      return res.status(500).json({ success: false, error: `Woo ${r.status}: ${errText.slice(0, 200)}` });
+    }
+
+    res.json({ success: true, data: await r.json() });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// ── WOOCOMMERCE TEST ──────────────────────────────────────────────────────────
 app.get('/api/test-woo', async (req, res) => {
   const url = `${process.env.VITE_WOOCOMMERCE_URL}/wp-json/wc/v3/products?per_page=1`;
   const auth = 'Basic ' + Buffer.from(
@@ -91,7 +115,7 @@ app.get('/api/test-woo', async (req, res) => {
 });
 
 // ── UNIVERSAL ASSET RESOLVER ──────────────────────────────────────────────────
-// Remaps stale hashed filenames (from LiteSpeed/browser cache) to fixed names.
+// Handles stale hashed filenames from LiteSpeed/browser cache
 const HASH_MAP = [
   [/^index-.*\.js$/,           'index.js'],
   [/^index-.*\.css$/,          'index.css'],
@@ -105,10 +129,10 @@ const HASH_MAP = [
 app.get('/assets/:filename', (req, res, next) => {
   const filename = req.params.filename.split('?')[0];
 
-  // Exact file exists → let static middleware handle it
+  // Exact file exists → pass to static middleware
   if (existsSync(path.join(BUILD_DIR, 'assets', filename))) return next();
 
-  // Try remap hashed → fixed
+  // Remap hashed → fixed filename
   for (const [pattern, fixed] of HASH_MAP) {
     if (pattern.test(filename)) {
       const fixedPath = path.join(BUILD_DIR, 'assets', fixed);
@@ -120,15 +144,14 @@ app.get('/assets/:filename', (req, res, next) => {
     }
   }
 
-  // Truly missing asset → 404 (never serve index.html for assets)
+  // Asset truly missing → 404, never serve index.html for assets
   console.warn(`❌ Asset not found: ${filename}`);
   return res.status(404).end();
 });
 
-// ── STATIC + SPA ──────────────────────────────────────────────────────────────
+// ── STATIC FILES ──────────────────────────────────────────────────────────────
 if (existsSync(path.join(BUILD_DIR, 'index.html'))) {
 
-  // Serve assets — no long-term cache since filenames have no hashes
   app.use('/assets', express.static(path.join(BUILD_DIR, 'assets'), {
     maxAge: 0,
     etag: false,
@@ -138,10 +161,9 @@ if (existsSync(path.join(BUILD_DIR, 'index.html'))) {
     },
   }));
 
-  // Other static files (favicon, robots.txt, etc.)
   app.use(express.static(BUILD_DIR, { index: false }));
 
-  // SPA fallback — serve index.html for all non-API routes
+  // ── SPA FALLBACK ────────────────────────────────────────────────────────────
   app.get('*', (req, res) => {
     if (
       req.path.startsWith('/api') ||
@@ -152,7 +174,8 @@ if (existsSync(path.join(BUILD_DIR, 'index.html'))) {
     try {
       let html = readFileSync(path.join(BUILD_DIR, 'index.html'), 'utf8');
 
-      // Inject Firebase config so the built app can read window.__FIREBASE_CONFIG
+      // Inject Firebase config from server env vars so window.__FIREBASE_CONFIG
+      // is available before index.js runs — fixes auth/invalid-api-key
       const fbConfig = {
         apiKey:            process.env.VITE_FIREBASE_API_KEY,
         authDomain:        process.env.VITE_FIREBASE_AUTH_DOMAIN,
@@ -165,10 +188,12 @@ if (existsSync(path.join(BUILD_DIR, 'index.html'))) {
       const configScript = `<script>window.__FIREBASE_CONFIG = ${JSON.stringify(fbConfig)};</script>`;
       html = html.replace('<head>', `<head>\n  ${configScript}`);
 
+      // Surrogate-Control tells LiteSpeed/CDN never to cache this HTML
+      // so the injected window.__FIREBASE_CONFIG always reaches the browser
       res.set({
         'Content-Type': 'text/html; charset=utf-8',
         'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
-        'Surrogate-Control': 'no-store',   // Tells LiteSpeed not to cache HTML
+        'Surrogate-Control': 'no-store',
         'Pragma': 'no-cache',
         'Expires': '0',
       });
