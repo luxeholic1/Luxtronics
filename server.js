@@ -13,113 +13,70 @@ dotenv.config({ path: path.join(__dirname, '.env') });
 const app = express();
 const port = parseInt(process.env.PORT || '3001', 10);
 
-function findBuildDir() {
-  const searchPaths = [
-    path.join(__dirname, 'build'),
-    path.join(process.cwd(), 'build'),
-    path.join(__dirname, 'dist'),
-    path.join(process.cwd(), 'dist'),
-  ];
-  return searchPaths.find(p => existsSync(path.join(p, 'index.html')));
-}
-
-const BUILD_DIR = findBuildDir();
-
-// ── DATA NORMALIZATION (Crucial for frontend) ────────────────────────────────
-function normalizeProduct(p) {
-  if (!p) return null;
-  const regularPrice = parseFloat(p.regular_price || p.price || '0');
-  const salePrice = p.sale_price ? parseFloat(p.sale_price) : undefined;
-  return {
-    id: p.id,
-    slug: p.slug,
-    name: p.name,
-    description: p.description || '',
-    shortDescription: p.short_description || '',
-    price: salePrice ?? regularPrice,
-    regularPrice,
-    salePrice,
-    images: (p.images || []).map(img => ({ id: img.id, src: img.src, alt: img.alt || '' })),
-    category: p.categories?.[0]?.name || 'Uncategorized',
-    stockStatus: p.stock_status || 'instock',
-    rating: parseFloat(p.average_rating || 0),
-    reviewCount: p.rating_count || 0,
-    attributes: p.attributes?.map(attr => ({
-      name: attr.name,
-      options: Array.isArray(attr.options) ? attr.options : [],
-    })),
-  };
-}
+// SEARCH FOR BUILD
+const BUILD_DIR = [
+  path.join(__dirname, 'build'),
+  path.join(process.cwd(), 'build'),
+  path.join(__dirname, 'dist'),
+].find(p => existsSync(path.join(p, 'index.html')));
 
 app.use(cors());
 app.use(express.json());
 
 // ── DEBUG ───────────────────────────────────────────────────────────────────
 app.get('/debug', (req, res) => {
+  let indexHtml = 'NOT FOUND';
   let assets = [];
-  try { assets = readdirSync(path.join(BUILD_DIR, 'assets')); } catch (e) {}
-  
-  let indexContent = '';
-  try { indexContent = readFileSync(path.join(BUILD_DIR, 'index.html'), 'utf8').substring(0, 1000); } catch (e) {}
+  try { 
+    indexHtml = readFileSync(path.join(BUILD_DIR, 'index.html'), 'utf8'); 
+    assets = readdirSync(path.join(BUILD_DIR, 'assets'));
+  } catch (e) {}
 
-  res.json({
-    ok: true,
-    build: BUILD_DIR,
-    assets: assets.filter(a => !a.startsWith('.')),
-    indexHasFixedJS: indexContent.includes('index.js'),
-    indexHasFixedCSS: indexContent.includes('index.css'),
-    env: {
-      WOO_URL: process.env.VITE_WOOCOMMERCE_URL,
-      WOO_KEY_SET: !!process.env.VITE_WOOCOMMERCE_KEY,
-      NODE_ENV: process.env.NODE_ENV
-    }
-  });
+  res.send(`
+    <html>
+      <body style="font-family:monospace; background:#111; color:#eee; padding:20px;">
+        <h1>🛠 Debug Info</h1>
+        <p><strong>Build Dir:</strong> ${BUILD_DIR}</p>
+        <p><strong>Assets found:</strong> ${assets.join(', ')}</p>
+        <hr/>
+        <h2>📄 index.html Content (First 2000 chars):</h2>
+        <pre style="background:#000; padding:10px; border:1px solid #444;">${indexHtml.substring(0, 2000).replace(/</g, '&lt;')}</pre>
+        <hr/>
+        <h2>📦 Environment:</h2>
+        <pre>${JSON.stringify({ PORT: process.env.PORT, WOO: !!process.env.VITE_WOOCOMMERCE_URL }, null, 2)}</pre>
+      </body>
+    </html>
+  `);
 });
 
 // ── API ─────────────────────────────────────────────────────────────────────
 app.get('/api/products', async (req, res) => {
   try {
-    const wooUrl = process.env.VITE_WOOCOMMERCE_URL;
-    const wooKey = process.env.VITE_WOOCOMMERCE_KEY;
-    const wooSec = process.env.VITE_WOOCOMMERCE_SECRET;
-    const auth = 'Basic ' + Buffer.from(`${wooKey}:${wooSec}`).toString('base64');
-    
-    const params = new URLSearchParams(req.query);
-    const r = await fetch(`${wooUrl}/wp-json/wc/v3/products?${params}`, {
-      headers: { 'Authorization': auth }
-    });
-    
-    if (!r.ok) throw new Error(`Woo Status: ${r.status}`);
-    const items = await r.json();
-    res.json({ success: true, data: items.map(normalizeProduct) });
-  } catch (err) {
-    res.status(500).json({ success: false, error: err.message });
-  }
+    const url = `${process.env.VITE_WOOCOMMERCE_URL}/wp-json/wc/v3/products?${new URLSearchParams(req.query)}`;
+    const auth = 'Basic ' + Buffer.from(`${process.env.VITE_WOOCOMMERCE_KEY}:${process.env.VITE_WOOCOMMERCE_SECRET}`).toString('base64');
+    const r = await fetch(url, { headers: { 'Authorization': auth } });
+    res.json(await r.json());
+  } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 // ── SERVING ──────────────────────────────────────────────────────────────────
 if (BUILD_DIR) {
-  // Static assets with immutable caching
-  app.use('/assets', express.static(path.join(BUILD_DIR, 'assets'), {
-    maxAge: '1y',
-    immutable: true,
-    fallthrough: false // Don't fall through to index.html if asset missing!
+  // Prevent MIME mismatch by disabling fallthrough
+  app.use('/assets', express.static(path.join(BUILD_DIR, 'assets'), { 
+    maxAge: '1y', 
+    immutable: true, 
+    fallthrough: false 
   }));
 
-  app.use(express.static(BUILD_DIR, { maxAge: '1h' }));
+  app.use(express.static(BUILD_DIR));
 
   app.get('*', (req, res) => {
     if (req.path.startsWith('/api') || req.path === '/debug') return res.status(404).end();
-    
-    res.set({
-      'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
-      'Pragma': 'no-cache',
-      'Expires': '0'
-    });
+    res.set('Cache-Control', 'no-store, no-cache, must-revalidate');
     res.sendFile(path.join(BUILD_DIR, 'index.html'));
   });
 } else {
-  app.get('*', (req, res) => res.status(503).send('Build not found. Check /debug'));
+  app.get('*', (req, res) => res.status(503).send('Build not found. check /debug'));
 }
 
 app.listen(port, () => console.log(`Server started on ${port}`));
