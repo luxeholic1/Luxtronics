@@ -52,7 +52,20 @@ function ensureFrontendBuild() {
     return clientPath;
   }
 
-  console.log('⚠️  No dist/ found — running npm run build...');
+  // ⚠️  NEVER auto-rebuild on the server.
+  // The build/ folder is pre-built locally (with correct VITE_ env vars)
+  // and committed to git. Auto-rebuilding here without VITE_FIREBASE_*
+  // env vars produces different Vite content-hashed filenames that won't
+  // match index.html → 404 on all assets → white page.
+  if (process.env.NODE_ENV === 'production') {
+    frontendBuildError = 'build/index.html not found. Deploy a pre-built build/ folder.';
+    console.error('❌', frontendBuildError);
+    console.error('💡 Run "npm run build" locally and commit the build/ directory to git.');
+    return null;
+  }
+
+  // Development only: auto-build if missing
+  console.log('⚠️  No dist/ found — running npm run build (dev only)...');
   const result = spawnSync('npm', ['run', 'build'], {
     cwd: __dirname,
     env: { ...process.env, NODE_ENV: 'production' },
@@ -291,15 +304,34 @@ app.post('/api/orders', async (req, res) => {
 });
 
 // ── Serve frontend ────────────────────────────────────────────────────────────
+// IMPORTANT: The build/ directory is pre-built locally and committed to git.
+// The server should NEVER auto-rebuild — doing so without VITE_ env vars
+// produces different asset hashes that won't match index.html → white page.
 const clientDistPath = ensureFrontendBuild();
 
 if (clientDistPath) {
-  app.use(express.static(clientDistPath, { maxAge: '1d', etag: true }));
+  // Static assets (JS/CSS with hash names) — long cache is safe, Vite hashes filenames
+  app.use('/assets', express.static(path.join(clientDistPath, 'assets'), {
+    maxAge: '1y',
+    immutable: true,
+    etag: false,
+  }));
+
+  // All other static files (favicon, robots.txt, etc.) — short cache
+  app.use(express.static(clientDistPath, {
+    maxAge: '1h',
+    etag: true,
+    index: false, // We handle index.html manually below with no-cache
+  }));
+
   app.use((req, res, next) => {
     // SPA fallback: only redirect to index.html for non-API, non-asset, non-health requests
     const isApiOrHealth = req.path.startsWith('/api') || req.path === '/health';
     const isStaticAsset = /\.(js|css|png|jpg|jpeg|gif|svg|ico|woff|woff2|ttf|eot|json)$/i.test(req.path);
     if (req.method !== 'GET' || isApiOrHealth || isStaticAsset) return next();
+    // Send index.html with no-cache so browsers always get fresh asset URLs after deploys
+    res.set('Cache-Control', 'no-store, no-cache, must-revalidate');
+    res.set('Pragma', 'no-cache');
     res.sendFile(path.join(clientDistPath, 'index.html'));
   });
 } else {

@@ -24,7 +24,8 @@ dist-ssr
 *.sw?
 .vercel
 
-# CI/CD — never commit secrets or deploy artifacts
+# CI/CD — keep local overrides and production secrets out of git
+# .env is committed (contains production-safe public Firebase config)
 .env.local
 .env.production
 deploy.log
