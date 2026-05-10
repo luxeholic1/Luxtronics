@@ -8,11 +8,36 @@ import { fileURLToPath } from 'url';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
+import { MongoClient } from 'mongodb';
+
 dotenv.config({ path: path.join(__dirname, '.env') });
 
 const app = express();
 const port = parseInt(process.env.PORT || '3001', 10);
 const BUILD_DIR = path.join(__dirname, 'build');
+
+// ── MONGODB STATE ────────────────────────────────────────────────────────────
+let db = null;
+let productsCol = null;
+let mongoReady = false;
+
+async function initMongo() {
+  if (!process.env.MONGODB_URI) {
+    console.warn('⚠️ MONGODB_URI not set. Running in WooCommerce-only mode.');
+    return;
+  }
+  try {
+    const client = new MongoClient(process.env.MONGODB_URI);
+    await client.connect();
+    db = client.db();
+    productsCol = db.collection('products');
+    mongoReady = true;
+    console.log('✅ MongoDB connected successfully');
+  } catch (err) {
+    console.error('❌ MongoDB connection failed:', err.message);
+  }
+}
+initMongo();
 
 function mask(str) {
   if (!str) return '❌ MISSING';
@@ -42,32 +67,130 @@ app.get('/debug', (req, res) => {
 });
 
 // ── WOOCOMMERCE API ───────────────────────────────────────────────────────────
+// ── WOOCOMMERCE API ───────────────────────────────────────────────────────────
 app.get('/api/products', async (req, res) => {
+  const page = parseInt(req.query.page || '1', 10);
+  const perPage = parseInt(req.query.per_page || '50', 10);
+  const search = req.query.search;
+  const category = req.query.category;
+
+  // Try MongoDB
+  if (mongoReady && productsCol) {
+    try {
+      const query = {};
+      if (search) query.name = { $regex: search, $options: 'i' };
+      if (category) query.category = { $regex: category, $options: 'i' };
+
+      const total = await productsCol.countDocuments(query);
+      const items = await productsCol.find(query)
+        .skip((page - 1) * perPage)
+        .limit(perPage)
+        .toArray();
+
+      if (items.length > 0) {
+        return res.json({ success: true, data: items, total, source: 'mongodb' });
+      }
+    } catch (err) {
+      console.error('MongoDB query error:', err.message);
+    }
+  }
+
+  // Fallback to WooCommerce
   try {
     const url = `${process.env.VITE_WOOCOMMERCE_URL}/wp-json/wc/v3/products?${new URLSearchParams(req.query)}`;
     const auth = 'Basic ' + Buffer.from(
       `${process.env.VITE_WOOCOMMERCE_KEY}:${process.env.VITE_WOOCOMMERCE_SECRET}`
     ).toString('base64');
 
-    console.log(`Proxying to: ${url}`);
+    console.log(`Proxying to Woo: ${url}`);
+    const r = await fetch(url, { headers: { 'Authorization': auth } });
+    if (!r.ok) return res.status(r.status).json({ success: false, error: 'WooCommerce API error' });
+    
+    res.json({ success: true, data: await r.json(), source: 'woocommerce' });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
 
-    const r = await fetch(url, {
-      headers: {
-        'Authorization': auth,
-        'User-Agent': 'LuxtronicsServer/1.0',
-        'Accept': 'application/json',
-      },
-    });
+app.get('/api/products/slug/:slug', async (req, res) => {
+  const { slug } = req.params;
 
-    if (!r.ok) {
-      const errText = await r.text();
-      console.error(`Woo Error (${r.status}):`, errText);
-      return res.status(500).json({ success: false, error: `Woo ${r.status}: ${errText.slice(0, 200)}` });
+  // Try MongoDB
+  if (mongoReady && productsCol) {
+    try {
+      const product = await productsCol.findOne({ slug });
+      if (product) return res.json({ success: true, data: product, source: 'mongodb' });
+    } catch (err) {
+      console.error('MongoDB slug error:', err.message);
+    }
+  }
+
+  // Fallback to WooCommerce
+  try {
+    const auth = 'Basic ' + Buffer.from(
+      `${process.env.VITE_WOOCOMMERCE_KEY}:${process.env.VITE_WOOCOMMERCE_SECRET}`
+    ).toString('base64');
+    const url = `${process.env.VITE_WOOCOMMERCE_URL}/wp-json/wc/v3/products?slug=${slug}`;
+    const r = await fetch(url, { headers: { 'Authorization': auth } });
+    const items = await r.json();
+    const item = items[0];
+
+    if (!item) return res.status(404).json({ success: false, error: 'Product not found' });
+
+    // Fetch variations if it's a variable product
+    let variations = [];
+    if (item.type === 'variable') {
+      const vUrl = `${process.env.VITE_WOOCOMMERCE_URL}/wp-json/wc/v3/products/${item.id}/variations`;
+      const vr = await fetch(vUrl, { headers: { 'Authorization': auth } });
+      variations = await vr.json();
     }
 
-    res.json({ success: true, data: await r.json() });
+    // Transform for frontend (minimal transformation needed as frontend expects MongoDB format or raw)
+    // Actually, root server.js is simple, we just send it.
+    // Wait, the frontend expects the format from createProductDocument!
+    // I should probably import createProductDocument or just manually map.
+    // But wait, the MongoDB sync already uses createProductDocument.
+    
+    res.json({ success: true, data: { ...item, variations }, source: 'woocommerce' });
   } catch (err) {
-    console.error('API Error:', err.message);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+app.get('/api/products/:id', async (req, res) => {
+  const { id } = req.params;
+
+  // Try MongoDB
+  if (mongoReady && productsCol) {
+    try {
+      const product = await productsCol.findOne({ id: parseInt(id) });
+      if (product) return res.json({ success: true, data: product, source: 'mongodb' });
+    } catch (err) {
+      console.error('MongoDB ID error:', err.message);
+    }
+  }
+
+  // Fallback to WooCommerce
+  try {
+    const auth = 'Basic ' + Buffer.from(
+      `${process.env.VITE_WOOCOMMERCE_KEY}:${process.env.VITE_WOOCOMMERCE_SECRET}`
+    ).toString('base64');
+    const url = `${process.env.VITE_WOOCOMMERCE_URL}/wp-json/wc/v3/products/${id}`;
+    const r = await fetch(url, { headers: { 'Authorization': auth } });
+    const item = await r.json();
+
+    if (!item || item.code === 'rest_no_route') return res.status(404).json({ success: false, error: 'Product not found' });
+
+    // Fetch variations if it's a variable product
+    let variations = [];
+    if (item.type === 'variable') {
+      const vUrl = `${process.env.VITE_WOOCOMMERCE_URL}/wp-json/wc/v3/products/${item.id}/variations`;
+      const vr = await fetch(vUrl, { headers: { 'Authorization': auth } });
+      variations = await vr.json();
+    }
+    
+    res.json({ success: true, data: { ...item, variations }, source: 'woocommerce' });
+  } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }
 });
