@@ -1,0 +1,56 @@
+# ============================================================
+#  Luxtronics — Apache config for Hostinger (SPA + perf)
+# ============================================================
+
+# ── 1. SPA Routing (MOST IMPORTANT) ─────────────────────────
+#  Without this, Apache returns 404/blank for all React routes
+#  because the files don't physically exist on disk.
+<IfModule mod_rewrite.c>
+  RewriteEngine On
+  RewriteBase /
+
+  # Don't rewrite real files or directories
+  RewriteCond %{REQUEST_FILENAME} !-f
+  RewriteCond %{REQUEST_FILENAME} !-d
+
+  # Send everything else to index.html so React Router handles it
+  RewriteRule ^ index.html [L]
+</IfModule>
+
+# ── 2. HTTPS redirect ────────────────────────────────────────
+<IfModule mod_rewrite.c>
+  RewriteCond %{HTTPS} off
+  RewriteRule ^ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
+</IfModule>
+
+# ── 3. Compression ───────────────────────────────────────────
+<IfModule mod_deflate.c>
+  AddOutputFilterByType DEFLATE text/html text/plain text/xml text/css text/javascript application/javascript application/json
+</IfModule>
+
+# ── 4. Browser Caching ───────────────────────────────────────
+<IfModule mod_expires.c>
+  ExpiresActive On
+  # HTML — short cache so updates are picked up quickly
+  ExpiresByType text/html                 "access plus 1 hour"
+  # Vite hashes JS/CSS filenames, so long cache is safe
+  ExpiresByType text/css                  "access plus 1 year"
+  ExpiresByType application/javascript    "access plus 1 year"
+  ExpiresByType text/javascript           "access plus 1 year"
+  # Images
+  ExpiresByType image/jpeg                "access plus 1 month"
+  ExpiresByType image/png                 "access plus 1 month"
+  ExpiresByType image/webp                "access plus 1 month"
+  ExpiresByType image/svg+xml             "access plus 1 month"
+  ExpiresByType image/x-icon              "access plus 1 year"
+  # Fonts
+  ExpiresByType font/woff2                "access plus 1 year"
+  ExpiresByType font/woff                 "access plus 1 year"
+</IfModule>
+
+# ── 5. Security headers ──────────────────────────────────────
+<IfModule mod_headers.c>
+  Header always set X-Frame-Options "DENY"
+  Header always set X-Content-Type-Options "nosniff"
+  Header always set Referrer-Policy "strict-origin-when-cross-origin"
+</IfModule>

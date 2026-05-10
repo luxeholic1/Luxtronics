@@ -114,9 +114,7 @@ if (existsSync(path.join(BUILD_DIR, 'index.html'))) {
       
       // Inject cache-busting
       const cacheBuster = `?v=${Date.now()}`;
-      html = html.replace(/\.js"/g, `.js${cacheBuster}"`);
-      html = html.replace(/\.css"/g, `.css${cacheBuster}"`);
-      
+     
       res.set({
         'Content-Type': 'text/html',
         'Cache-Control': 'no-store, no-cache, must-revalidate',
