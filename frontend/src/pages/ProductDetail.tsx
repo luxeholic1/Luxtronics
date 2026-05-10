@@ -6,7 +6,7 @@ import Layout from "@/components/Layout";
 import { getProduct, products } from "@/data/products";
 import ProductCard from "@/components/ProductCard";
 import { useCurrency } from "@/context/CurrencyContext";
-import { fetchStoreProductBySlug, fetchStoreProducts, mapStoreProductToLocalProduct } from "@/services/store-api";
+import { fetchStoreProduct, fetchStoreProducts, mapStoreProductToLocalProduct } from "@/services/store-api";
 import { sanitizeHtml } from "@/lib/sanitize";
 import { redirectToWooCheckout } from "@/lib/woo-checkout";
 import type { Product } from "@/data/products";
@@ -28,7 +28,7 @@ const ProductDetail = () => {
   const { data: product, isLoading: productLoading } = useQuery({
     queryKey: ['product', slug],
     queryFn: async () => {
-      const detail = await fetchStoreProductBySlug(slug);
+      const detail = await fetchStoreProduct(slug);
       if (detail) return mapStoreProductToLocalProduct(detail);
       
       // If not found by slug directly, try to find in the products list as a backup

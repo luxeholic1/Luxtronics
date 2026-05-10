@@ -83,7 +83,7 @@ export async function fetchStoreProducts(page = 1, perPage = 100): Promise<Store
   return response.data;
 }
 
-export async function fetchStoreProductBySlug(slug: string): Promise<StoreProduct | null> {
+export async function fetchStoreProduct(slug: string): Promise<StoreProduct | null> {
   try {
     const response = await fetchJson<ApiResponse<StoreProduct>>(`/api/products/slug/${encodeURIComponent(slug)}`);
 
