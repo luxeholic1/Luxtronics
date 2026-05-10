@@ -1,10 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
 import Layout from "@/components/Layout";
 import ProductCard from "@/components/ProductCard";
 import { cn } from "@/lib/utils";
-import { fetchStoreCategories, fetchStoreProducts, fetchStoreProduct, mapStoreProductToLocalProduct } from "@/services/store-api";
+import { fetchStoreCategories, fetchStoreProducts, mapStoreProductToLocalProduct } from "@/services/store-api";
 import type { Product } from "@/data/products";
 
 type CategoryFilter = {
@@ -16,54 +15,58 @@ type CategoryFilter = {
 
 const Shop = () => {
   const [params, setParams] = useSearchParams();
-  const queryClient = useQueryClient();
-
-  const prefetchProduct = (slug: string) => {
-    queryClient.prefetchQuery({
-      queryKey: ['product', slug],
-      queryFn: () => fetchStoreProduct(slug),
-      staleTime: 1000 * 60 * 15,
-    });
-  };
   const activeCat = params.get("cat") || "all";
-  const activeSearch = params.get("q") || "";
+  const searchQuery = params.get("q") || "";           // ← FIX: read search query from URL
   const [sort, setSort] = useState("featured");
-  // ─── Fetch Categories ──────────────────────────────────────────────────
-  const { data: categoryResult } = useQuery({
-    queryKey: ['categories'],
-    queryFn: () => fetchStoreCategories(1, 100),
-    staleTime: 1000 * 60 * 30, // 30 minutes
-  });
+  const [categories, setCategories] = useState<CategoryFilter[]>([]);
+  const [products, setProducts] = useState<Product[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  const categories = categoryResult?.data || [];
+  useEffect(() => {
+    let mounted = true;
 
-  // ─── Fetch Products ────────────────────────────────────────────────────
-  const { data: storeProducts = [], isLoading: productsLoading, error: productsError } = useQuery({
-    queryKey: ['products'],
-    queryFn: () => fetchStoreProducts(1, 100),
-    staleTime: 1000 * 60 * 5, // 5 minutes
-  });
+    const load = async () => {
+      try {
+        setLoading(true);
+        const [categoryData, productData] = await Promise.all([
+          fetchStoreCategories(),
+          fetchStoreProducts(),                         // ← loads all products once; filtering is done client-side
+        ]);
 
-  const products = useMemo(() => 
-    storeProducts
-      .map(mapStoreProductToLocalProduct)
-      .filter((p): p is Product => p !== null), 
-    [storeProducts]
-  );
-  const loading = productsLoading;
-  const error = productsError ? (productsError as Error).message : null;
+        if (!mounted) return;
 
+        setCategories(categoryData.data);
+        setProducts(productData.map(mapStoreProductToLocalProduct));
+        setError(null);
+      } catch (loadError) {
+        if (!mounted) return;
+        setError(loadError instanceof Error ? loadError.message : "Failed to load products");
+        setCategories([]);
+        setProducts([]);
+      } finally {
+        if (mounted) setLoading(false);
+      }
+    };
+
+    load();
+
+    return () => {
+      mounted = false;
+    };
+  }, []);                                               // ← FIX: no dependency on searchQuery; products load once
 
   const list = useMemo(() => {
     let p = [...products];
 
-    // Filter by search query
-    if (activeSearch) {
-      const q = activeSearch.toLowerCase();
-      p = p.filter((x) =>
-        x.name.toLowerCase().includes(q) ||
-        (x.description || "").toLowerCase().includes(q) ||
-        (x.category || "").toLowerCase().includes(q)
+    // Filter by search query (from URL param ?q=...)
+    if (searchQuery) {
+      const q = searchQuery.toLowerCase();
+      p = p.filter(
+        (x) =>
+          x.name.toLowerCase().includes(q) ||
+          x.description.toLowerCase().includes(q) ||
+          x.category.toLowerCase().includes(q)
       );
     }
 
@@ -75,11 +78,13 @@ const Shop = () => {
       }
     }
 
+    // Sort
     if (sort === "low") p = [...p].sort((a, b) => a.price - b.price);
     if (sort === "high") p = [...p].sort((a, b) => b.price - a.price);
     if (sort === "rating") p = [...p].sort((a, b) => b.rating - a.rating);
+
     return p;
-  }, [activeCat, activeSearch, sort, products, categories]);
+  }, [activeCat, searchQuery, sort, products, categories]);
 
   return (
     <Layout>
@@ -88,29 +93,29 @@ const Shop = () => {
           Shop
         </p>
         <h1 className="font-display font-bold text-5xl sm:text-6xl tracking-tight">
-          {activeSearch
-            ? <>Results for <span className="text-gradient">"{activeSearch}"</span></>
-            : <>All <span className="text-gradient">products</span></>}
+          {searchQuery ? (
+            <>
+              Results for{" "}
+              <span className="text-gradient">"{searchQuery}"</span>
+            </>
+          ) : (
+            <>
+              All <span className="text-gradient">products</span>
+            </>
+          )}
         </h1>
         <p className="mt-4 text-muted-foreground max-w-xl">
-          Browse our curated collection of premium electronics. Filter by category and sort to find your perfect match.
+          {searchQuery
+            ? `Showing ${list.length} result${list.length !== 1 ? "s" : ""} for "${searchQuery}"`
+            : "Browse our curated collection of premium electronics. Filter by category and sort to find your perfect match."}
         </p>
-        {/* Clear search chip */}
-        {activeSearch && (
-          <button
-            onClick={() => setParams({})}
-            className="mt-4 inline-flex items-center gap-1.5 rounded-full border border-border px-3 py-1 text-xs font-medium hover:border-primary/50 transition-colors"
-          >
-            ✕ Clear search
-          </button>
-        )}
       </section>
 
       <section className="container pb-24">
         <div className="flex items-center justify-between gap-4 flex-wrap mb-8">
           <div className="flex gap-2 flex-wrap">
             <button
-              onClick={() => setParams({})}
+              onClick={() => setParams(searchQuery ? { q: searchQuery } : {})}
               className={cn(
                 "px-4 py-2 rounded-full text-sm font-medium border transition-all",
                 activeCat === "all"
@@ -123,7 +128,9 @@ const Shop = () => {
             {categories.map((c) => (
               <button
                 key={c.slug}
-                onClick={() => setParams({ cat: c.slug })}
+                onClick={() =>
+                  setParams(searchQuery ? { q: searchQuery, cat: c.slug } : { cat: c.slug })
+                }
                 className={cn(
                   "px-4 py-2 rounded-full text-sm font-medium border transition-all",
                   activeCat === c.slug
@@ -157,17 +164,25 @@ const Shop = () => {
         {loading ? (
           <p className="text-center text-muted-foreground py-24">Loading products...</p>
         ) : list.length === 0 ? (
-          <p className="text-center text-muted-foreground py-24">No products found.</p>
+          <div className="text-center py-24">
+            <p className="text-muted-foreground">
+              {searchQuery
+                ? `No products found for "${searchQuery}".`
+                : "No products found."}
+            </p>
+            {searchQuery && (
+              <button
+                onClick={() => setParams({})}
+                className="mt-4 px-6 py-2 rounded-full bg-gradient-brand text-primary-foreground text-sm font-medium shadow-glow"
+              >
+                Clear search
+              </button>
+            )}
+          </div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
             {list.map((p) => (
-              <div 
-              key={p.id}
-              onMouseEnter={() => prefetchProduct(p.slug)}
-              className="animate-fade-in"
-            >
-              <ProductCard product={p} />
-            </div>
+              <ProductCard key={p.id} product={p} />
             ))}
           </div>
         )}

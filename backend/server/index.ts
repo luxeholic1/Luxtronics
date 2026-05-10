@@ -12,6 +12,7 @@ import { fileURLToPath } from 'url';
 import { initializeMongoDB } from './db/mongodb';
 import { createProductDocument, createCategoryDocument } from './models/mongo-models';
 import { globalRateLimiter, sanitizeRequestBody, securityHeaders } from './middleware/security';
+import WooCommerceSync from './services/woocommerce-sync';
 
 // ── Load env vars using absolute paths so tsx watch always finds them ─────────
 const __selfDir = path.dirname(fileURLToPath(import.meta.url));
@@ -140,7 +141,9 @@ export async function setupServer(config: ServerConfig = {}): Promise<Express> {
     if (mongoReady && productService) {
       try {
         let result;
-        if (category) {
+        if (search) {
+          result = await productService.searchProducts(search, page, perPage);
+        } else if (category) {
           result = await productService.getProductsByCategory(category, page, perPage);
         } else {
           result = await productService.getProducts(page, perPage);
@@ -356,7 +359,24 @@ export async function setupServer(config: ServerConfig = {}): Promise<Express> {
     if (token !== process.env.SYNC_TOKEN) {
       return res.status(401).json({ success: false, error: 'Unauthorized' });
     }
-    res.json({ success: true, message: 'Sync triggered. Check server logs.' });
+    
+    if (!mongoReady) {
+      return res.status(503).json({ success: false, error: 'MongoDB not ready for sync' });
+    }
+
+    // Trigger sync in background
+    const db = await initializeMongoDB();
+    const syncService = new WooCommerceSync(db);
+    
+    syncService.fullSync()
+      .then(result => {
+        console.log(`✅ Manual sync completed: ${result.products} products, ${result.categories} categories`);
+      })
+      .catch(err => {
+        console.error('❌ Manual sync failed:', err);
+      });
+
+    res.json({ success: true, message: 'Sync triggered successfully in background' });
     console.log('Manual sync triggered via API');
   });
 

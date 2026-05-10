@@ -125,18 +125,20 @@ export class ProductService {
 
     const skip = (page - 1) * perPage;
 
+    const query = {
+      $or: [
+        { name: { $regex: searchTerm, $options: 'i' } },
+        { category: { $regex: searchTerm, $options: 'i' } }
+      ]
+    };
+
     const [products, total] = await Promise.all([
       collection
-        .find({
-          $text: { $search: searchTerm },
-        })
+        .find(query)
         .skip(skip)
         .limit(perPage)
-        .sort({ score: { $meta: 'textScore' } })
         .toArray() as Promise<MongoProduct[]>,
-      collection.countDocuments({
-        $text: { $search: searchTerm },
-      }),
+      collection.countDocuments(query),
     ]);
 
     return { products, total };

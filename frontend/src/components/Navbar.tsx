@@ -8,7 +8,7 @@ import { useAuth } from "@/context/AuthContext";
 import ThemeToggle from "@/components/ThemeToggle";
 import { useQuery } from "@tanstack/react-query";
 import { fetchSearchSuggestions } from "@/services/store-api";
-import { Product } from "@/data/products";
+import { motion, AnimatePresence } from "framer-motion";
 
 const links = [
   { to: "/", label: "Home" },
@@ -26,6 +26,16 @@ const Navbar = () => {
   const [currencyOpen, setCurrencyOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+  const [debouncedQuery, setDebouncedQuery] = useState("");
+
+  // Debounce: update debouncedQuery 300ms after searchQuery changes
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedQuery(searchQuery.trim());
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
+
   const searchInputRef = useRef<HTMLInputElement>(null);
   const location = useLocation();
   const navigate = useNavigate();
@@ -44,6 +54,7 @@ const Navbar = () => {
     setMobileOpen(false);
     setSearchOpen(false);
     setSearchQuery("");
+    setDebouncedQuery("");
   }, [location.pathname]);
 
   useEffect(() => {
@@ -54,7 +65,11 @@ const Navbar = () => {
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setSearchOpen(false);
+      if (e.key === "Escape") {
+        setSearchOpen(false);
+        setSearchQuery("");
+        setDebouncedQuery("");
+      }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
@@ -67,6 +82,7 @@ const Navbar = () => {
     navigate(`/shop?q=${encodeURIComponent(q)}`);
     setSearchOpen(false);
     setSearchQuery("");
+    setDebouncedQuery("");
   };
 
   const handleLogOut = async () => {
@@ -74,7 +90,6 @@ const Navbar = () => {
     navigate("/");
   };
 
-  // Avatar initials from display name or email
   const avatarLabel = user?.displayName
     ? user.displayName.charAt(0).toUpperCase()
     : user?.email?.charAt(0).toUpperCase() ?? "U";
@@ -132,11 +147,17 @@ const Navbar = () => {
         <div className="flex items-center gap-0.5 sm:gap-1 md:gap-2">
           <ThemeToggle />
 
-          {/* Search */}
+          {/* Search toggle */}
           <button
             id="navbar-search-btn"
             aria-label="Search products"
-            onClick={() => setSearchOpen((v) => !v)}
+            onClick={() => {
+              setSearchOpen((v) => !v);
+              if (searchOpen) {
+                setSearchQuery("");
+                setDebouncedQuery("");
+              }
+            }}
             className={cn(
               "h-9 w-9 sm:h-10 sm:w-10 rounded-full flex items-center justify-center transition-colors",
               searchOpen ? "bg-primary/10 text-primary" : "hover:bg-secondary"
@@ -164,9 +185,8 @@ const Navbar = () => {
                     <button
                       key={c.code}
                       onClick={() => { setCountry(c); setCurrencyOpen(false); }}
-                      className={`w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-white/[0.06] transition-colors text-sm ${
-                        country.code === c.code ? "bg-primary/10 border-l-2 border-primary" : ""
-                      }`}
+                      className={`w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-white/[0.06] transition-colors text-sm ${country.code === c.code ? "bg-primary/10 border-l-2 border-primary" : ""
+                        }`}
                     >
                       <span className="text-lg">{c.flag}</span>
                       <div className="flex-1">
@@ -247,10 +267,11 @@ const Navbar = () => {
         </div>
       </div>
 
+      {/* Search bar */}
       <div
         className={cn(
-          "overflow-hidden transition-all duration-300 ease-in-out",
-          searchOpen ? "max-h-[500px] opacity-100" : "max-h-0 opacity-0 pointer-events-none"
+          "transition-all duration-300 ease-in-out",
+          searchOpen ? "max-h-[800px] opacity-100 overflow-visible" : "max-h-0 opacity-0 overflow-hidden pointer-events-none"
         )}
       >
         <div className="container mt-2">
@@ -279,19 +300,39 @@ const Navbar = () => {
               )}
               <button
                 type="button"
-                onClick={() => setSearchOpen(false)}
+                onClick={() => {
+                  setSearchOpen(false);
+                  setSearchQuery("");
+                  setDebouncedQuery("");
+                }}
                 className="shrink-0 text-muted-foreground hover:text-foreground transition-colors"
               >
                 <X className="h-4 w-4" />
               </button>
             </form>
 
-            {/* Search Suggestions */}
-            {searchQuery.length >= 2 && (
-              <div className="absolute top-full left-0 right-0 mt-2 z-50 rounded-2xl border border-white/10 bg-background/90 backdrop-blur-xl shadow-2xl overflow-hidden animate-fade-in">
-                <SearchSuggestions query={searchQuery} onSelect={() => setSearchOpen(false)} />
-              </div>
-            )}
+            {/* Search Suggestions dropdown */}
+            <AnimatePresence>
+              {debouncedQuery.length >= 2 && searchOpen && (
+                <motion.div
+                  initial={{ opacity: 0, y: 10, scale: 0.98 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  exit={{ opacity: 0, y: 10, scale: 0.98 }}
+                  transition={{ duration: 0.2 }}
+                  className="absolute top-full left-0 right-0 mt-4 z-50 rounded-2xl border border-white/10 bg-background/90 backdrop-blur-xl shadow-2xl overflow-hidden"
+                >
+                  <SearchSuggestions
+                    query={searchQuery}
+                    debouncedQuery={debouncedQuery}
+                    onSelect={() => {
+                      setSearchOpen(false);
+                      setSearchQuery("");
+                      setDebouncedQuery("");
+                    }}
+                  />
+                </motion.div>
+              )}
+            </AnimatePresence>
           </div>
         </div>
       </div>
@@ -370,40 +411,85 @@ const Navbar = () => {
   );
 };
 
-const SearchSuggestions = ({ query, onSelect }: { query: string; onSelect: () => void }) => {
-  const { data: suggestions = [], isLoading } = useQuery({
-    queryKey: ['search-suggestions', query],
-    queryFn: () => fetchSearchSuggestions(query),
-    enabled: query.length >= 2,
-    staleTime: 1000 * 60 * 5, // 5 minutes
+// ─── Search Suggestions ────────────────────────────────────────────────────────
+
+const SearchSuggestions = ({
+  query,
+  debouncedQuery,
+  onSelect,
+}: {
+  query: string;
+  debouncedQuery: string;
+  onSelect: () => void;
+}) => {
+  const isTyping = query.trim() !== debouncedQuery;
+
+  const {
+    data: suggestions = [],
+    isLoading,
+    isError,
+    error,
+  } = useQuery({
+    queryKey: ["search-suggestions", debouncedQuery],
+    queryFn: async () => {
+      console.log("[Search] Fetching suggestions for:", debouncedQuery);
+      const result = await fetchSearchSuggestions(debouncedQuery);
+      console.log("[Search] Got results:", result);
+      return result;
+    },
+    enabled: debouncedQuery.length >= 2 && !isTyping,
+    staleTime: 1000 * 60 * 5,
+    retry: 1,
   });
 
-  if (isLoading) {
+  // Still typing — show skeleton
+  if (isTyping || isLoading) {
     return (
       <div className="p-4 space-y-3">
         {[1, 2, 3].map((i) => (
           <div key={i} className="flex gap-3 animate-pulse">
-            <div className="h-12 w-12 rounded-lg bg-white/5" />
+            <div className="h-12 w-12 rounded-lg bg-white/5 shrink-0" />
             <div className="flex-1 space-y-2 py-1">
-              <div className="h-3 w-1/3 bg-white/5 rounded" />
+              <div className="h-3 w-2/5 bg-white/5 rounded" />
               <div className="h-3 w-1/4 bg-white/5 rounded" />
             </div>
+            <div className="h-3 w-12 bg-white/5 rounded self-center" />
           </div>
         ))}
       </div>
     );
   }
 
+  // API error
+  if (isError) {
+    return (
+      <div className="p-5 text-center">
+        <p className="text-sm text-red-400">
+          ❌ {error instanceof Error ? error.message : "Failed to fetch suggestions"}
+        </p>
+        <p className="text-[10px] text-muted-foreground mt-1">Check console for details</p>
+      </div>
+    );
+  }
+
+  // No results
   if (suggestions.length === 0) {
     return (
-      <div className="p-6 text-center text-sm text-muted-foreground">
-        No products found for "{query}"
+      <div className="p-6 text-center">
+        <p className="text-sm text-muted-foreground">
+          No products found for{" "}
+          <span className="text-foreground font-medium">"{debouncedQuery}"</span>
+        </p>
+        <p className="text-xs text-muted-foreground/60 mt-1">Try a different keyword</p>
       </div>
     );
   }
 
   return (
     <div className="max-h-[400px] overflow-y-auto py-2 scrollbar-hidden">
+      <p className="px-4 pb-2 text-[10px] font-medium uppercase tracking-widest text-muted-foreground/60">
+        Suggestions ({suggestions.length})
+      </p>
       {suggestions.map((product) => (
         <Link
           key={product.id}
@@ -411,31 +497,31 @@ const SearchSuggestions = ({ query, onSelect }: { query: string; onSelect: () =>
           onClick={onSelect}
           className="flex items-center gap-4 px-4 py-3 hover:bg-white/5 transition-colors border-b border-white/5 last:border-0"
         >
-          <div className="h-12 w-12 rounded-lg overflow-hidden bg-secondary/50 shrink-0 border border-white/5 flex items-center justify-center">
-            <img 
-              src={product.image || 'https://images.unsplash.com/photo-1581091226825-a6a2a5aee158?q=80&w=100&auto=format&fit=crop'} 
-              alt={product.name} 
+          <div className="h-12 w-12 rounded-lg overflow-hidden bg-secondary/50 shrink-0 border border-white/5">
+            <img
+              src={product.image}
+              alt={product.name}
               className="h-full w-full object-cover"
-              onError={(e) => {
-                (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1581091226825-a6a2a5aee158?q=80&w=100&auto=format&fit=crop';
-              }}
             />
           </div>
           <div className="flex-1 min-w-0">
             <p className="text-sm font-medium text-foreground truncate">{product.name}</p>
-            <p className="text-[10px] text-muted-foreground uppercase tracking-wider">{product.category}</p>
+            <p className="text-[10px] text-muted-foreground uppercase tracking-wider">
+              {product.category}
+            </p>
           </div>
-          <div className="text-sm font-semibold text-primary">
+          <div className="text-sm font-semibold text-primary shrink-0">
             ₹{product.price.toLocaleString()}
           </div>
         </Link>
       ))}
       <Link
-        to={`/shop?q=${encodeURIComponent(query)}`}
+        to={`/shop?q=${encodeURIComponent(debouncedQuery)}`}
         onClick={onSelect}
         className="block w-full p-3 text-center text-xs font-medium text-muted-foreground hover:text-primary transition-colors border-t border-white/5"
       >
-        View all results
+        View all results for{" "}
+        <span className="font-semibold">"{debouncedQuery}"</span>
       </Link>
     </div>
   );

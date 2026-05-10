@@ -13,26 +13,6 @@ export interface StoreCategory {
   description?: string;
   image?: StoreImage;
   count: number;
-  productCount?: number;
-  sampleImage?: string | null;
-}
-
-export interface StoreVariation {
-  id: number;
-  sku?: string;
-  price: number;
-  salePrice?: number;
-  regularPrice: number;
-  stockStatus: 'instock' | 'outofstock' | 'onbackorder';
-  attributes: Array<{
-    name: string;
-    option: string;
-  }>;
-  image?: {
-    id: number;
-    src: string;
-    alt: string;
-  };
 }
 
 export interface StoreProduct {
@@ -42,18 +22,27 @@ export interface StoreProduct {
   description: string;
   shortDescription?: string;
   category: string;
+  categoryId?: number;
   price: number;
   salePrice?: number;
   regularPrice: number;
   images: StoreImage[];
-  average_rating?: string;
-  rating_count?: number;
+  rating: number;
+  reviewCount: number;
   stockStatus: 'instock' | 'outofstock' | 'onbackorder';
-  variations?: StoreVariation[];
-  attributes?: Array<{
-    name: string;
-    value: string;
-    options?: string[];
+  variations?: Array<{
+    id: number;
+    sku?: string;
+    price: number;
+    salePrice?: number;
+    regularPrice: number;
+    stockStatus: 'instock' | 'outofstock' | 'onbackorder';
+    stock?: number;
+    attributes: Array<{
+      name: string;
+      option: string;
+    }>;
+    image?: StoreImage;
   }>;
 }
 
@@ -73,8 +62,11 @@ async function fetchJson<T>(url: string): Promise<T> {
   return response.json() as Promise<T>;
 }
 
-export async function fetchStoreProducts(page = 1, perPage = 100): Promise<StoreProduct[]> {
-  const response = await fetchJson<ApiResponse<StoreProduct[]>>(`/api/products?per_page=${perPage}&page=${page}`);
+export async function fetchStoreProducts(page = 1, perPage = 100, search?: string): Promise<StoreProduct[]> {
+  let url = `/api/products?per_page=${perPage}&page=${page}`;
+  if (search) url += `&search=${encodeURIComponent(search)}`;
+
+  const response = await fetchJson<ApiResponse<StoreProduct[]>>(url);
 
   if (!response.success) {
     throw new Error(response.error || 'Failed to load products');
@@ -114,82 +106,49 @@ export async function fetchStoreCategories(page = 1, perPage = 20): Promise<{
   };
 }
 
-const FALLBACK_IMAGE = 'https://images.unsplash.com/photo-1581091226825-a6a2a5aee158?q=80&w=400&auto=format&fit=crop';
-
-export function mapStoreProductToLocalProduct(product: any): Product | null {
-  if (!product || typeof product !== 'object') {
-    return null;
-  }
-
-  try {
-    const images = Array.isArray(product.images) ? product.images : [];
-    const mainImage = images[0]?.src || product.image || FALLBACK_IMAGE;
-    const allImages = images.map((img: any) => img.src).filter(Boolean);
-    if (allImages.length === 0 && mainImage) allImages.push(mainImage);
-    
-    // Handle both camelCase (MongoDB) and snake_case (WooCommerce direct)
-    const price = product.price || 0;
-    const salePrice = product.salePrice ?? product.sale_price;
-    const regularPrice = product.regularPrice ?? product.regular_price;
-    
-    const activePrice = salePrice && salePrice > 0 ? salePrice : price;
-    const originalPrice = regularPrice && regularPrice > 0 ? regularPrice : price;
-    
-    // Safety check for ID
-    const productId = (product.id || product._id || Math.random()).toString();
-
-    return {
-      id: productId,
-      slug: product.slug || '',
-      name: product.name || 'Unknown Product',
-      category: product.category || (product.categories?.[0]?.name) || 'Uncategorized',
-      price: Math.round(Number(activePrice)),
-      oldPrice: Number(originalPrice) > Number(activePrice) ? Math.round(Number(originalPrice)) : undefined,
-      image: mainImage,
-      images: allImages,
-      rating: parseFloat(product.average_rating || '0'),
-      reviews: product.rating_count || 0,
-      description: product.description || product.shortDescription || product.short_description || '',
-      badge: Number(originalPrice) > Number(activePrice) ? `-${Math.round(((Number(originalPrice) - Number(activePrice)) / Number(originalPrice)) * 100)}%` : undefined,
-      variations: Array.isArray(product.variations) 
-        ? product.variations.filter((v: any) => v && (v.id || v._id)).map((v: any) => {
-            const vPrice = v.price || 0;
-            const vSalePrice = v.salePrice ?? v.sale_price;
-            const vRegularPrice = v.regularPrice ?? v.regular_price;
-            const vActivePrice = vSalePrice && vSalePrice > 0 ? vSalePrice : vPrice;
-            
-            // Safety check for variation ID
-            const varId = (v.id || v._id || Math.random()).toString();
-
-            return {
-              id: varId,
-              sku: v.sku,
-              price: Math.round(Number(vActivePrice)),
-              oldPrice: Number(vRegularPrice) > Number(vActivePrice) ? Math.round(Number(vRegularPrice)) : undefined,
-              attributes: v.attributes || [],
-              image: v.image?.src || v.image,
-              stockStatus: v.stockStatus || v.stock_status || 'instock',
-            };
-          })
-        : undefined,
-    };
-  } catch (err) {
-    console.error('Error mapping product:', err, product);
-    return null;
-  }
-}
-
 /**
  * Fetch search suggestions based on a query
  */
 export async function fetchSearchSuggestions(query: string): Promise<Product[]> {
   if (!query || query.length < 2) return [];
   
-  const response = await fetchJson<ApiResponse<StoreProduct[]>>(`/api/search?q=${encodeURIComponent(query)}&per_page=5`);
+  const response = await fetchJson<ApiResponse<StoreProduct[]>>(`/api/products?search=${encodeURIComponent(query)}&per_page=5`);
   
   if (!response.success || !Array.isArray(response.data)) return [];
   
   return response.data
-    .map(mapStoreProductToLocalProduct)
-    .filter((p): p is Product => p !== null);
+    .map(mapStoreProductToLocalProduct);
+}
+
+export function mapStoreProductToLocalProduct(product: StoreProduct): Product {
+  const images = Array.isArray(product.images) ? product.images : [];
+  const mainImage = images[0]?.src || '';
+  const allImages = images.map(img => img.src).filter(Boolean);
+  
+  const price = product.salePrice ?? product.price;
+  const originalPrice = product.regularPrice || product.price;
+
+  return {
+    id: product.id.toString(),
+    slug: product.slug,
+    name: product.name,
+    category: product.category,
+    price: Math.round(price),
+    oldPrice: originalPrice > price ? Math.round(originalPrice) : undefined,
+    image: mainImage,
+    images: allImages.length > 0 ? allImages : [mainImage],
+    rating: product.rating,
+    reviews: product.reviewCount,
+    description: product.description || product.shortDescription || '',
+    badge: originalPrice > price ? '-20%' : undefined,
+    variations: product.variations?.map((variation) => ({
+      id: variation.id.toString(),
+      sku: variation.sku,
+      price: Math.round(variation.salePrice ?? variation.price),
+      oldPrice: (variation.regularPrice > (variation.salePrice ?? variation.price)) ? Math.round(variation.regularPrice) : undefined,
+      attributes: variation.attributes,
+      image: variation.image?.src,
+      stockStatus: variation.stockStatus,
+    })),
+  };
 }

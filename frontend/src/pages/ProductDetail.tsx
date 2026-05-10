@@ -98,7 +98,6 @@ const ProductDetail = () => {
   // Build images list (product images)
   const productImages: string[] = useMemo(() => {
     if (!product) return [];
-    if (product.images && product.images.length > 0) return product.images;
     return [product.image].filter(Boolean);
   }, [product]);
 
@@ -332,18 +331,6 @@ const ProductDetail = () => {
                         {options.map((option) => {
                           const isSelected = selected === option;
                           const available = isOptionAvailable(attrName, option);
-                          
-                          // Color mapping helper
-                          const getColorValue = (colorName: string) => {
-                            const colors: Record<string, string> = {
-                              'Black': '#000000', 'White': '#FFFFFF', 'Red': '#FF0000', 
-                              'Blue': '#0000FF', 'Green': '#008000', 'Gold': '#FFD700', 
-                              'Silver': '#C0C0C0', 'Grey': '#808080', 'Rose Gold': '#B76E79',
-                              'Purple': '#800080', 'Orange': '#FFA500', 'Yellow': '#FFFF00',
-                              'Emerald': '#50C878'
-                            };
-                            return colors[colorName] || colorName;
-                          };
 
                           return (
                             <button
@@ -351,30 +338,21 @@ const ProductDetail = () => {
                               id={`attr-${attrName}-${option}`}
                               onClick={() => available && handleAttributeChange(attrName, option)}
                               disabled={!available}
-                              className={cn(
-                                "relative flex items-center justify-center gap-1.5 px-4 py-2 rounded-full text-sm font-medium border-2 transition-all duration-300",
-                                isSelected
+                              className={`
+                                relative flex items-center gap-1.5 px-4 py-2 rounded-full text-sm font-medium
+                                border-2 transition-all duration-200 select-none
+                                ${isSelected
                                   ? "border-primary bg-primary/10 text-primary shadow-glow scale-105"
                                   : available
                                     ? "border-border text-foreground hover:border-primary/60 hover:bg-secondary/50 hover:scale-105"
                                     : "border-border/40 text-muted-foreground/40 cursor-not-allowed line-through"
-                              )}
-                              title={option}
+                                }
+                              `}
                             >
-                              {isColor ? (
-                                <div className="flex items-center gap-2">
-                                  <div 
-                                    className="h-4 w-4 rounded-full border border-white/20 shadow-sm" 
-                                    style={{ backgroundColor: getColorValue(option) }} 
-                                  />
-                                  {option}
-                                </div>
-                              ) : (
-                                <>
-                                  {isSelected && <Check className="h-3 w-3 shrink-0" />}
-                                  {option}
-                                </>
+                              {isSelected && (
+                                <Check className="h-3 w-3 shrink-0" />
                               )}
+                              {option}
                               {!available && (
                                 <span className="absolute inset-0 rounded-full overflow-hidden">
                                   <span
