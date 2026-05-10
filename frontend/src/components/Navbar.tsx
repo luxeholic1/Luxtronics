@@ -422,6 +422,7 @@ const SearchSuggestions = ({
   debouncedQuery: string;
   onSelect: () => void;
 }) => {
+  const { formatPrice } = useCurrency();
   const isTyping = query.trim() !== debouncedQuery;
 
   const {
@@ -511,7 +512,7 @@ const SearchSuggestions = ({
             </p>
           </div>
           <div className="text-sm font-semibold text-primary shrink-0">
-            ₹{product.price.toLocaleString()}
+            {formatPrice(product.price)}
           </div>
         </Link>
       ))}
