@@ -18,112 +18,85 @@ const BUILD_DIR = path.join(__dirname, 'prod-build-final');
 app.use(cors());
 app.use(express.json());
 
-// ─── DEBUG ───────────────────────────────────────────────────────────────────
-app.get('/debug', (req, res) => {
-  let indexHtml = 'NOT FOUND';
-  let assets = [];
+// ── WooCommerce Helpers ──────────────────────────────────────────────────────
+const wooUrl = () => process.env.VITE_WOOCOMMERCE_URL || '';
+const wooAuth = () => {
+  const k = process.env.VITE_WOOCOMMERCE_KEY;
+  const s = process.env.VITE_WOOCOMMERCE_SECRET;
+  if (!k || !s) return '';
+  return 'Basic ' + Buffer.from(`${k}:${s}`).toString('base64');
+};
 
-  try {
-    indexHtml = readFileSync(path.join(BUILD_DIR, 'index.html'), 'utf8');
-  } catch (e) {
-    indexHtml = `Error reading index.html: ${e.message}`;
-  }
-
-  try {
-    assets = readdirSync(path.join(BUILD_DIR, 'assets'));
-  } catch (e) {
-    assets = [`Error reading assets dir: ${e.message}`];
-  }
-
-  res.send(`
-    <html>
-      <body style="font-family:monospace; background:#111; color:#eee; padding:20px;">
-        <h1>🛠 Debug Info</h1>
-        <p><strong>Build Dir:</strong> ${BUILD_DIR}</p>
-        <p><strong>index.html exists:</strong> ${existsSync(path.join(BUILD_DIR, 'index.html'))}</p>
-        <p><strong>Assets found (${assets.length}):</strong></p>
-        <ul>${assets.map(a => `<li>${a}</li>`).join('')}</ul>
-        <hr/>
-        <h2>📄 index.html Content:</h2>
-        <pre style="background:#000; padding:10px; border:1px solid #444; white-space:pre-wrap;">${indexHtml.replace(/</g, '&lt;')}</pre>
-      </body>
-    </html>
-  `);
-});
-
-// ─── API ROUTES (add your API routes here) ───────────────────────────────────
-// app.use('/api/...', yourRouter);
-
-// ─── STATIC ASSETS ───────────────────────────────────────────────────────────
-// Serve hashed assets with long-term cache (safe because filenames change on rebuild)
-app.use(
-  '/assets',
-  express.static(path.join(BUILD_DIR, 'assets'), {
-    maxAge: '1y',
-    immutable: true,
-    fallthrough: false, // return 404 immediately if asset not found
-  })
-);
-
-// Serve other static files (favicon, robots.txt, etc.)
-app.use(
-  express.static(BUILD_DIR, {
-    index: false,       // don't auto-serve index.html here, we handle it below
-    maxAge: '1d',
-    fallthrough: true,
-  })
-);
-
-// ─── SPA FALLBACK ─────────────────────────────────────────────────────────────
-if (existsSync(path.join(BUILD_DIR, 'index.html'))) {
-  app.get('*', (req, res) => {
-    // Let API and debug routes fall through to their own handlers
-    if (req.path.startsWith('/api') || req.path === '/debug') {
-      return res.status(404).json({ error: 'Not found' });
-    }
-
-    // Any unmatched asset request = 404 (don't serve index.html for missing JS/CSS)
-    if (req.path.startsWith('/assets/')) {
-      return res.status(404).end();
-    }
-
-    try {
-      const html = readFileSync(path.join(BUILD_DIR, 'index.html'), 'utf8');
-
-      res.set({
-        'Content-Type': 'text/html; charset=utf-8',
-        // Never cache the HTML shell — assets are cache-busted by Vite's hashed filenames
-        'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
-        'Pragma': 'no-cache',
-        'Expires': '0',
-      });
-
-      res.send(html);
-    } catch (e) {
-      console.error('Failed to read index.html:', e);
-      res.status(500).send('Internal server error: could not read index.html');
-    }
-  });
-} else {
-  // Build directory or index.html is missing
-  app.get('*', (req, res) => {
-    res.status(503).send(`
-      <html>
-        <body style="font-family:monospace; background:#111; color:#f66; padding:20px;">
-          <h1>⚠️ Build not found</h1>
-          <p><strong>Expected:</strong> ${BUILD_DIR}/index.html</p>
-          <p>Upload your Vite build output to <code>prod-build-final/</code> and restart.</p>
-          <p><a href="/debug" style="color:#6af;">→ Open /debug for details</a></p>
-        </body>
-      </html>
-    `);
-  });
+function normalizeProduct(p) {
+  const regPrice = parseFloat(p.regular_price || p.price || '0');
+  const salePrice = p.sale_price ? parseFloat(p.sale_price) : undefined;
+  return {
+    id: p.id,
+    slug: p.slug,
+    name: p.name,
+    price: salePrice ?? regPrice,
+    regularPrice: regPrice,
+    salePrice,
+    images: (p.images || []).map(img => ({ id: img.id, src: img.src, alt: img.alt || '' })),
+    category: p.categories?.[0]?.name || 'Uncategorized',
+    description: p.description || '',
+    stockStatus: p.stock_status || 'instock',
+  };
 }
 
-// ─── START ───────────────────────────────────────────────────────────────────
-app.listen(port, () => {
-  console.log(`✅ Server running on port ${port}`);
-  console.log(`📁 Serving from: ${BUILD_DIR}`);
-  console.log(`🔍 Debug info:   http://localhost:${port}/debug`);
-  console.log(`   Build exists: ${existsSync(path.join(BUILD_DIR, 'index.html'))}`);
+// ── API ──────────────────────────────────────────────────────────────────────
+app.get('/api/products', async (req, res) => {
+  try {
+    const url = `${wooUrl()}/wp-json/wc/v3/products?${new URLSearchParams(req.query)}`;
+    const r = await fetch(url, { headers: { 'Authorization': wooAuth() } });
+    const items = await r.json();
+    res.json({ success: true, data: Array.isArray(items) ? items.map(normalizeProduct) : [] });
+  } catch (err) { res.status(500).json({ error: err.message }); }
 });
+
+app.get('/debug', (req, res) => {
+  let assets = [];
+  try { assets = readdirSync(path.join(BUILD_DIR, 'assets')); } catch (e) {}
+  res.json({ ok: true, build: BUILD_DIR, assets });
+});
+
+// ── UNIVERSAL ASSET RESOLVER (The Ultimate Fix) ──────────────────────────────
+// If a browser asks for a hashed file (stale cache), redirect it to the fixed filename.
+app.get('/assets/:filename', (req, res, next) => {
+  const { filename } = req.params;
+  
+  // Map hashed names to fixed names
+  let target = filename;
+  if (filename.startsWith('index-') && filename.endsWith('.js')) target = 'index.js';
+  if (filename.startsWith('index-') && filename.endsWith('.css')) target = 'index.css';
+  if (filename.startsWith('vendor-react-')) target = 'vendor-react.js';
+  if (filename.startsWith('vendor-ui-')) target = 'vendor-ui.js';
+  if (filename.startsWith('vendor-query-')) target = 'vendor-query.js';
+  if (filename.startsWith('vendor-icons-')) target = 'vendor-icons.js';
+  if (filename.startsWith('vendor-firebase-')) target = 'vendor-firebase.js';
+
+  const fullPath = path.join(BUILD_DIR, 'assets', target);
+  
+  if (existsSync(fullPath)) {
+    console.log(`🎯 Universal Resolver: ${filename} -> ${target}`);
+    return res.sendFile(fullPath, { maxAge: '1y', immutable: true });
+  }
+  
+  next();
+});
+
+// ── SERVING ──────────────────────────────────────────────────────────────────
+if (existsSync(path.join(BUILD_DIR, 'index.html'))) {
+  app.use('/assets', express.static(path.join(BUILD_DIR, 'assets'), { maxAge: '1y', immutable: true }));
+  app.use(express.static(BUILD_DIR));
+  
+  app.get('*', (req, res) => {
+    if (req.path.startsWith('/api') || req.path === '/debug') return res.status(404).end();
+    res.set('Cache-Control', 'no-store, no-cache, must-revalidate');
+    res.sendFile(path.join(BUILD_DIR, 'index.html'));
+  });
+} else {
+  app.get('*', (req, res) => res.status(503).send('Build not found. Please run npm run build.'));
+}
+
+app.listen(port, () => console.log(`🚀 Server ready on ${port}`));
