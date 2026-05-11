@@ -42,8 +42,8 @@ const Hero = () => {
       <div className="absolute top-1/4 right-1/4 h-[500px] w-[500px] rounded-full bg-primary/20 blur-[120px] animate-glow-pulse" />
       <div className="absolute bottom-1/4 left-1/4 h-[400px] w-[400px] rounded-full bg-accent/20 blur-[120px] animate-glow-pulse" />
 
-      <div className="container relative min-h-screen flex items-center pt-32 pb-12 sm:pt-40 lg:pt-48 sm:pb-0">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-12 lg:gap-16 xl:gap-24 items-center w-full">
+      <div className="container relative min-h-screen flex items-center pt-28 pb-12 sm:pt-36 lg:pt-40 sm:pb-0">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-10 lg:gap-16 items-center w-full">
           {/* Copy */}
           <motion.div
             initial={{ opacity: 0, y: 30 }}
@@ -88,15 +88,15 @@ const Hero = () => {
               </Link>
             </div>
 
-            <div className="mt-10 sm:mt-14 grid grid-cols-3 gap-6 sm:gap-10 max-w-xl w-full">
+            <div className="mt-8 sm:mt-12 flex items-center justify-center md:justify-start gap-8 sm:gap-12 w-full">
               {[
                 { num: "12K+", label: "Products" },
                 { num: "98%", label: "Happy Buyers" },
                 { num: "24/7", label: "Support" },
               ].map((s) => (
-                <div key={s.label} className="flex flex-col items-center md:items-start">
-                  <div className="font-display font-bold text-2xl sm:text-3xl xl:text-4xl text-gradient">{s.num}</div>
-                  <div className="text-[10px] sm:text-xs text-muted-foreground mt-1 uppercase tracking-widest font-semibold">{s.label}</div>
+                <div key={s.label} className="flex flex-col items-center md:items-start shrink-0">
+                  <div className="font-display font-bold text-xl sm:text-2xl lg:text-3xl text-gradient">{s.num}</div>
+                  <div className="text-[10px] sm:text-xs text-muted-foreground mt-0.5 uppercase tracking-widest font-semibold">{s.label}</div>
                 </div>
               ))}
             </div>
