@@ -62,13 +62,13 @@ export interface MongoProduct {
       alt: string;
     };
   }>;
-  
+
   // Metadata
   syncedAt: Date;
   updatedAt: Date;
   createdAt: Date;
   lastWooSyncAt?: Date;
-  
+
   // Search optimization
   searchText?: string;
 }
@@ -87,7 +87,7 @@ export interface MongoCategory {
     alt: string;
   };
   count: number;
-  
+
   // Metadata
   syncedAt: Date;
   updatedAt: Date;
@@ -189,10 +189,10 @@ export function createProductDocument(wooProduct: any, variations?: any[]): Mong
     weight: wooProduct.weight ? parseFloat(wooProduct.weight) : undefined,
     dimensions: wooProduct.dimensions
       ? {
-          length: parseFloat(wooProduct.dimensions.length || 0),
-          width: parseFloat(wooProduct.dimensions.width || 0),
-          height: parseFloat(wooProduct.dimensions.height || 0),
-        }
+        length: parseFloat(wooProduct.dimensions.length || 0),
+        width: parseFloat(wooProduct.dimensions.width || 0),
+        height: parseFloat(wooProduct.dimensions.height || 0),
+      }
       : undefined,
     attributes: wooProduct.attributes?.map((attr: any) => ({
       name: attr.name,
@@ -236,9 +236,9 @@ export function createCategoryDocument(wooCat: any): MongoCategory {
     description: wooCat.description,
     image: wooCat.image
       ? {
-          src: wooCat.image.src,
-          alt: wooCat.image.alt || '',
-        }
+        src: wooCat.image.src,
+        alt: wooCat.image.alt || '',
+      }
       : undefined,
     count: wooCat.count || 0,
     syncedAt: new Date(),
@@ -254,14 +254,14 @@ export const MongoValidation = {
   product: {
     validate: (doc: MongoProduct): string[] => {
       const errors: string[] = [];
-      
+
       if (!doc.id || !Number.isInteger(doc.id)) errors.push('Invalid product ID');
       if (!doc.slug || doc.slug.length === 0) errors.push('Product slug is required');
       if (!doc.name || doc.name.length === 0) errors.push('Product name is required');
       if (!Array.isArray(doc.images)) errors.push('Images must be an array');
       if (doc.price < 0) errors.push('Price cannot be negative');
       if (doc.rating < 0 || doc.rating > 5) errors.push('Rating must be between 0-5');
-      
+
       return errors;
     },
   },
@@ -269,11 +269,11 @@ export const MongoValidation = {
   category: {
     validate: (doc: MongoCategory): string[] => {
       const errors: string[] = [];
-      
+
       if (!doc.id || !Number.isInteger(doc.id)) errors.push('Invalid category ID');
       if (!doc.slug || doc.slug.length === 0) errors.push('Category slug is required');
       if (!doc.name || doc.name.length === 0) errors.push('Category name is required');
-      
+
       return errors;
     },
   },

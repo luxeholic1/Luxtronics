@@ -43,7 +43,8 @@ export interface StoreProduct {
     stock?: number;
     attributes: Array<{
       name: string;
-      option: string;
+      option?: string;
+      value?: string;
     }>;
     image?: StoreImage;
   }>;

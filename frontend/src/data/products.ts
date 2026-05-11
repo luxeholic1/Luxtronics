@@ -11,6 +11,7 @@ export type Product = {
   id: string;
   slug: string;
   name: string;
+  description: string;
   category: string;
   price: number;
   oldPrice?: number;
@@ -19,10 +20,8 @@ export type Product = {
   rating: number;
   reviews: number;
   badge?: "New" | "Hot" | "-20%";
-  description: string;
-  category: string; // Keep for display
   categories: Array<{ id: number; name: string }>;
-  categoryId?: number; // Keep for single-cat legacy compatibility
+  categoryId?: number;
   variations?: Array<{
     id: string;
     sku?: string;
@@ -58,6 +57,7 @@ export const products: Product[] = [
     rating: 4.8,
     reviews: 1247,
     badge: "-20%",
+    categories: [{ id: 1, name: "Audio" }],
     description:
       "Studio-grade noise cancellation with 40-hour battery and adaptive spatial audio.",
   },
@@ -69,10 +69,11 @@ export const products: Product[] = [
     price: 249,
     image: watch,
     rating: 4.7,
-    reviews: 892,
-    badge: "New",
+    reviews: 842,
+    badge: "Hot",
+    categories: [{ id: 2, name: "Wearables" }],
     description:
-      "Always-on AMOLED, 14-day battery, advanced health & fitness tracking.",
+      "Advanced health tracking with always-on AMOLED display and 7-day battery life.",
   },
   {
     id: "3",
@@ -83,10 +84,11 @@ export const products: Product[] = [
     oldPrice: 159,
     image: earbuds,
     rating: 4.6,
-    reviews: 2103,
-    badge: "Hot",
+    reviews: 2156,
+    badge: "New",
+    categories: [{ id: 1, name: "Audio" }],
     description:
-      "True wireless with active noise cancellation and seamless multi-device pairing.",
+      "Custom-tuned drivers, personalized EQ, and pocket-sized charging case.",
   },
   {
     id: "4",
@@ -96,10 +98,11 @@ export const products: Product[] = [
     price: 1499,
     image: laptop,
     rating: 4.9,
-    reviews: 412,
+    reviews: 532,
     badge: "New",
+    categories: [{ id: 3, name: "Laptops" }],
     description:
-      "Ultra-thin 15-inch laptop with M-series performance and 18-hour battery.",
+      "M3 Pro chip, Liquid Retina XDR display, and 22 hours of peak performance.",
   },
   {
     id: "5",
@@ -110,6 +113,7 @@ export const products: Product[] = [
     image: controller,
     rating: 4.5,
     reviews: 756,
+    categories: [{ id: 4, name: "Gaming" }],
     description:
       "Hall-effect sticks, RGB lighting, and ultra-low latency wireless play.",
   },
@@ -124,6 +128,7 @@ export const products: Product[] = [
     rating: 4.9,
     reviews: 318,
     badge: "-20%",
+    categories: [{ id: 5, name: "Cameras" }],
     description:
       "Full-frame sensor, 8K video, and lightning-fast hybrid autofocus.",
   },
@@ -136,6 +141,7 @@ export const products: Product[] = [
     image: speaker,
     rating: 4.6,
     reviews: 945,
+    categories: [{ id: 1, name: "Audio" }],
     description:
       "360° immersive sound with deep bass and 24-hour playtime.",
   },
@@ -149,6 +155,7 @@ export const products: Product[] = [
     rating: 4.8,
     reviews: 2241,
     badge: "Hot",
+    categories: [{ id: 6, name: "Smartphones" }],
     description:
       "Pro-grade triple camera, 120Hz display, and all-day battery in titanium.",
   },

@@ -63,7 +63,7 @@ export const CurrencyProvider = ({ children }: { children: ReactNode }) => {
         const parsed = JSON.parse(saved);
         return countries.find((c) => c.code === parsed.code) ?? countries[2]; // Default to India
       }
-    } catch {}
+    } catch { }
     return countries[2]; // Default to India
   });
 

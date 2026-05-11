@@ -4,19 +4,12 @@ export const DOMAIN_CONFIG = {
   'luxtronics.com': 'US',
   'luxtronics.co.uk': 'GB',
   'luxtronics.in': 'IN',
-  'luxtronics.de': 'DE',
-  'luxtronics.fr': 'FR',
-  'luxtronics.jp': 'JP',
+  'luxtronics.luxtronics.in': 'IN',
   'luxtronics.com.au': 'AU',
   'luxtronics.co.nz': 'NZ',
-  'luxtronics.ca': 'CA',
-  'luxtronics.ae': 'AE',
-  'luxtronics.sg': 'SG',
-  'luxtronics.br': 'BR',
-  'luxtronics.kr': 'KR',
 
   // Indian regional domains
-  'luxtronics.in.au': 'AU', // Indian domain for Australia
+  'luxtronics.in.au': 'AU', 
   'luxtronics.in.nz': 'NZ', // Indian domain for New Zealand
 
   // Alternative domains (redirects)

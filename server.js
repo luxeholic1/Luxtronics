@@ -44,13 +44,31 @@ function mask(str) {
   return str.substring(0, 3) + '...' + str.substring(str.length - 2);
 }
 
+// ── DYNAMIC STORE CONFIG ─────────────────────────────────────────────────────
+const WOO_DOMAINS = {
+  'luxtronics.in': 'https://luxtronics.luxtronics.in',
+  'luxtronics.luxtronics.in': 'https://luxtronics.luxtronics.in',
+  'luxtronics.com.au': 'https://luxtronics.com.au',
+  'luxtronics.co.nz': 'https://luxtronics.co.nz',
+  // Default fallback
+  'default': process.env.VITE_WOOCOMMERCE_URL || 'https://luxtronics.luxtronics.in'
+};
+
+function getWooUrl(req) {
+  const host = req.headers.host || '';
+  for (const [domain, url] of Object.entries(WOO_DOMAINS)) {
+    if (host.includes(domain)) return url;
+  }
+  return WOO_DOMAINS.default;
+}
+
 app.use(cors());
 app.use(express.json());
 
 // ── DEBUG ─────────────────────────────────────────────────────────────────────
 app.get('/debug', (req, res) => {
   let assets = [];
-  try { assets = readdirSync(path.join(BUILD_DIR, 'assets')); } catch (e) {}
+  try { assets = readdirSync(path.join(BUILD_DIR, 'assets')); } catch (e) { }
 
   res.json({
     ok: true,
@@ -102,7 +120,8 @@ app.get('/api/products', async (req, res) => {
 
   // Fallback to WooCommerce
   try {
-    const url = `${process.env.VITE_WOOCOMMERCE_URL}/wp-json/wc/v3/products?${new URLSearchParams(req.query)}`;
+    const wooUrl = getWooUrl(req);
+    const url = `${wooUrl}/wp-json/wc/v3/products?${new URLSearchParams(req.query)}`;
     const auth = 'Basic ' + Buffer.from(
       `${process.env.VITE_WOOCOMMERCE_KEY}:${process.env.VITE_WOOCOMMERCE_SECRET}`
     ).toString('base64');
@@ -110,7 +129,7 @@ app.get('/api/products', async (req, res) => {
     console.log(`Proxying to Woo: ${url}`);
     const r = await fetch(url, { headers: { 'Authorization': auth } });
     if (!r.ok) return res.status(r.status).json({ success: false, error: 'WooCommerce API error' });
-    
+
     res.json({ success: true, data: await r.json(), source: 'woocommerce' });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
@@ -132,10 +151,11 @@ app.get('/api/products/slug/:slug', async (req, res) => {
 
   // Fallback to WooCommerce
   try {
+    const wooUrl = getWooUrl(req);
     const auth = 'Basic ' + Buffer.from(
       `${process.env.VITE_WOOCOMMERCE_KEY}:${process.env.VITE_WOOCOMMERCE_SECRET}`
     ).toString('base64');
-    const url = `${process.env.VITE_WOOCOMMERCE_URL}/wp-json/wc/v3/products?slug=${slug}`;
+    const url = `${wooUrl}/wp-json/wc/v3/products?slug=${slug}`;
     const r = await fetch(url, { headers: { 'Authorization': auth } });
     const items = await r.json();
     const item = items[0];
@@ -155,7 +175,7 @@ app.get('/api/products/slug/:slug', async (req, res) => {
     // Wait, the frontend expects the format from createProductDocument!
     // I should probably import createProductDocument or just manually map.
     // But wait, the MongoDB sync already uses createProductDocument.
-    
+
     res.json({ success: true, data: { ...item, variations }, source: 'woocommerce' });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
@@ -177,10 +197,11 @@ app.get('/api/products/:id', async (req, res) => {
 
   // Fallback to WooCommerce
   try {
+    const wooUrl = getWooUrl(req);
     const auth = 'Basic ' + Buffer.from(
       `${process.env.VITE_WOOCOMMERCE_KEY}:${process.env.VITE_WOOCOMMERCE_SECRET}`
     ).toString('base64');
-    const url = `${process.env.VITE_WOOCOMMERCE_URL}/wp-json/wc/v3/products/${id}`;
+    const url = `${wooUrl}/wp-json/wc/v3/products/${id}`;
     const r = await fetch(url, { headers: { 'Authorization': auth } });
     const item = await r.json();
 
@@ -193,7 +214,7 @@ app.get('/api/products/:id', async (req, res) => {
       const vr = await fetch(vUrl, { headers: { 'Authorization': auth } });
       variations = await vr.json();
     }
-    
+
     res.json({ success: true, data: { ...item, variations }, source: 'woocommerce' });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
@@ -202,7 +223,8 @@ app.get('/api/products/:id', async (req, res) => {
 
 app.get('/api/categories', async (req, res) => {
   try {
-    const url = `${process.env.VITE_WOOCOMMERCE_URL}/wp-json/wc/v3/products/categories?${new URLSearchParams(req.query)}`;
+    const wooUrl = getWooUrl(req);
+    const url = `${wooUrl}/wp-json/wc/v3/products/categories?${new URLSearchParams(req.query)}`;
     const auth = 'Basic ' + Buffer.from(
       `${process.env.VITE_WOOCOMMERCE_KEY}:${process.env.VITE_WOOCOMMERCE_SECRET}`
     ).toString('base64');
@@ -245,12 +267,12 @@ app.get('/api/test-woo', async (req, res) => {
 // ── UNIVERSAL ASSET RESOLVER ──────────────────────────────────────────────────
 // Handles stale hashed filenames from LiteSpeed/browser cache
 const HASH_MAP = [
-  [/^index-.*\.js$/,           'index.js'],
-  [/^index-.*\.css$/,          'index.css'],
-  [/^vendor-react-.*\.js$/,    'vendor-react.js'],
-  [/^vendor-ui-.*\.js$/,       'vendor-ui.js'],
-  [/^vendor-query-.*\.js$/,    'vendor-query.js'],
-  [/^vendor-icons-.*\.js$/,    'vendor-icons.js'],
+  [/^index-.*\.js$/, 'index.js'],
+  [/^index-.*\.css$/, 'index.css'],
+  [/^vendor-react-.*\.js$/, 'vendor-react.js'],
+  [/^vendor-ui-.*\.js$/, 'vendor-ui.js'],
+  [/^vendor-query-.*\.js$/, 'vendor-query.js'],
+  [/^vendor-icons-.*\.js$/, 'vendor-icons.js'],
   [/^vendor-firebase-.*\.js$/, 'vendor-firebase.js'],
 ];
 
@@ -305,12 +327,12 @@ if (existsSync(path.join(BUILD_DIR, 'index.html'))) {
       // Inject Firebase config from server env vars so window.__FIREBASE_CONFIG
       // is available before index.js runs — fixes auth/invalid-api-key
       const fbConfig = {
-        apiKey:            process.env.VITE_FIREBASE_API_KEY,
-        authDomain:        process.env.VITE_FIREBASE_AUTH_DOMAIN,
-        projectId:         process.env.VITE_FIREBASE_PROJECT_ID,
-        storageBucket:     process.env.VITE_FIREBASE_STORAGE_BUCKET,
+        apiKey: process.env.VITE_FIREBASE_API_KEY,
+        authDomain: process.env.VITE_FIREBASE_AUTH_DOMAIN,
+        projectId: process.env.VITE_FIREBASE_PROJECT_ID,
+        storageBucket: process.env.VITE_FIREBASE_STORAGE_BUCKET,
         messagingSenderId: process.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
-        appId:             process.env.VITE_FIREBASE_APP_ID,
+        appId: process.env.VITE_FIREBASE_APP_ID,
       };
 
       const configScript = `<script>window.__FIREBASE_CONFIG = ${JSON.stringify(fbConfig)};</script>`;

@@ -50,7 +50,7 @@ const CategoryStrip = () => {
         ) : (
           displayCategories.slice(0, 6).map((cat) => {
             const Icon = icons[cat.slug as keyof typeof icons] || Package;
-            const count = cat.productCount ?? cat.count ?? 0;
+            const count = (cat as any).productCount ?? cat.count ?? 0;
             return (
               <Link
                 key={cat.slug}
