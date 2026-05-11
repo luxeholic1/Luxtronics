@@ -1,7 +1,6 @@
 // src/config/storeConfig.ts
 
 export interface StoreConfig {
-  apiUrl: string;
   currency: string;
   symbol: string;
   country: string;
@@ -10,21 +9,18 @@ export interface StoreConfig {
 
 const STORE_CONFIG: Record<string, StoreConfig> = {
   'luxtronics.in': {
-    apiUrl: 'https://luxtronics.luxtronics.in/wp-json/wc/v3',
     currency: 'INR',
     symbol: '₹',
     country: 'IN',
     label: 'India',
   },
   'luxtronics.com.au': {
-    apiUrl: 'https://luxtronics.com.au/wp-json/wc/v3',
     currency: 'AUD',
     symbol: 'A$',
     country: 'AU',
     label: 'Australia',
   },
   'luxtronics.co.nz': {
-    apiUrl: 'https://luxtronics.co.nz/wp-json/wc/v3',
     currency: 'NZD',
     symbol: 'NZ$',
     country: 'NZ',
@@ -37,4 +33,5 @@ const hostname = typeof window !== 'undefined' ? window.location.hostname : 'lux
 
 export const storeConfig: StoreConfig = STORE_CONFIG[hostname] ?? STORE_CONFIG['luxtronics.in'];
 
-export const API_URL = storeConfig.apiUrl;
+// Single WooCommerce API URL (shared across all domains)
+export const API_URL = 'https://luxtronics.luxtronics.in/wp-json/wc/v3';
