@@ -7,6 +7,7 @@ import { ThemeProvider } from "./context/ThemeContext.tsx";
 import { CurrencyProvider } from "./context/CurrencyContext.tsx";
 import { CartProvider } from "./context/CartContext.tsx";
 import { AuthProvider } from "./context/AuthContext.tsx";
+import { StoreProvider } from "./context/StoreContext.tsx";
 import Index from "./pages/Index.tsx";
 import Shop from "./pages/Shop.tsx";
 import ProductDetail from "./pages/ProductDetail.tsx";
@@ -35,47 +36,49 @@ const queryClient = new QueryClient();
 
 const App = () => {
   return (
-    <ThemeProvider>
-      <QueryClientProvider client={queryClient}>
-        <AuthProvider>
-          <CurrencyProvider>
-            <CartProvider>
-              <TooltipProvider>
-                <Toaster />
-                <Sonner />
-                <BrowserRouter>
-                  <Routes>
-                    <Route path="/" element={<Index />} />
-                    <Route path="/shop" element={<Shop />} />
-                    <Route path="/product/:slug" element={<ProductDetail />} />
-                    <Route path="/categories" element={<Categories />} />
-                    <Route path="/cart" element={<Cart />} />
-                    <Route path="/checkout" element={<Checkout />} />
-                    <Route path="/blog" element={<Blog />} />
-                    <Route path="/blog/:slug" element={<BlogPost />} />
-                    <Route path="/contact" element={<Contact />} />
-                    <Route path="/about" element={<About />} />
-                    <Route path="/faq" element={<FAQ />} />
-                    <Route path="/shipping-returns" element={<ShippingReturns />} />
-                    <Route path="/privacy" element={<Privacy />} />
-                    <Route path="/terms" element={<Terms />} />
-                    <Route path="/account" element={<AccountDashboard />} />
-                    <Route path="/account/login" element={<AccountLogin />} />
-                    <Route path="/account/register" element={<AccountRegister />} />
-                    <Route path="/account/orders" element={<AccountOrders />} />
-                    <Route path="/account/profile" element={<AccountProfile />} />
-                    <Route path="/admin" element={<AdminGuard><AdminDashboard /></AdminGuard>} />
-                    <Route path="/admin/products" element={<AdminGuard><AdminProducts /></AdminGuard>} />
-                    {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
-                    <Route path="*" element={<NotFound />} />
-                  </Routes>
-                </BrowserRouter>
-              </TooltipProvider>
-            </CartProvider>
-          </CurrencyProvider>
-        </AuthProvider>
-      </QueryClientProvider>
-    </ThemeProvider>
+    <StoreProvider>
+      <ThemeProvider>
+        <QueryClientProvider client={queryClient}>
+          <AuthProvider>
+            <CurrencyProvider>
+              <CartProvider>
+                <TooltipProvider>
+                  <Toaster />
+                  <Sonner />
+                  <BrowserRouter>
+                    <Routes>
+                      <Route path="/" element={<Index />} />
+                      <Route path="/shop" element={<Shop />} />
+                      <Route path="/product/:slug" element={<ProductDetail />} />
+                      <Route path="/categories" element={<Categories />} />
+                      <Route path="/cart" element={<Cart />} />
+                      <Route path="/checkout" element={<Checkout />} />
+                      <Route path="/blog" element={<Blog />} />
+                      <Route path="/blog/:slug" element={<BlogPost />} />
+                      <Route path="/contact" element={<Contact />} />
+                      <Route path="/about" element={<About />} />
+                      <Route path="/faq" element={<FAQ />} />
+                      <Route path="/shipping-returns" element={<ShippingReturns />} />
+                      <Route path="/privacy" element={<Privacy />} />
+                      <Route path="/terms" element={<Terms />} />
+                      <Route path="/account" element={<AccountDashboard />} />
+                      <Route path="/account/login" element={<AccountLogin />} />
+                      <Route path="/account/register" element={<AccountRegister />} />
+                      <Route path="/account/orders" element={<AccountOrders />} />
+                      <Route path="/account/profile" element={<AccountProfile />} />
+                      <Route path="/admin" element={<AdminGuard><AdminDashboard /></AdminGuard>} />
+                      <Route path="/admin/products" element={<AdminGuard><AdminProducts /></AdminGuard>} />
+                      {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
+                      <Route path="*" element={<NotFound />} />
+                    </Routes>
+                  </BrowserRouter>
+                </TooltipProvider>
+              </CartProvider>
+            </CurrencyProvider>
+          </AuthProvider>
+        </QueryClientProvider>
+      </ThemeProvider>
+    </StoreProvider>
   );
 };
 
