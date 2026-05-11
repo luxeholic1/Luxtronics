@@ -42,8 +42,8 @@ const Hero = () => {
       <div className="absolute top-1/4 right-1/4 h-[500px] w-[500px] rounded-full bg-primary/20 blur-[120px] animate-glow-pulse" />
       <div className="absolute bottom-1/4 left-1/4 h-[400px] w-[400px] rounded-full bg-accent/20 blur-[120px] animate-glow-pulse" />
 
-      <div className="container relative min-h-screen flex items-center pt-20 pb-12 sm:pt-24 sm:pb-0">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 lg:gap-12 xl:gap-20 items-center w-full">
+      <div className="container relative min-h-screen flex items-center pt-32 pb-12 sm:pt-40 lg:pt-48 sm:pb-0">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-12 lg:gap-16 xl:gap-24 items-center w-full">
           {/* Copy */}
           <motion.div
             initial={{ opacity: 0, y: 30 }}
