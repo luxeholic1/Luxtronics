@@ -74,7 +74,10 @@ const Shop = () => {
     if (activeCat !== "all") {
       const selectedCategory = categories.find((c) => c.slug === activeCat);
       if (selectedCategory) {
-        p = p.filter((x) => x.category === selectedCategory.name);
+        p = p.filter((x) => 
+          x.categoryId === selectedCategory.id || 
+          x.category.toLowerCase().trim() === selectedCategory.name.toLowerCase().trim()
+        );
       }
     }
 

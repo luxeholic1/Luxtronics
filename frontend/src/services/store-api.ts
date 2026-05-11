@@ -143,6 +143,7 @@ export function mapStoreProductToLocalProduct(product: StoreProduct): Product {
     slug: product.slug || '',
     name: product.name || 'Unnamed Product',
     category: product.category || 'Uncategorized',
+    categoryId: product.categoryId,
     price: Math.round(price),
     oldPrice: originalPrice > price ? Math.round(originalPrice) : undefined,
     image: mainImage,

@@ -20,6 +20,7 @@ export type Product = {
   reviews: number;
   badge?: "New" | "Hot" | "-20%";
   description: string;
+  categoryId?: number;
   variations?: Array<{
     id: string;
     sku?: string;
