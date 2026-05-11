@@ -48,8 +48,8 @@ const Hero = () => {
         - py handles top/bottom spacing uniformly
         - Grid takes full height so image scales within available space
       */}
-      <div className="container relative flex items-center h-screen max-h-screen py-20 sm:py-24 lg:py-28">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 lg:gap-10 items-center w-full h-full">
+      <div className="container relative flex flex-col md:flex-row items-center justify-center min-h-screen py-24 sm:py-32 lg:py-40">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-10 lg:gap-16 items-center w-full">
 
           {/* Copy */}
           <motion.div
@@ -116,8 +116,7 @@ const Hero = () => {
             animate={{ opacity: 1, scale: 1, rotate: 0 }}
             transition={{ duration: 1.1, ease: [0.34, 1.56, 0.64, 1], delay: 0.2 }}
             className="relative flex items-center justify-center order-first md:order-last
-              h-[240px] sm:h-[340px] md:h-full
-              max-h-[300px] sm:max-h-[420px] md:max-h-full"
+              h-[280px] sm:h-[400px] md:h-[500px] lg:h-[600px] xl:h-[700px] w-full"
           >
             <div className="absolute inset-0 bg-gradient-radial opacity-80" />
             <div className="relative z-10 h-full w-full overflow-hidden">
@@ -133,7 +132,7 @@ const Hero = () => {
                     animate={{ opacity: 1, scale: 1, y: 0 }}
                     exit={{ opacity: 0, scale: 0.96, y: -12 }}
                     transition={{ duration: 0.6, ease: [0.4, 0, 0.2, 1] }}
-                    className={`absolute inset-0 h-full w-full object-contain animate-float cursor-pointer ${categorySlides[activeSlide].glow}`}
+                    className={`absolute inset-0 h-full w-full object-contain animate-float cursor-pointer will-change-transform ${categorySlides[activeSlide].glow}`}
                   />
                 </Link>
               </AnimatePresence>
