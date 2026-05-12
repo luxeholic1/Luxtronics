@@ -1,12 +1,14 @@
 /**
  * woo-checkout.ts
  * Builds the WooCommerce checkout redirect URL so the React frontend
- * can hand off to the WordPress/WooCommerce payment flow on
- * luxtronics.luxtronics.in, with WooMultiDomain knowing which
- * source domain/currency the customer came from.
+ * can hand off to the WordPress/WooCommerce payment flow on the
+ * appropriate store based on the current domain.
  */
 
-export const WOO_BASE = "https://luxtronics.luxtronics.in";
+import { storeConfig } from '@/config/storeConfig';
+
+// Get store-specific WooCommerce base URL
+export const WOO_BASE = storeConfig.apiUrl.replace('/wp-json/wc/v3', '');
 
 export interface CartLineItem {
   /** WooCommerce product ID (numeric) */
@@ -16,7 +18,7 @@ export interface CartLineItem {
 }
 
 /**
- * Redirects the browser to the WooCommerce checkout page.
+ * Redirects the browser to the WooCommerce checkout page for the current store.
  *
  * Strategy:
  *  1. For a single product ("Buy Now") → use WooCommerce's
@@ -24,11 +26,12 @@ export interface CartLineItem {
  *     /?add-to-cart=<id>&quantity=<qty>&return_to=checkout
  *
  *  2. For multiple items (full cart) → link directly to
- *     /checkout/ with source_domain + currency so WooMultiDomain
- *     can apply the correct pricing tier.
+ *     /checkout/ with source_domain + currency.
  *
- * WooMultiDomain reads `source_domain` from the query string and
- * switches the store context accordingly.
+ * The checkout URL is automatically determined based on the current domain:
+ * - luxtronics.in → luxtronics.luxtronics.in
+ * - luxtronics.com.au → luxtronics.luxtronics.in/storeau
+ * - luxtronics.co.nz → luxtronics.luxtronics.in/storenz
  */
 export function redirectToWooCheckout(
   items: CartLineItem[],
