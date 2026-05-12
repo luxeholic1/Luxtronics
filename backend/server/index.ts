@@ -12,6 +12,7 @@ import { fileURLToPath } from 'url';
 import { initializeMongoDB } from './db/mongodb';
 import { createProductDocument, createCategoryDocument } from './models/mongo-models';
 import { globalRateLimiter, sanitizeRequestBody, securityHeaders } from './middleware/security';
+import { createWooCommerceProxyRoutes } from './routes/woocommerce-proxy';
 import WooCommerceSync from './services/woocommerce-sync';
 
 // ── Load env vars using absolute paths so tsx watch always finds them ─────────
@@ -28,9 +29,17 @@ interface ServerConfig {
 }
 
 // ── Read WooCommerce creds at call-time so they're never stale ───────────────
-function wooUrl(): string { return process.env.VITE_WOOCOMMERCE_URL || ''; }
-function wooKey(): string { return process.env.VITE_WOOCOMMERCE_KEY || ''; }
-function wooSecret(): string { return process.env.VITE_WOOCOMMERCE_SECRET || ''; }
+// For multi-store support, we use India store credentials by default
+// Frontend will call WooCommerce directly for store-specific operations
+function wooUrl(): string { 
+  return process.env.VITE_WOOCOMMERCE_URL_INDIA || process.env.VITE_WOOCOMMERCE_URL || ''; 
+}
+function wooKey(): string { 
+  return process.env.VITE_WOOCOMMERCE_KEY_INDIA || process.env.VITE_WOOCOMMERCE_KEY || ''; 
+}
+function wooSecret(): string { 
+  return process.env.VITE_WOOCOMMERCE_SECRET_INDIA || process.env.VITE_WOOCOMMERCE_SECRET || ''; 
+}
 
 function wooAuthHeader(): string {
   const key = wooKey();
@@ -107,6 +116,9 @@ export async function setupServer(config: ServerConfig = {}): Promise<Express> {
     origin: corsOrigins.includes('*') ? true : corsOrigins,
     credentials: true,
   }));
+
+  // ── Register WooCommerce Proxy Routes ─────────────────────────────────────
+  app.use('/api', createWooCommerceProxyRoutes());
 
   // ── State ─────────────────────────────────────────────────────────────────
   let mongoReady = false;

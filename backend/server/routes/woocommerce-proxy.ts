@@ -11,27 +11,27 @@ export function createWooCommerceProxyRoutes(): Router {
 
   // Multi-domain support: different stores for different domains
   const STORES = {
-    'luxtronics.com': {
-      url: process.env.VITE_WOOCOMMERCE_URL || process.env.WOOCOMMERCE_URL_US,
-      key: process.env.VITE_WOOCOMMERCE_KEY || process.env.WOOCOMMERCE_KEY_US,
-      secret: process.env.VITE_WOOCOMMERCE_SECRET || process.env.WOOCOMMERCE_SECRET_US,
+    'luxtronics.in': {
+      url: process.env.VITE_WOOCOMMERCE_URL_INDIA,
+      key: process.env.VITE_WOOCOMMERCE_KEY_INDIA,
+      secret: process.env.VITE_WOOCOMMERCE_SECRET_INDIA,
     },
     'luxtronics.com.au': {
-      url: process.env.WOOCOMMERCE_URL_AU,
-      key: process.env.WOOCOMMERCE_KEY_AU,
-      secret: process.env.WOOCOMMERCE_SECRET_AU,
+      url: process.env.VITE_WOOCOMMERCE_URL_AUSTRALIA,
+      key: process.env.VITE_WOOCOMMERCE_KEY_AUSTRALIA,
+      secret: process.env.VITE_WOOCOMMERCE_SECRET_AUSTRALIA,
     },
     'luxtronics.co.nz': {
-      url: process.env.WOOCOMMERCE_URL_NZ,
-      key: process.env.WOOCOMMERCE_KEY_NZ,
-      secret: process.env.WOOCOMMERCE_SECRET_NZ,
+      url: process.env.VITE_WOOCOMMERCE_URL_NEWZEALAND,
+      key: process.env.VITE_WOOCOMMERCE_KEY_NEWZEALAND,
+      secret: process.env.VITE_WOOCOMMERCE_SECRET_NEWZEALAND,
     },
   };
 
   function getStoreConfig(host: string) {
     // Remove www. if present
     const domain = host.replace(/^www\./, '');
-    return STORES[domain] || STORES['luxtronics.com']; // Default to US store
+    return STORES[domain] || STORES['luxtronics.in']; // Default to India store
   }
 
   function getAuthHeader(host: string): string {
@@ -53,7 +53,7 @@ export function createWooCommerceProxyRoutes(): Router {
    */
   router.get('/woo/products', async (req: Request, res: Response) => {
     try {
-      const host = req.headers.host || 'luxtronics.com';
+      const host = req.headers.host || 'luxtronics.in';
       const SOURCE_URL = getSourceUrl(host);
 
       if (!SOURCE_URL) {
@@ -107,7 +107,7 @@ export function createWooCommerceProxyRoutes(): Router {
    */
   router.get('/woo/products/:id', async (req: Request, res: Response) => {
     try {
-      const host = req.headers.host || 'luxtronics.com';
+      const host = req.headers.host || 'luxtronics.in';
       const SOURCE_URL = getSourceUrl(host);
 
       if (!SOURCE_URL) {
@@ -145,7 +145,7 @@ export function createWooCommerceProxyRoutes(): Router {
    */
   router.get('/woo/categories', async (req: Request, res: Response) => {
     try {
-      const host = req.headers.host || 'luxtronics.com';
+      const host = req.headers.host || 'luxtronics.in';
       const SOURCE_URL = getSourceUrl(host);
 
       if (!SOURCE_URL) {
@@ -184,7 +184,7 @@ export function createWooCommerceProxyRoutes(): Router {
    */
   router.get('/woo/status', async (req: Request, res: Response) => {
     try {
-      const host = req.headers.host || 'luxtronics.com';
+      const host = req.headers.host || 'luxtronics.in';
       const SOURCE_URL = getSourceUrl(host);
       const store = getStoreConfig(host);
 
@@ -212,7 +212,7 @@ export function createWooCommerceProxyRoutes(): Router {
         totalProducts: total,
       });
     } catch (error: any) {
-      const host = req.headers.host || 'luxtronics.com';
+      const host = req.headers.host || 'luxtronics.in';
       const SOURCE_URL = getSourceUrl(host);
       res.json({ connected: false, error: error.message, sourceUrl: SOURCE_URL, domain: host });
     }
@@ -224,7 +224,7 @@ export function createWooCommerceProxyRoutes(): Router {
    */
   router.post('/woo/products', async (req: Request, res: Response) => {
     try {
-      const host = req.headers.host || 'luxtronics.com';
+      const host = req.headers.host || 'luxtronics.in';
       const SOURCE_URL = getSourceUrl(host);
 
       if (!SOURCE_URL) {
@@ -304,7 +304,7 @@ export function createWooCommerceProxyRoutes(): Router {
    */
   router.delete('/woo/products/:id', async (req: Request, res: Response) => {
     try {
-      const host = req.headers.host || 'luxtronics.com';
+      const host = req.headers.host || 'luxtronics.in';
       const SOURCE_URL = getSourceUrl(host);
 
       if (!SOURCE_URL) {
