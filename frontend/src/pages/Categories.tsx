@@ -49,7 +49,7 @@ const Categories = () => {
   return (
     <Layout>
       {/* ── Header ───────────────────────────────────────────── */}
-      <section className="container pt-32 pb-10">
+      <section className="container pt-24 sm:pt-28 lg:pt-32 pb-10 sm:pb-12">
         <p className="text-sm text-primary font-medium uppercase tracking-widest mb-3">Browse</p>
         <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
           <div>
@@ -69,7 +69,7 @@ const Categories = () => {
       </section>
 
       {/* ── Grid ─────────────────────────────────────────────── */}
-      <section className="container pb-8">
+      <section className="container pb-10 sm:pb-12 lg:pb-16">
         {loading ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
             {[...Array(PER_PAGE)].map((_, i) => <SkeletonCard key={i} />)}
@@ -152,61 +152,9 @@ const Categories = () => {
         )}
       </section>
 
-      {/* ── Pagination ────────────────────────────────────────── */}
-      {!loading && totalPages > 1 && (
-        <div className="container pb-16 flex items-center justify-center gap-3">
-          {/* Prev */}
-          <button
-            onClick={() => handlePageChange(page - 1)}
-            disabled={page === 1}
-            className="h-10 w-10 rounded-full border border-border flex items-center justify-center hover:border-primary hover:text-primary transition-all disabled:opacity-30 disabled:cursor-not-allowed"
-          >
-            <ChevronLeft className="h-4 w-4" />
-          </button>
-
-          {/* Page numbers */}
-          {Array.from({ length: totalPages }, (_, i) => i + 1).map((p) => {
-            // Show first, last, current ±1, and ellipsis
-            const show = p === 1 || p === totalPages || Math.abs(p - page) <= 1;
-            const showEllipsisBefore = p === page - 2 && page > 3;
-            const showEllipsisAfter  = p === page + 2 && page < totalPages - 2;
-
-            if (!show && !showEllipsisBefore && !showEllipsisAfter) return null;
-            if (showEllipsisBefore || showEllipsisAfter) {
-              return (
-                <span key={`e${p}`} className="text-muted-foreground text-sm px-1">…</span>
-              );
-            }
-
-            return (
-              <button
-                key={p}
-                onClick={() => handlePageChange(p)}
-                className={`h-10 min-w-10 px-3 rounded-full text-sm font-medium border transition-all ${
-                  page === p
-                    ? "bg-gradient-brand text-primary-foreground border-transparent shadow-glow"
-                    : "border-border hover:border-primary hover:text-primary"
-                }`}
-              >
-                {p}
-              </button>
-            );
-          })}
-
-          {/* Next */}
-          <button
-            onClick={() => handlePageChange(page + 1)}
-            disabled={page === totalPages}
-            className="h-10 w-10 rounded-full border border-border flex items-center justify-center hover:border-primary hover:text-primary transition-all disabled:opacity-30 disabled:cursor-not-allowed"
-          >
-            <ChevronRight className="h-4 w-4" />
-          </button>
-        </div>
-      )}
-
       {/* ── All products CTA ──────────────────────────────────── */}
       {!loading && categories.length > 0 && (
-        <div className="container pb-24 text-center">
+        <div className="container pb-16 sm:pb-20 lg:pb-24 text-center">
           <Link
             to="/shop"
             className="inline-flex items-center gap-2 rounded-full bg-gradient-brand px-8 py-4 text-sm font-semibold text-primary-foreground shadow-glow hover:shadow-glow-pink transition-all hover:scale-[1.03]"

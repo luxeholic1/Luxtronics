@@ -61,7 +61,7 @@ const Cart = () => {
 
   return (
     <Layout>
-      <section className="container pt-32 pb-16">
+      <section className="container pt-24 sm:pt-28 lg:pt-32 pb-12 sm:pb-16">
         <h1 className="font-display font-bold text-5xl sm:text-6xl tracking-tight mb-12">
           Your <span className="text-gradient">cart</span>
         </h1>
@@ -167,7 +167,7 @@ const Cart = () => {
         )}
       </section>
 
-      <section className="container pb-24">
+      <section className="container pb-16 sm:pb-20 lg:pb-24">
         <div className="mb-6 flex items-end justify-between gap-4">
           <div>
             <p className="text-sm text-primary font-medium uppercase tracking-widest mb-2">Recommended</p>

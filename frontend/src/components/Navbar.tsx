@@ -44,9 +44,13 @@ const Navbar = () => {
   const { totalItems } = useCart();
 
   useEffect(() => {
-    const onScroll = () => setScrolled(window.scrollY > 20);
+    const onScroll = () => {
+      requestAnimationFrame(() => {
+        setScrolled(window.scrollY > 20);
+      });
+    };
     onScroll();
-    window.addEventListener("scroll", onScroll);
+    window.addEventListener("scroll", onScroll, { passive: true });
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
 
@@ -98,13 +102,13 @@ const Navbar = () => {
     <header
       className={cn(
         "fixed top-0 left-0 right-0 z-50 transition-all duration-500 ease-smooth",
-        scrolled ? "py-3" : "py-6"
+        scrolled ? "py-2 sm:py-3" : "py-3 sm:py-5"
       )}
     >
       <div
         className={cn(
-          "container flex items-center justify-between transition-all duration-500",
-          scrolled && "rounded-2xl border border-white/5 bg-background/10 px-6 py-3 backdrop-blur-md"
+          "w-full flex items-center justify-between transition-all duration-500 px-4 sm:px-6 md:px-8 lg:px-12 xl:px-16 max-w-[1920px] mx-auto",
+          scrolled && "rounded-lg sm:rounded-xl lg:rounded-2xl border dark:border-white/10 light:border-black/10 dark:bg-black/60 light:bg-white/90 px-4 sm:px-6 md:px-8 lg:px-12 xl:px-16 py-2.5 sm:py-3 backdrop-blur-xl shadow-lg"
         )}
       >
         {/* Logo */}
@@ -112,7 +116,7 @@ const Navbar = () => {
           <div className="relative h-8 w-8 sm:h-9 sm:w-9 rounded-lg bg-gradient-brand flex items-center justify-center shadow-glow group-hover:scale-110 transition-transform duration-300">
             <Zap className="h-4 w-4 sm:h-5 sm:w-5 text-primary-foreground" strokeWidth={2.5} />
           </div>
-          <span className="font-display font-bold text-lg sm:text-xl lg:text-2xl tracking-tight">
+          <span className="font-display font-bold text-lg sm:text-xl lg:text-2xl tracking-tight dark:text-white light:text-black">
             Lux<span className="text-gradient">tronics</span>
           </span>
         </Link>
@@ -127,7 +131,7 @@ const Navbar = () => {
               className={({ isActive }) =>
                 cn(
                   "relative px-4 py-2 text-sm font-medium transition-colors",
-                  isActive ? "text-foreground" : "text-muted-foreground hover:text-foreground"
+                  isActive ? "dark:text-white light:text-black" : "dark:text-white/80 light:text-black/80 dark:hover:text-white light:hover:text-black"
                 )
               }
             >
@@ -159,8 +163,8 @@ const Navbar = () => {
               }
             }}
             className={cn(
-              "h-9 w-9 sm:h-10 sm:w-10 rounded-full flex items-center justify-center transition-colors",
-              searchOpen ? "bg-primary/10 text-primary" : "hover:bg-secondary"
+              "h-9 w-9 sm:h-10 sm:w-10 rounded-full flex items-center justify-center transition-colors dark:text-white light:text-black",
+              searchOpen ? "bg-primary/10 text-primary" : "dark:hover:bg-white/10 light:hover:bg-black/10"
             )}
           >
             {searchOpen ? <X className="h-4 w-4 sm:h-[18px] sm:w-[18px]" /> : <Search className="h-4 w-4 sm:h-[18px] sm:w-[18px]" />}
@@ -170,22 +174,22 @@ const Navbar = () => {
           <div className="relative">
             <button
               onClick={() => setCurrencyOpen((v) => !v)}
-              className="hidden sm:flex h-9 items-center gap-1.5 rounded-full hover:bg-secondary px-3 text-sm font-medium transition-colors"
+              className="hidden sm:flex h-9 items-center gap-1.5 rounded-full dark:hover:bg-white/10 light:hover:bg-black/10 px-3 text-sm font-medium transition-colors dark:text-white light:text-black"
               aria-label="Switch currency"
             >
               <span className="text-base leading-none">{country.flag}</span>
-              <span className="text-xs text-muted-foreground">{country.currency}</span>
-              <ChevronDown className={`h-3 w-3 text-muted-foreground transition-transform duration-200 ${currencyOpen ? "rotate-180" : ""}`} />
+              <span className="text-xs dark:text-white/80 light:text-black/80">{country.currency}</span>
+              <ChevronDown className={`h-3 w-3 dark:text-white/80 light:text-black/80 transition-transform duration-200 ${currencyOpen ? "rotate-180" : ""}`} />
             </button>
             {currencyOpen && (
               <>
                 <div className="fixed inset-0 z-40" onClick={() => setCurrencyOpen(false)} />
-                <div className="absolute right-0 top-full mt-2 z-50 w-52 rounded-2xl border border-white/8 bg-[hsl(0_0%_6%)] shadow-2xl overflow-hidden max-h-80 overflow-y-auto scrollbar-hidden">
+                <div className="absolute right-0 top-full mt-2 z-50 w-52 rounded-2xl border dark:border-white/10 light:border-black/10 dark:bg-black/80 light:bg-white/95 backdrop-blur-xl shadow-2xl overflow-hidden max-h-80 overflow-y-auto scrollbar-hidden">
                   {countries.map((c) => (
                     <button
                       key={c.code}
                       onClick={() => { setCountry(c); setCurrencyOpen(false); }}
-                      className={`w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-white/[0.06] transition-colors text-sm ${country.code === c.code ? "bg-primary/10 border-l-2 border-primary" : ""
+                      className={`w-full flex items-center gap-3 px-4 py-3 text-left dark:hover:bg-white/[0.08] light:hover:bg-black/[0.05] transition-colors text-sm ${country.code === c.code ? "dark:bg-primary/10 light:bg-primary/10 border-l-2 border-primary" : ""
                         }`}
                     >
                       <span className="text-lg">{c.flag}</span>
@@ -205,9 +209,9 @@ const Navbar = () => {
           <Link
             to="/cart"
             aria-label="Cart"
-            className="h-9 w-9 sm:h-10 sm:w-10 rounded-full hover:bg-secondary flex items-center justify-center transition-colors relative"
+            className="h-9 w-9 sm:h-10 sm:w-10 rounded-full dark:hover:bg-white/10 light:hover:bg-black/10 flex items-center justify-center transition-colors relative"
           >
-            <ShoppingBag className="h-4 w-4 sm:h-[18px] sm:w-[18px]" />
+            <ShoppingBag className="h-4 w-4 sm:h-[18px] sm:w-[18px] dark:text-white light:text-black" />
             {totalItems > 0 && (
               <span className="absolute top-1 right-1 h-4 w-4 rounded-full bg-gradient-brand text-[10px] font-bold flex items-center justify-center text-primary-foreground">
                 {totalItems > 99 ? "99+" : totalItems}
@@ -228,7 +232,7 @@ const Navbar = () => {
               <button
                 onClick={handleLogOut}
                 aria-label="Sign out"
-                className="h-9 w-9 rounded-full hover:bg-secondary flex items-center justify-center transition-colors"
+                className="h-9 w-9 rounded-full dark:hover:bg-white/10 light:hover:bg-black/10 flex items-center justify-center transition-colors dark:text-white light:text-black"
               >
                 <LogOut className="h-4 w-4" />
               </button>
@@ -238,13 +242,13 @@ const Navbar = () => {
               <Link
                 to="/account/login"
                 aria-label="Account"
-                className="h-9 w-9 sm:h-10 sm:w-10 rounded-full hover:bg-secondary flex items-center justify-center transition-colors"
+                className="h-9 w-9 sm:h-10 sm:w-10 rounded-full dark:hover:bg-white/10 light:hover:bg-black/10 flex items-center justify-center transition-colors dark:text-white light:text-black"
               >
                 <User className="h-4 w-4 sm:h-[18px] sm:w-[18px]" />
               </Link>
               <Link
                 to="/account/login"
-                className="h-9 inline-flex items-center rounded-full border border-border px-4 text-sm font-medium hover:border-primary/40 transition-colors"
+                className="h-9 inline-flex items-center rounded-full border dark:border-white/20 light:border-black/20 px-4 text-sm font-medium hover:border-primary/40 transition-colors dark:text-white light:text-black"
               >
                 Sign in
               </Link>
@@ -260,7 +264,7 @@ const Navbar = () => {
           <button
             aria-label="Menu"
             onClick={() => setMobileOpen((v) => !v)}
-            className="md:hidden h-9 w-9 rounded-full hover:bg-secondary flex items-center justify-center transition-colors"
+            className="md:hidden h-9 w-9 rounded-full dark:hover:bg-white/10 light:hover:bg-black/10 flex items-center justify-center transition-colors dark:text-white light:text-black"
           >
             {mobileOpen ? <X className="h-4 w-4" /> : <Menu className="h-4 w-4" />}
           </button>
@@ -275,12 +279,12 @@ const Navbar = () => {
         )}
       >
         <div className="container mt-2">
-          <div className="relative">
+          <div className="relative max-w-[1920px] mx-auto">
             <form
               onSubmit={handleSearch}
-              className="flex items-center gap-3 rounded-2xl border border-white/10 bg-background/80 backdrop-blur-xl px-5 py-3 shadow-2xl"
+              className="flex items-center gap-3 rounded-2xl border dark:border-white/10 light:border-black/10 dark:bg-black/60 light:bg-white/90 backdrop-blur-xl px-5 py-3 shadow-2xl"
             >
-              <Search className="h-5 w-5 text-muted-foreground shrink-0" />
+              <Search className="h-5 w-5 dark:text-white light:text-black shrink-0" />
               <input
                 ref={searchInputRef}
                 id="navbar-search-input"
@@ -288,7 +292,7 @@ const Navbar = () => {
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="Search products… (press Enter)"
-                className="flex-1 bg-transparent text-sm text-foreground placeholder:text-muted-foreground focus:outline-none"
+                className="flex-1 bg-transparent text-sm dark:text-white light:text-black dark:placeholder:text-white/60 light:placeholder:text-black/60 focus:outline-none"
               />
               {searchQuery && (
                 <button
@@ -305,7 +309,7 @@ const Navbar = () => {
                   setSearchQuery("");
                   setDebouncedQuery("");
                 }}
-                className="shrink-0 text-muted-foreground hover:text-foreground transition-colors"
+                className="shrink-0 dark:text-white light:text-black hover:text-primary transition-colors"
               >
                 <X className="h-4 w-4" />
               </button>
@@ -319,7 +323,7 @@ const Navbar = () => {
                   animate={{ opacity: 1, y: 0, scale: 1 }}
                   exit={{ opacity: 0, y: 10, scale: 0.98 }}
                   transition={{ duration: 0.2 }}
-                  className="absolute top-full left-0 right-0 mt-4 z-50 rounded-2xl border border-white/10 bg-background/90 backdrop-blur-xl shadow-2xl overflow-hidden"
+                  className="absolute top-full left-0 right-0 mt-4 z-50 rounded-2xl border dark:border-white/10 light:border-black/10 dark:bg-black/80 light:bg-white/95 backdrop-blur-xl shadow-2xl overflow-hidden"
                 >
                   <SearchSuggestions
                     query={searchQuery}
@@ -339,19 +343,19 @@ const Navbar = () => {
 
       {/* Mobile menu */}
       {mobileOpen && (
-        <div className="md:hidden container mt-2 sm:mt-3 animate-fade-up px-4 sm:px-6">
-          <div className="rounded-2xl border border-white/5 bg-background/35 p-3 sm:p-4 flex flex-col gap-1 backdrop-blur-xl">
+        <div className="md:hidden container mt-2 sm:mt-3 animate-fade-up px-4 sm:px-6 max-w-[1920px] mx-auto">
+          <div className="rounded-2xl border dark:border-white/10 light:border-black/10 dark:bg-black/60 light:bg-white/90 p-3 sm:p-4 flex flex-col gap-1 backdrop-blur-xl shadow-lg">
             <form
               onSubmit={handleSearch}
-              className="flex items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-3 py-2 mb-2"
+              className="flex items-center gap-2 rounded-xl border dark:border-white/10 light:border-black/10 dark:bg-white/5 light:bg-black/5 px-3 py-2 mb-2"
             >
-              <Search className="h-4 w-4 text-muted-foreground shrink-0" />
+              <Search className="h-4 w-4 dark:text-white light:text-black shrink-0" />
               <input
                 type="search"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="Search products…"
-                className="flex-1 bg-transparent text-sm text-foreground placeholder:text-muted-foreground focus:outline-none"
+                className="flex-1 bg-transparent text-sm dark:text-white light:text-black dark:placeholder:text-white/60 light:placeholder:text-black/60 focus:outline-none"
               />
             </form>
 
@@ -363,7 +367,7 @@ const Navbar = () => {
                 className={({ isActive }) =>
                   cn(
                     "px-4 py-3 rounded-lg text-sm font-medium transition-colors",
-                    isActive ? "bg-secondary text-foreground" : "text-muted-foreground hover:bg-secondary/60"
+                    isActive ? "dark:bg-white/10 light:bg-black/10 dark:text-white light:text-black" : "dark:text-white/80 light:text-black/80 dark:hover:bg-white/5 light:hover:bg-black/5"
                   )
                 }
               >
@@ -376,13 +380,13 @@ const Navbar = () => {
                 <>
                   <Link
                     to="/account"
-                    className="w-full rounded-lg border border-border px-4 py-3 text-sm font-medium text-center"
+                    className="w-full rounded-lg border dark:border-white/20 light:border-black/20 px-4 py-3 text-sm font-medium text-center dark:text-white light:text-black dark:hover:bg-white/5 light:hover:bg-black/5"
                   >
                     My Account
                   </Link>
                   <button
                     onClick={handleLogOut}
-                    className="w-full rounded-lg border border-border px-4 py-3 text-sm font-medium text-center hover:border-primary/40 transition-colors"
+                    className="w-full rounded-lg border dark:border-white/20 light:border-black/20 px-4 py-3 text-sm font-medium text-center hover:border-primary/40 transition-colors dark:text-white light:text-black"
                   >
                     Sign out
                   </button>
@@ -391,7 +395,7 @@ const Navbar = () => {
                 <>
                   <Link
                     to="/account/login"
-                    className="w-full rounded-lg border border-border px-4 py-3 text-sm font-medium hover:border-primary/40 transition-colors text-center"
+                    className="w-full rounded-lg border dark:border-white/20 light:border-black/20 px-4 py-3 text-sm font-medium hover:border-primary/40 transition-colors text-center dark:text-white light:text-black dark:hover:bg-white/5 light:hover:bg-black/5"
                   >
                     Sign in
                   </Link>

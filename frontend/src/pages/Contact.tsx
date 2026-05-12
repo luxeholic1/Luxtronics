@@ -11,7 +11,7 @@ const Contact = () => {
 
   return (
     <Layout>
-      <section className="container pt-32 pb-16">
+      <section className="container pt-24 sm:pt-28 lg:pt-32 pb-12 sm:pb-16">
         <p className="text-sm text-primary font-medium uppercase tracking-widest mb-3">Contact</p>
         <h1 className="font-display font-bold text-5xl sm:text-6xl tracking-tight">
           Let's <span className="text-gradient">talk</span>
@@ -21,7 +21,7 @@ const Contact = () => {
         </p>
       </section>
 
-      <section className="container pb-24 grid grid-cols-1 lg:grid-cols-3 gap-8">
+      <section className="container pb-16 sm:pb-20 lg:pb-24 grid grid-cols-1 lg:grid-cols-3 gap-8">
         <div className="space-y-4 lg:col-span-1">
           {[
             { Icon: Mail, label: "Email", value: "hello@luxtronics.shop" },

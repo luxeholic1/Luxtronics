@@ -5,7 +5,7 @@ import { blogPosts } from "@/data/blog-posts";
 
 const Blog = () => (
   <Layout>
-    <section className="container pt-32 pb-16">
+    <section className="container pt-24 sm:pt-28 lg:pt-32 pb-12 sm:pb-16">
       <p className="text-sm text-primary font-medium uppercase tracking-widest mb-3">Blog</p>
       <h1 className="font-display font-bold text-5xl sm:text-6xl tracking-tight">
         Stories & <span className="text-gradient">guides</span>
@@ -15,7 +15,7 @@ const Blog = () => (
       </p>
     </section>
 
-    <section className="container pb-24 grid grid-cols-1 md:grid-cols-3 gap-6">
+    <section className="container pb-16 sm:pb-20 lg:pb-24 grid grid-cols-1 md:grid-cols-3 gap-6">
       {blogPosts.map((p) => (
         <Link
           key={p.slug}

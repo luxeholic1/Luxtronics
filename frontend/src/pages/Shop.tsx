@@ -2,6 +2,8 @@ import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import Layout from "@/components/Layout";
 import ProductCard from "@/components/ProductCard";
+import StylishCategoryDisplay from "@/components/StylishCategoryDisplay";
+import SEO from "@/components/SEO";
 import { cn } from "@/lib/utils";
 import { fetchStoreCategories, fetchStoreProducts, mapStoreProductToLocalProduct } from "@/services/store-api";
 import type { Product } from "@/data/products";
@@ -22,6 +24,23 @@ const Shop = () => {
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  // SEO configuration - will be updated after list is calculated
+  const getPageTitle = () => {
+    if (searchQuery) return `Search Results for "${searchQuery}" | Luxtronics`;
+    if (activeCat !== "all") {
+      const category = categories.find(c => c.slug === activeCat);
+      return `${category?.name || 'Category'} Products | Luxtronics`;
+    }
+    return "All Products | Premium Electronics Store";
+  };
+  
+  const getPageDescription = (productCount: number) => {
+    if (searchQuery) {
+      return `Browse ${productCount} premium electronics products matching "${searchQuery}". Find the best deals on smartphones, laptops, audio, and more.`;
+    }
+    return "Browse our curated collection of premium electronics from top brands. Free shipping, 2-year warranty, 30-day returns.";
+  };
 
   useEffect(() => {
     let mounted = true;
@@ -91,7 +110,41 @@ const Shop = () => {
 
   return (
     <Layout>
-      <section className="container pt-32 pb-16">
+      <SEO
+        title={getPageTitle()}
+        description={getPageDescription(list.length)}
+        keywords={searchQuery ? `${searchQuery}, electronics, gadgets` : "electronics, gadgets, smartphones, laptops, audio, wearables"}
+        url={`https://luxtronics.com/shop${searchQuery ? `?q=${encodeURIComponent(searchQuery)}` : ''}${activeCat !== 'all' ? `?cat=${activeCat}` : ''}`}
+        structuredData={{
+          "@context": "https://schema.org",
+          "@type": "CollectionPage",
+          "name": getPageTitle(),
+          "description": getPageDescription(list.length),
+          "url": `https://luxtronics.com/shop`,
+          "mainEntity": {
+            "@type": "ItemList",
+            "numberOfItems": list.length,
+            "itemListElement": list.slice(0, 10).map((product, index) => ({
+              "@type": "ListItem",
+              "position": index + 1,
+              "item": {
+                "@type": "Product",
+                "name": product.name,
+                "url": `https://luxtronics.com/product/${product.slug}`,
+                "image": product.image,
+                "description": product.description,
+                "offers": {
+                  "@type": "Offer",
+                  "price": product.price,
+                  "priceCurrency": "USD"
+                }
+              }
+            }))
+          }
+        }}
+      />
+      
+      <section className="container pt-24 sm:pt-28 lg:pt-32 pb-12 sm:pb-16">
         <p className="text-sm text-primary font-medium uppercase tracking-widest mb-3">
           Shop
         </p>
@@ -114,47 +167,54 @@ const Shop = () => {
         </p>
       </section>
 
-      <section className="container pb-24">
-        <div className="flex items-center justify-between gap-4 flex-wrap mb-8">
-          <div className="flex gap-2 flex-wrap">
-            <button
-              onClick={() => setParams(searchQuery ? { q: searchQuery } : {})}
-              className={cn(
-                "px-4 py-2 rounded-full text-sm font-medium border transition-all",
-                activeCat === "all"
-                  ? "bg-gradient-brand text-primary-foreground border-transparent shadow-glow"
-                  : "border-border hover:border-foreground"
-              )}
+      <section className="container pb-16 sm:pb-20 lg:pb-24">
+        {/* Stylish Category Display */}
+        <div className="mb-12">
+          <StylishCategoryDisplay
+            categories={categories.map(cat => ({
+              ...cat,
+              color: "text-primary",
+              gradient: "from-primary/20 to-accent/20",
+              icon: () => <div>{cat.name.charAt(0)}</div>, // Default icon
+              description: `Browse ${cat.count} premium ${cat.name.toLowerCase()} products`
+            }))}
+            activeCat={activeCat}
+            onCategoryChange={(slug) => {
+              setParams(searchQuery ? { q: searchQuery, cat: slug } : { cat: slug });
+            }}
+          />
+        </div>
+
+        {/* Sort and Filter Bar */}
+        <div className="flex items-center justify-between gap-4 flex-wrap mb-8 p-4 rounded-2xl bg-gradient-card border border-border">
+          <div className="flex items-center gap-2">
+            <span className="text-sm text-muted-foreground">Sort by:</span>
+            <select
+              value={sort}
+              onChange={(e) => setSort(e.target.value)}
+              className="h-10 rounded-full border border-border bg-background px-4 text-sm focus:outline-none focus:border-primary"
             >
-              All
-            </button>
-            {categories.map((c) => (
-              <button
-                key={c.slug}
-                onClick={() =>
-                  setParams(searchQuery ? { q: searchQuery, cat: c.slug } : { cat: c.slug })
-                }
-                className={cn(
-                  "px-4 py-2 rounded-full text-sm font-medium border transition-all",
-                  activeCat === c.slug
-                    ? "bg-gradient-brand text-primary-foreground border-transparent shadow-glow"
-                    : "border-border hover:border-foreground"
-                )}
-              >
-                {c.name}
-              </button>
-            ))}
+              <option value="featured">Featured</option>
+              <option value="low">Price: Low to High</option>
+              <option value="high">Price: High to Low</option>
+              <option value="rating">Top Rated</option>
+              <option value="new">New Arrivals</option>
+            </select>
           </div>
-          <select
-            value={sort}
-            onChange={(e) => setSort(e.target.value)}
-            className="h-10 rounded-full border border-border bg-background px-4 text-sm focus:outline-none focus:border-primary"
-          >
-            <option value="featured">Featured</option>
-            <option value="low">Price: Low to High</option>
-            <option value="high">Price: High to Low</option>
-            <option value="rating">Top Rated</option>
-          </select>
+          
+          <div className="flex items-center gap-2">
+            <span className="text-sm text-muted-foreground">
+              Showing {list.length} of {products.length} products
+            </span>
+            {activeCat !== "all" && (
+              <button
+                onClick={() => setParams(searchQuery ? { q: searchQuery } : {})}
+                className="px-4 py-2 rounded-full text-sm font-medium border border-border hover:border-primary/40 transition-colors"
+              >
+                Clear filter
+              </button>
+            )}
+          </div>
         </div>
 
         {error && (

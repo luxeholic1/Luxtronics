@@ -3,14 +3,14 @@ import Layout from "@/components/Layout";
 const ShippingReturns = () => {
   return (
     <Layout>
-      <section className="container pt-32 pb-16">
+      <section className="container pt-24 sm:pt-28 lg:pt-32 pb-12 sm:pb-16">
         <p className="text-sm text-primary font-medium uppercase tracking-widest mb-3">Policy</p>
         <h1 className="font-display font-bold text-5xl sm:text-6xl tracking-tight">
           Shipping & <span className="text-gradient">returns</span>
         </h1>
       </section>
 
-      <section className="container pb-24 grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <section className="container pb-16 sm:pb-20 lg:pb-24 grid grid-cols-1 lg:grid-cols-2 gap-6">
         <article className="rounded-3xl border border-border bg-gradient-card p-7">
           <h2 className="font-display font-bold text-2xl">Shipping</h2>
           <ul className="mt-4 space-y-2 text-sm text-muted-foreground leading-relaxed list-disc pl-5">

@@ -41,19 +41,28 @@ class MongoDBConnection {
       console.log('🔗 Connecting to MongoDB...');
       console.log('📋 Connection URI starts with:', this.uri.substring(0, 20) + '...');
 
-      this.client = new MongoClient(this.uri, {
+      // Enable TLS/SSL only when the URI indicates it's required (e.g. mongodb+srv)
+      const uriLower = this.uri.toLowerCase();
+      const useTls = uriLower.startsWith('mongodb+srv') || uriLower.includes('ssl=true') || uriLower.includes('tls=true');
+
+      const clientOptions: any = {
         retryWrites: true,
         w: 'majority',
         journal: true,
         serverSelectionTimeoutMS: 5000,
         socketTimeoutMS: 45000,
-        ssl: true,
-        tls: true,
-        tlsAllowInvalidCertificates: false,
-        tlsAllowInvalidHostnames: false,
         maxPoolSize: 10,
         minPoolSize: 5,
-      });
+      };
+
+      if (useTls) {
+        clientOptions.tls = true;
+        clientOptions.ssl = true;
+        clientOptions.tlsAllowInvalidCertificates = false;
+        clientOptions.tlsAllowInvalidHostnames = false;
+      }
+
+      this.client = new MongoClient(this.uri, clientOptions);
 
       console.log('🔄 Attempting to connect...');
       await this.client.connect();

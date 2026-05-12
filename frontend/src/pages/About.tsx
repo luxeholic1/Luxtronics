@@ -4,7 +4,7 @@ import { Sparkles, ShieldCheck, Truck, Headphones } from "lucide-react";
 const About = () => {
   return (
     <Layout>
-      <section className="container pt-32 pb-16">
+      <section className="container pt-24 sm:pt-28 lg:pt-32 pb-12 sm:pb-16">
         <p className="text-sm text-primary font-medium uppercase tracking-widest mb-3">About</p>
         <h1 className="font-display font-bold text-5xl sm:text-6xl tracking-tight">
           Our Story: <span className="text-gradient">Where Innovation Meets Identity</span>
@@ -21,7 +21,7 @@ const About = () => {
         </p>
       </section>
 
-      <section className="container pb-12 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
+      <section className="container pb-12 sm:pb-16 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
         {[
           {
             icon: Sparkles,
@@ -54,7 +54,7 @@ const About = () => {
         ))}
       </section>
 
-      <section className="container pb-24">
+      <section className="container pb-16 sm:pb-20 lg:pb-24">
         <div className="rounded-3xl border border-border bg-gradient-card p-8 sm:p-10">
           <h2 className="font-display font-bold text-3xl">The Luxtonics Philosophy</h2>
           <p className="mt-4 text-muted-foreground leading-relaxed max-w-3xl">

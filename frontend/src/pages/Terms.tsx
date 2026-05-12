@@ -3,14 +3,14 @@ import Layout from "@/components/Layout";
 const Terms = () => {
   return (
     <Layout>
-      <section className="container pt-32 pb-16">
+      <section className="container pt-24 sm:pt-28 lg:pt-32 pb-12 sm:pb-16">
         <p className="text-sm text-primary font-medium uppercase tracking-widest mb-3">Legal</p>
         <h1 className="font-display font-bold text-5xl sm:text-6xl tracking-tight">
           Terms of <span className="text-gradient">service</span>
         </h1>
       </section>
 
-      <section className="container pb-24 space-y-6">
+      <section className="container pb-16 sm:pb-20 lg:pb-24 space-y-6">
         <article className="rounded-2xl border border-border bg-gradient-card p-6">
           <h2 className="font-semibold text-lg">Use of website</h2>
           <p className="mt-2 text-sm text-muted-foreground leading-relaxed">
