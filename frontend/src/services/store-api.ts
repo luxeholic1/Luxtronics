@@ -70,23 +70,20 @@ async function fetchJson<T>(url: string): Promise<T> {
 }
 
 export async function fetchStoreProducts(page = 1, perPage = 100, search?: string): Promise<StoreProduct[]> {
-  let url = `${BACKEND_URL}/api/products?per_page=${perPage}&page=${page}`;
+  let url = `${BACKEND_URL}/api/woo/products?per_page=${perPage}&page=${page}`;
   if (search) url += `&search=${encodeURIComponent(search)}`;
 
-  const response = await fetchJson<ApiResponse<StoreProduct[]>>(url);
-
-  if (!response.success) {
-    throw new Error(response.error || 'Failed to load products');
-  }
-
-  return response.data;
+  const response = await fetchJson<StoreProduct[]>(url);
+  
+  return Array.isArray(response) ? response : [];
 }
 
 export async function fetchStoreProduct(slug: string): Promise<StoreProduct | null> {
   try {
-    const response = await fetchJson<ApiResponse<StoreProduct>>(`${BACKEND_URL}/api/products/slug/${encodeURIComponent(slug)}`);
-
-    return response.success ? response.data : null;
+    // WooCommerce doesn't support slug lookup directly, so we search by slug
+    const response = await fetchJson<StoreProduct[]>(`${BACKEND_URL}/api/woo/products?slug=${encodeURIComponent(slug)}&per_page=1`);
+    
+    return Array.isArray(response) && response.length > 0 ? response[0] : null;
   } catch {
     return null;
   }
@@ -96,20 +93,13 @@ export async function fetchStoreCategories(page = 1, perPage = 20): Promise<{
   data: StoreCategory[];
   pagination: { page: number; perPage: number; total: number; totalPages: number };
 }> {
-  const response = await fetchJson<{
-    success: boolean;
-    data: StoreCategory[];
-    pagination?: { page: number; perPage: number; total: number; totalPages: number };
-    error?: string;
-  }>(`${BACKEND_URL}/api/categories?page=${page}&per_page=${perPage}`);
+  const response = await fetchJson<StoreCategory[]>(`${BACKEND_URL}/api/woo/categories?page=${page}&per_page=${perPage}`);
 
-  if (!response.success) {
-    throw new Error(response.error || 'Failed to load categories');
-  }
-
+  const categories = Array.isArray(response) ? response : [];
+  
   return {
-    data: response.data,
-    pagination: response.pagination || { page, perPage, total: response.data.length, totalPages: 1 },
+    data: categories,
+    pagination: { page, perPage, total: categories.length, totalPages: 1 },
   };
 }
 
@@ -119,12 +109,11 @@ export async function fetchStoreCategories(page = 1, perPage = 20): Promise<{
 export async function fetchSearchSuggestions(query: string): Promise<Product[]> {
   if (!query || query.length < 2) return [];
   
-  const response = await fetchJson<ApiResponse<StoreProduct[]>>(`${BACKEND_URL}/api/products?search=${encodeURIComponent(query)}&per_page=5`);
+  const response = await fetchJson<StoreProduct[]>(`${BACKEND_URL}/api/woo/products?search=${encodeURIComponent(query)}&per_page=5`);
   
-  if (!response.success || !Array.isArray(response.data)) return [];
+  if (!Array.isArray(response)) return [];
   
-  return response.data
-    .map(mapStoreProductToLocalProduct);
+  return response.map(mapStoreProductToLocalProduct);
 }
 
 export function mapStoreProductToLocalProduct(product: StoreProduct): Product {
@@ -142,8 +131,9 @@ export function mapStoreProductToLocalProduct(product: StoreProduct): Product {
   const mainImage = images[0]?.src || '';
   const allImages = images.map(img => img.src).filter(Boolean);
   
-  const price = parsePrice(product.salePrice ?? product.price);
-  const originalPrice = parsePrice(product.regularPrice || product.price);
+  // Handle both MongoDB format (price, salePrice, regularPrice) and WooCommerce format (price, sale_price, regular_price)
+  const price = parsePrice((product as any).sale_price || product.salePrice || (product as any).price || product.price);
+  const regularPrice = parsePrice((product as any).regular_price || product.regularPrice || (product as any).price || product.price);
 
   return {
     id: (product.id ?? Math.random()).toString(),
@@ -153,13 +143,13 @@ export function mapStoreProductToLocalProduct(product: StoreProduct): Product {
     category: product.categories?.[0]?.name || 'Uncategorized',
     categoryId: product.categories?.[0]?.id,
     price: Math.round(price),
-    oldPrice: originalPrice > price ? Math.round(originalPrice) : undefined,
+    oldPrice: regularPrice > price ? Math.round(regularPrice) : undefined,
     image: mainImage,
     images: allImages.length > 0 ? allImages : [mainImage],
-    rating: Number(product.rating || 5),
-    reviews: Number(product.reviewCount || 0),
-    description: product.description || product.shortDescription || '',
-    badge: originalPrice > price ? '-20%' : undefined,
+    rating: Number((product as any).average_rating || product.rating || 5),
+    reviews: Number((product as any).rating_count || product.reviewCount || 0),
+    description: (product as any).short_description || product.description || product.shortDescription || '',
+    badge: regularPrice > price ? '-20%' : undefined,
     variations: (Array.isArray(product.variations) ? product.variations : [])
       .map((variation) => {
         if (!variation) return null;
