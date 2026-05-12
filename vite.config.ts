@@ -28,6 +28,7 @@ export default defineConfig(({ mode }) => ({
     outDir: "../dist",
     emptyOutDir: true,
     chunkSizeWarningLimit: 1000,
+    minify: 'esbuild', // Use esbuild (faster, built-in)
     rollupOptions: {
       output: {
         // Fixed filenames WITHOUT content hashes.
