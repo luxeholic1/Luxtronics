@@ -5,6 +5,7 @@ export interface StoreConfig {
   symbol: string;
   country: string;
   label: string;
+  apiUrl: string;
 }
 
 const STORE_CONFIG: Record<string, StoreConfig> = {
@@ -13,18 +14,42 @@ const STORE_CONFIG: Record<string, StoreConfig> = {
     symbol: '₹',
     country: 'IN',
     label: 'India',
+    apiUrl: 'https://luxtronics.luxtronics.in/wp-json/wc/v3',
+  },
+  'www.luxtronics.in': {
+    currency: 'INR',
+    symbol: '₹',
+    country: 'IN',
+    label: 'India',
+    apiUrl: 'https://luxtronics.luxtronics.in/wp-json/wc/v3',
   },
   'luxtronics.com.au': {
     currency: 'AUD',
     symbol: 'A$',
     country: 'AU',
     label: 'Australia',
+    apiUrl: 'https://storeau.luxtronics.luxtronics.in/wp-json/wc/v3',
+  },
+  'www.luxtronics.com.au': {
+    currency: 'AUD',
+    symbol: 'A$',
+    country: 'AU',
+    label: 'Australia',
+    apiUrl: 'https://storeau.luxtronics.luxtronics.in/wp-json/wc/v3',
   },
   'luxtronics.co.nz': {
     currency: 'NZD',
     symbol: 'NZ$',
     country: 'NZ',
     label: 'New Zealand',
+    apiUrl: 'https://storenz.luxtronics.luxtronics.in/wp-json/wc/v3',
+  },
+  'www.luxtronics.co.nz': {
+    currency: 'NZD',
+    symbol: 'NZ$',
+    country: 'NZ',
+    label: 'New Zealand',
+    apiUrl: 'https://storenz.luxtronics.luxtronics.in/wp-json/wc/v3',
   },
 };
 
@@ -33,5 +58,5 @@ const hostname = typeof window !== 'undefined' ? window.location.hostname : 'lux
 
 export const storeConfig: StoreConfig = STORE_CONFIG[hostname] ?? STORE_CONFIG['luxtronics.in'];
 
-// Single WooCommerce API URL (shared across all domains)
-export const API_URL = 'https://luxtronics.luxtronics.in/wp-json/wc/v3';
+// Export API_URL for backward compatibility
+export const API_URL = storeConfig.apiUrl;

@@ -1,10 +1,33 @@
 // src/api/wooClient.ts
-import { API_URL } from '../config/storeConfig';
+import { storeConfig } from '../config/storeConfig';
 
-// WooCommerce REST API keys (per store)
-// Store these in .env per domain — see Step 5
-const CK = import.meta.env.VITE_WOOCOMMERCE_KEY || '';
-const CS = import.meta.env.VITE_WOOCOMMERCE_SECRET || '';
+// Get store-specific WooCommerce API keys based on current domain
+function getStoreCredentials() {
+  const country = storeConfig.country;
+  
+  let key = '';
+  let secret = '';
+  
+  switch (country) {
+    case 'IN':
+      key = import.meta.env.VITE_WOOCOMMERCE_KEY_INDIA || '';
+      secret = import.meta.env.VITE_WOOCOMMERCE_SECRET_INDIA || '';
+      break;
+    case 'AU':
+      key = import.meta.env.VITE_WOOCOMMERCE_KEY_AUSTRALIA || '';
+      secret = import.meta.env.VITE_WOOCOMMERCE_SECRET_AUSTRALIA || '';
+      break;
+    case 'NZ':
+      key = import.meta.env.VITE_WOOCOMMERCE_KEY_NEWZEALAND || '';
+      secret = import.meta.env.VITE_WOOCOMMERCE_SECRET_NEWZEALAND || '';
+      break;
+    default:
+      key = import.meta.env.VITE_WOOCOMMERCE_KEY_INDIA || '';
+      secret = import.meta.env.VITE_WOOCOMMERCE_SECRET_INDIA || '';
+  }
+  
+  return { key, secret };
+}
 
 export interface WooResponse<T> {
   data?: T;
@@ -12,9 +35,12 @@ export interface WooResponse<T> {
 }
 
 export async function wcFetch(endpoint: string, options: RequestInit = {}): Promise<unknown> {
+  const { key, secret } = getStoreCredentials();
+  const apiUrl = storeConfig.apiUrl;
+  
   // Append consumer_key and consumer_secret to the URL
   const separator = endpoint.includes('?') ? '&' : '?';
-  const urlWithAuth = `${API_URL}${endpoint}${separator}consumer_key=${CK}&consumer_secret=${CS}`;
+  const urlWithAuth = `${apiUrl}${endpoint}${separator}consumer_key=${key}&consumer_secret=${secret}`;
 
   const res = await fetch(urlWithAuth, {
     ...options,

@@ -9,8 +9,8 @@ This architecture allows a single React frontend to serve multiple domains (luxt
 | Domain | React Build | WooCommerce Backend | Currency |
 |--------|-------------|-------------------|----------|
 | luxtronics.in | /var/www/luxtronics.in | luxtronics.luxtronics.in | INR ₹ |
-| luxtronics.com.au | /var/www/luxtronics.com.au | luxtronics.com.au | AUD A$ |
-| luxtronics.co.nz | /var/www/luxtronics.co.nz | luxtronics.co.nz | NZD NZ$ |
+| luxtronics.com.au | /var/www/luxtronics.com.au | storeau.luxtronics.luxtronics.in | AUD A$ |
+| luxtronics.co.nz | /var/www/luxtronics.co.nz | storenz.luxtronics.luxtronics.in | NZD NZ$ |
 
 ## File Structure
 
@@ -36,12 +36,17 @@ This architecture allows a single React frontend to serve multiple domains (luxt
 
 ### 1. Domain Detection
 
-The `storeConfig.ts` file detects the current domain from `window.location.hostname` and returns the appropriate configuration:
+The `storeConfig.ts` file detects the current domain from `window.location.hostname` and returns the appropriate configuration including the store-specific API URL:
 
 ```typescript
 const hostname = typeof window !== 'undefined' ? window.location.hostname : 'luxtronics.in';
 export const storeConfig = STORE_CONFIG[hostname] ?? STORE_CONFIG['luxtronics.in'];
 ```
+
+Each domain now connects to its own WooCommerce store:
+- **luxtronics.in** → luxtronics.luxtronics.in
+- **luxtronics.com.au** → storeau.luxtronics.luxtronics.in  
+- **luxtronics.co.nz** → storenz.luxtronics.luxtronics.in
 
 ### 2. API Routing
 
@@ -54,7 +59,7 @@ import { API_URL } from '../config/storeConfig';
 
 ### 3. Component Usage
 
-Components can access store-specific data using the `useStore` hook:
+Components can access store-specific data including the API URL using the `useStore` hook:
 
 ```typescript
 import { useStore } from '../context/StoreContext';
