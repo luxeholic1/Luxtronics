@@ -218,9 +218,10 @@ export class WooCommerceSync {
     page: number,
     perPage: number
   ): Promise<any[]> {
-    const storeUrl = process.env.VITE_WOOCOMMERCE_URL;
-    const consumerKey = process.env.VITE_WOOCOMMERCE_KEY;
-    const consumerSecret = process.env.VITE_WOOCOMMERCE_SECRET;
+    // Use India store credentials for sync (main store)
+    const storeUrl = process.env.VITE_WOOCOMMERCE_URL_INDIA;
+    const consumerKey = process.env.VITE_WOOCOMMERCE_KEY_INDIA;
+    const consumerSecret = process.env.VITE_WOOCOMMERCE_SECRET_INDIA;
 
     if (!storeUrl || !consumerKey || !consumerSecret) {
       throw new Error('WooCommerce credentials not configured');
@@ -255,9 +256,10 @@ export class WooCommerceSync {
    * Fetch categories from WooCommerce
    */
   private async fetchCategoriesFromWooCommerce(): Promise<any[]> {
-    const storeUrl = process.env.VITE_WOOCOMMERCE_URL;
-    const consumerKey = process.env.VITE_WOOCOMMERCE_KEY;
-    const consumerSecret = process.env.VITE_WOOCOMMERCE_SECRET;
+    // Use India store credentials for sync (main store)
+    const storeUrl = process.env.VITE_WOOCOMMERCE_URL_INDIA;
+    const consumerKey = process.env.VITE_WOOCOMMERCE_KEY_INDIA;
+    const consumerSecret = process.env.VITE_WOOCOMMERCE_SECRET_INDIA;
 
     if (!storeUrl || !consumerKey || !consumerSecret) {
       throw new Error('WooCommerce credentials not configured');
@@ -285,9 +287,10 @@ export class WooCommerceSync {
    * Get total product count from WooCommerce
    */
   private async getTotalProductCount(): Promise<number> {
-    const storeUrl = process.env.VITE_WOOCOMMERCE_URL;
-    const consumerKey = process.env.VITE_WOOCOMMERCE_KEY;
-    const consumerSecret = process.env.VITE_WOOCOMMERCE_SECRET;
+    // Use India store credentials for sync (main store)
+    const storeUrl = process.env.VITE_WOOCOMMERCE_URL_INDIA;
+    const consumerKey = process.env.VITE_WOOCOMMERCE_KEY_INDIA;
+    const consumerSecret = process.env.VITE_WOOCOMMERCE_SECRET_INDIA;
 
     const url = `${storeUrl}/wp-json/wc/v3/products?per_page=1`;
     const auth = btoa(`${consumerKey}:${consumerSecret}`);
@@ -309,9 +312,10 @@ export class WooCommerceSync {
   private async fetchModifiedProductsFromWooCommerce(
     after: Date
   ): Promise<any[]> {
-    const storeUrl = process.env.VITE_WOOCOMMERCE_URL;
-    const consumerKey = process.env.VITE_WOOCOMMERCE_KEY;
-    const consumerSecret = process.env.VITE_WOOCOMMERCE_SECRET;
+    // Use India store credentials for sync (main store)
+    const storeUrl = process.env.VITE_WOOCOMMERCE_URL_INDIA;
+    const consumerKey = process.env.VITE_WOOCOMMERCE_KEY_INDIA;
+    const consumerSecret = process.env.VITE_WOOCOMMERCE_SECRET_INDIA;
 
     const params = new URLSearchParams({
       per_page: '100',
@@ -340,9 +344,10 @@ export class WooCommerceSync {
    * Fetch variations for a variable product from WooCommerce
    */
   private async fetchVariationsFromWooCommerce(productId: number): Promise<any[]> {
-    const storeUrl = process.env.VITE_WOOCOMMERCE_URL;
-    const consumerKey = process.env.VITE_WOOCOMMERCE_KEY;
-    const consumerSecret = process.env.VITE_WOOCOMMERCE_SECRET;
+    // Use India store credentials for sync (main store)
+    const storeUrl = process.env.VITE_WOOCOMMERCE_URL_INDIA;
+    const consumerKey = process.env.VITE_WOOCOMMERCE_KEY_INDIA;
+    const consumerSecret = process.env.VITE_WOOCOMMERCE_SECRET_INDIA;
 
     if (!storeUrl || !consumerKey || !consumerSecret) {
       throw new Error('WooCommerce credentials not configured');
