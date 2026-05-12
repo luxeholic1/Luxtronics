@@ -80,7 +80,7 @@ SYNC_TOKEN=qwertyasdfghjklzxcvbnm1234567890
 
 ## Complete Environment Variables List for Hostinger
 
-Copy this entire block and add to Hostinger:
+Copy this entire block and add to Hostinger (REMOVE VITE_BACKEND_URL for production):
 
 ```bash
 # Firebase Auth
@@ -121,6 +121,9 @@ VITE_ADMIN_EMAILS=admin@luxtronics.in
 
 # Sync Token
 SYNC_TOKEN=qwertyasdfghjklzxcvbnm1234567890
+
+# IMPORTANT: DO NOT ADD VITE_BACKEND_URL in production
+# It will default to current domain automatically
 ```
 
 ## How It Works

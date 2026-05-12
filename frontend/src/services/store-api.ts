@@ -1,7 +1,8 @@
 import type { Product } from '@/data/products';
+import { storeConfig } from '@/config/storeConfig';
 
-// Backend API URL - absolute for parked domains
-const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || 'https://luxtronics.in';
+// Backend API URL - only used if backend is available
+const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || '';
 
 export interface StoreImage {
   id: number;
@@ -70,20 +71,78 @@ async function fetchJson<T>(url: string): Promise<T> {
 }
 
 export async function fetchStoreProducts(page = 1, perPage = 100, search?: string): Promise<StoreProduct[]> {
-  let url = `${BACKEND_URL}/api/woo/products?per_page=${perPage}&page=${page}`;
-  if (search) url += `&search=${encodeURIComponent(search)}`;
-
-  const response = await fetchJson<StoreProduct[]>(url);
+  // Direct WooCommerce API call using store-specific credentials
+  const { apiUrl } = storeConfig;
+  const { key, secret } = getStoreCredentials();
   
-  return Array.isArray(response) ? response : [];
+  let url = `${apiUrl}/products?per_page=${perPage}&page=${page}&status=publish`;
+  if (search) url += `&search=${encodeURIComponent(search)}`;
+  
+  const authHeader = 'Basic ' + btoa(`${key}:${secret}`);
+  
+  const response = await fetch(url, {
+    headers: {
+      'Authorization': authHeader,
+      'Content-Type': 'application/json',
+    },
+  });
+  
+  if (!response.ok) {
+    throw new Error(`Failed to fetch products: ${response.statusText}`);
+  }
+  
+  const products = await response.json();
+  return Array.isArray(products) ? products : [];
+}
+
+// Get store-specific credentials
+function getStoreCredentials() {
+  const country = storeConfig.country;
+  
+  let key = '';
+  let secret = '';
+  
+  switch (country) {
+    case 'IN':
+      key = import.meta.env.VITE_WOOCOMMERCE_KEY_INDIA || '';
+      secret = import.meta.env.VITE_WOOCOMMERCE_SECRET_INDIA || '';
+      break;
+    case 'AU':
+      key = import.meta.env.VITE_WOOCOMMERCE_KEY_AUSTRALIA || '';
+      secret = import.meta.env.VITE_WOOCOMMERCE_SECRET_AUSTRALIA || '';
+      break;
+    case 'NZ':
+      key = import.meta.env.VITE_WOOCOMMERCE_KEY_NEWZEALAND || '';
+      secret = import.meta.env.VITE_WOOCOMMERCE_SECRET_NEWZEALAND || '';
+      break;
+    default:
+      key = import.meta.env.VITE_WOOCOMMERCE_KEY_INDIA || '';
+      secret = import.meta.env.VITE_WOOCOMMERCE_SECRET_INDIA || '';
+  }
+  
+  return { key, secret };
 }
 
 export async function fetchStoreProduct(slug: string): Promise<StoreProduct | null> {
   try {
-    // WooCommerce doesn't support slug lookup directly, so we search by slug
-    const response = await fetchJson<StoreProduct[]>(`${BACKEND_URL}/api/woo/products?slug=${encodeURIComponent(slug)}&per_page=1`);
+    // Direct WooCommerce API call
+    const { apiUrl } = storeConfig;
+    const { key, secret } = getStoreCredentials();
     
-    return Array.isArray(response) && response.length > 0 ? response[0] : null;
+    const url = `${apiUrl}/products?slug=${encodeURIComponent(slug)}&per_page=1&status=publish`;
+    const authHeader = 'Basic ' + btoa(`${key}:${secret}`);
+    
+    const response = await fetch(url, {
+      headers: {
+        'Authorization': authHeader,
+        'Content-Type': 'application/json',
+      },
+    });
+    
+    if (!response.ok) return null;
+    
+    const products = await response.json();
+    return Array.isArray(products) && products.length > 0 ? products[0] : null;
   } catch {
     return null;
   }
@@ -93,13 +152,31 @@ export async function fetchStoreCategories(page = 1, perPage = 20): Promise<{
   data: StoreCategory[];
   pagination: { page: number; perPage: number; total: number; totalPages: number };
 }> {
-  const response = await fetchJson<StoreCategory[]>(`${BACKEND_URL}/api/woo/categories?page=${page}&per_page=${perPage}`);
+  // Direct WooCommerce API call
+  const { apiUrl } = storeConfig;
+  const { key, secret } = getStoreCredentials();
+  
+  const url = `${apiUrl}/products/categories?page=${page}&per_page=${perPage}&hide_empty=false`;
+  const authHeader = 'Basic ' + btoa(`${key}:${secret}`);
+  
+  const response = await fetch(url, {
+    headers: {
+      'Authorization': authHeader,
+      'Content-Type': 'application/json',
+    },
+  });
+  
+  if (!response.ok) {
+    throw new Error(`Failed to fetch categories: ${response.statusText}`);
+  }
 
-  const categories = Array.isArray(response) ? response : [];
+  const categories = await response.json();
+  const total = parseInt(response.headers.get('X-WP-Total') || '0');
+  const totalPages = parseInt(response.headers.get('X-WP-TotalPages') || '1');
   
   return {
-    data: categories,
-    pagination: { page, perPage, total: categories.length, totalPages: 1 },
+    data: Array.isArray(categories) ? categories : [],
+    pagination: { page, perPage, total, totalPages },
   };
 }
 
@@ -109,11 +186,31 @@ export async function fetchStoreCategories(page = 1, perPage = 20): Promise<{
 export async function fetchSearchSuggestions(query: string): Promise<Product[]> {
   if (!query || query.length < 2) return [];
   
-  const response = await fetchJson<StoreProduct[]>(`${BACKEND_URL}/api/woo/products?search=${encodeURIComponent(query)}&per_page=5`);
+  // Direct WooCommerce API call
+  const { apiUrl } = storeConfig;
+  const { key, secret } = getStoreCredentials();
   
-  if (!Array.isArray(response)) return [];
+  const url = `${apiUrl}/products?search=${encodeURIComponent(query)}&per_page=5&status=publish`;
+  const authHeader = 'Basic ' + btoa(`${key}:${secret}`);
   
-  return response.map(mapStoreProductToLocalProduct);
+  try {
+    const response = await fetch(url, {
+      headers: {
+        'Authorization': authHeader,
+        'Content-Type': 'application/json',
+      },
+    });
+    
+    if (!response.ok) return [];
+    
+    const products = await response.json();
+    
+    if (!Array.isArray(products)) return [];
+    
+    return products.map(mapStoreProductToLocalProduct);
+  } catch {
+    return [];
+  }
 }
 
 export function mapStoreProductToLocalProduct(product: StoreProduct): Product {
