@@ -4,6 +4,8 @@ import { motion } from "framer-motion";
 import type { Product } from "@/data/products";
 import { cn } from "@/lib/utils";
 import { useCurrency } from "@/context/CurrencyContext";
+import { useCart } from "@/context/CartContext";
+import { toast } from "sonner";
 
 const badgeStyles: Record<string, string> = {
   New: "bg-foreground text-background",
@@ -13,6 +15,16 @@ const badgeStyles: Record<string, string> = {
 
 const ProductCard = ({ product }: { product: Product }) => {
   const { formatPrice } = useCurrency();
+  const { addItem } = useCart();
+  
+  const handleAddToCart = (e: React.MouseEvent) => {
+    e.preventDefault(); // Prevent navigation to product page
+    e.stopPropagation();
+    addItem(product, 1);
+    toast.success(`${product.name} added to cart!`, {
+      duration: 2000,
+    });
+  };
   
   // Generate structured data for SEO
   const structuredData = {
@@ -127,14 +139,15 @@ const ProductCard = ({ product }: { product: Product }) => {
                   </span>
                 )}
               </div>
-              <motion.div
+              <motion.button
+                onClick={handleAddToCart}
                 whileHover={{ scale: 1.1 }}
                 whileTap={{ scale: 0.95 }}
                 className="h-8 w-8 sm:h-9 sm:w-9 rounded-full bg-secondary group-hover:bg-gradient-brand flex items-center justify-center transition-all duration-300 group-hover:shadow-glow group-hover:[transform:translateZ(24px)] cursor-pointer"
                 aria-label={`Add ${product.name} to cart`}
               >
                 <ShoppingBag className="h-3 w-3 sm:h-4 sm:w-4" />
-              </motion.div>
+              </motion.button>
             </div>
           </div>
         </div>

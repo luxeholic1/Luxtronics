@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, ReactNode } from "react";
+import { createContext, useContext, useState, useEffect, ReactNode } from "react";
 import type { Product } from "@/data/products";
 
 export interface CartItem {
@@ -17,8 +17,27 @@ type CartContextType = {
 
 const CartContext = createContext<CartContextType | null>(null);
 
+const CART_STORAGE_KEY = 'luxtronics_cart';
+
 export const CartProvider = ({ children }: { children: ReactNode }) => {
-  const [items, setItems] = useState<CartItem[]>([]);
+  // Load cart from localStorage on mount
+  const [items, setItems] = useState<CartItem[]>(() => {
+    try {
+      const stored = localStorage.getItem(CART_STORAGE_KEY);
+      return stored ? JSON.parse(stored) : [];
+    } catch {
+      return [];
+    }
+  });
+
+  // Save cart to localStorage whenever it changes
+  useEffect(() => {
+    try {
+      localStorage.setItem(CART_STORAGE_KEY, JSON.stringify(items));
+    } catch (error) {
+      console.error('Failed to save cart to localStorage:', error);
+    }
+  }, [items]);
 
   const addItem = (product: Product, qty = 1) => {
     setItems((prev) => {

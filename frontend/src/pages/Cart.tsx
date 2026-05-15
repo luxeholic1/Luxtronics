@@ -1,63 +1,39 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { Minus, Plus, X, ArrowRight, ExternalLink } from "lucide-react";
 import Layout from "@/components/Layout";
-import { products } from "@/data/products";
 import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious } from "@/components/ui/carousel";
 import { useCurrency } from "@/context/CurrencyContext";
-import { redirectToWooCheckout } from "@/lib/woo-checkout";
+import { useCart } from "@/context/CartContext";
+import { fetchStoreProducts, mapStoreProductToLocalProduct } from "@/services/store-api";
+import type { Product } from "@/data/products";
 
 const Cart = () => {
-  const { formatPrice, country } = useCurrency();
-  const [items, setItems] = useState([
-    { product: products[0], qty: 1 },
-    { product: products[2], qty: 2 },
-  ]);
+  const { formatPrice } = useCurrency();
+  const { items, updateQty, removeItem } = useCart();
+  const [relatedProducts, setRelatedProducts] = useState<Product[]>([]);
 
   const subtotal = items.reduce((sum, i) => sum + i.product.price * i.qty, 0);
   const shipping = subtotal > 200 ? 0 : 15;
   const total = subtotal + shipping;
 
-  const updateQty = (id: string, delta: number) => {
-    setItems((prev) =>
-      prev
-        .map((i) => (i.product.id === id ? { ...i, qty: Math.max(0, i.qty + delta) } : i))
-        .filter((i) => i.qty > 0)
-    );
-  };
-
-  const remove = (id: string) => setItems((prev) => prev.filter((i) => i.product.id !== id));
-
-  const addToCart = (productId: string) => {
-    const target = products.find((p) => p.id === productId);
-    if (!target) return;
-
-    setItems((prev) => {
-      const existing = prev.find((i) => i.product.id === productId);
-      if (existing) {
-        return prev.map((i) =>
-          i.product.id === productId ? { ...i, qty: i.qty + 1 } : i
-        );
+  // Load related products
+  useEffect(() => {
+    const loadRelated = async () => {
+      try {
+        const products = await fetchStoreProducts(1, 8);
+        const mapped = products.map(mapStoreProductToLocalProduct);
+        // Filter out items already in cart
+        const filtered = mapped.filter(p => !items.some(item => item.product.id === p.id));
+        setRelatedProducts(filtered.slice(0, 8));
+      } catch (error) {
+        console.error('Failed to load related products:', error);
       }
-      return [...prev, { product: target, qty: 1 }];
-    });
-  };
+    };
+    loadRelated();
+  }, [items]);
 
-  const handleWooCheckout = () => {
-    const lineItems = items.map((i) => ({
-      product_id: Number(i.product.id),
-      quantity: i.qty,
-    }));
-    redirectToWooCheckout(
-      lineItems,
-      window.location.hostname,
-      country.currency
-    );
-  };
-
-  const relatedProducts = products
-    .filter((p) => !items.some((item) => item.product.id === p.id))
-    .slice(0, 8);
+  const { addItem } = useCart();
 
   return (
     <Layout>
@@ -124,7 +100,7 @@ const Cart = () => {
                     </div>
                   </div>
                   <button
-                    onClick={() => remove(product.id)}
+                    onClick={() => removeItem(product.id)}
                     className="h-8 w-8 rounded-full hover:bg-secondary flex items-center justify-center self-start"
                     aria-label="Remove"
                   >
@@ -150,15 +126,12 @@ const Cart = () => {
                   <span className="text-gradient">{formatPrice(total)}</span>
                 </div>
               </div>
-              <button
-                onClick={handleWooCheckout}
+              <Link
+                to="/checkout"
                 className="mt-6 w-full inline-flex items-center justify-center gap-2 rounded-full bg-gradient-brand px-7 py-3.5 text-sm font-semibold text-primary-foreground shadow-glow hover:shadow-glow-pink transition-all"
               >
-                Proceed to Checkout <ExternalLink className="h-4 w-4" />
-              </button>
-              <p className="text-xs text-muted-foreground text-center mt-3">
-                You'll be taken to our secure WooCommerce checkout
-              </p>
+                Proceed to Checkout <ArrowRight className="h-4 w-4" />
+              </Link>
               <p className="text-xs text-muted-foreground text-center mt-4">
                 Free shipping on orders over $200
               </p>
@@ -208,7 +181,7 @@ const Cart = () => {
                     <p className="font-display text-xl font-bold">${product.price}</p>
                     <button
                       type="button"
-                      onClick={() => addToCart(product.id)}
+                      onClick={() => addItem(product)}
                       className="inline-flex items-center rounded-full bg-gradient-brand px-4 py-2 text-xs font-semibold text-primary-foreground shadow-glow hover:shadow-glow-pink transition-all"
                     >
                       Add item

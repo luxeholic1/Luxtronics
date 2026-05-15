@@ -48,9 +48,16 @@ const Shop = () => {
     const load = async () => {
       try {
         setLoading(true);
+        
+        // If search query exists, fetch all products (1000) to search through
+        // Otherwise, fetch only 100 for faster initial load
+        const productsToFetch = searchQuery ? 1000 : 100;
+        
         const [categoryData, productData] = await Promise.all([
           fetchStoreCategories(),
-          fetchStoreProducts(1, 1000),  // Fetch up to 1000 products (10 pages)
+          searchQuery 
+            ? fetchStoreProducts(1, productsToFetch, searchQuery)  // Search in WooCommerce API
+            : fetchStoreProducts(1, productsToFetch),
         ]);
 
         if (!mounted) return;
@@ -73,24 +80,16 @@ const Shop = () => {
     return () => {
       mounted = false;
     };
-  }, []);                                               // ← FIX: no dependency on searchQuery; products load once
+  }, [searchQuery]);
 
   const list = useMemo(() => {
     let p = [...products];
 
-    // Filter by search query (from URL param ?q=...)
-    if (searchQuery) {
-      const q = searchQuery.toLowerCase();
-      p = p.filter(
-        (x) =>
-          x.name.toLowerCase().includes(q) ||
-          x.description.toLowerCase().includes(q) ||
-          x.category.toLowerCase().includes(q)
-      );
-    }
+    // Note: If searchQuery exists, products are already filtered by WooCommerce API
+    // No need for client-side search filtering
 
-    // Filter by category
-    if (activeCat !== "all") {
+    // Filter by category (only if no search query)
+    if (activeCat !== "all" && !searchQuery) {
       const selectedCategory = categories.find((c) => c.slug === activeCat);
       console.log('[Shop] Filtering by category:', {
         activeCat,

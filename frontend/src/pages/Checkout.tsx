@@ -1,8 +1,10 @@
 import { useState } from "react";
-import { Link, useLocation, useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { ArrowLeft, CheckCircle2, CreditCard, Lock, Package, Truck, Shield, ShieldCheck } from "lucide-react";
 import Layout from "@/components/Layout";
-import { products } from "@/data/products";
+import { useCart } from "@/context/CartContext";
+import { useCurrency } from "@/context/CurrencyContext";
+import { redirectToWooCheckout } from "@/lib/woo-checkout";
 
 const PAYPAL_ICON = () => (
   <svg viewBox="0 0 24 24" className="h-5 w-5" fill="currentColor">
@@ -12,22 +14,20 @@ const PAYPAL_ICON = () => (
 );
 
 const Checkout = () => {
-  const location = useLocation();
   const navigate = useNavigate();
+  const { items, clearCart } = useCart();
+  const { formatPrice, country } = useCurrency();
   const [isProcessing, setIsProcessing] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState<"card" | "paypal">("card");
 
-  const directBuyProduct = location.state?.product;
+  // Redirect to cart if empty
+  if (items.length === 0 && !isSuccess) {
+    navigate('/cart');
+    return null;
+  }
 
-  const orderItems = directBuyProduct
-    ? [{ product: directBuyProduct, qty: 1 }]
-    : [
-        { product: products[0], qty: 1 },
-        { product: products[2], qty: 2 },
-      ];
-
-  const subtotal = orderItems.reduce((sum, i) => sum + i.product.price * i.qty, 0);
+  const subtotal = items.reduce((sum, i) => sum + i.product.price * i.qty, 0);
   const shipping = subtotal > 200 ? 0 : 15;
   const total = subtotal + shipping;
 
@@ -36,53 +36,22 @@ const Checkout = () => {
     setIsProcessing(true);
 
     try {
-      // Prepare order data
-      const lineItems = orderItems.map(item => ({
-        product_id: item.product.id,
-        variation_id: item.product.selectedVariation?.id || 0,
+      // Redirect to WooCommerce checkout with cart items
+      const lineItems = items.map(item => ({
+        product_id: Number(item.product.id),
         quantity: item.qty,
       }));
-
-      const orderData = {
-        line_items: lineItems,
-        billing: {
-          first_name: 'Test',
-          last_name: 'User',
-          email: 'test@example.com',
-          phone: '+1234567890',
-          address_1: '123 Test Street',
-          city: 'Test City',
-          state: 'Test State',
-          postcode: '12345',
-          country: 'US',
-        },
-        shipping: {
-          first_name: 'Test',
-          last_name: 'User',
-          address_1: '123 Test Street',
-          city: 'Test City',
-          state: 'Test State',
-          postcode: '12345',
-          country: 'US',
-        },
-      };
-
-      const response = await fetch('/api/orders', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(orderData),
-      });
-
-      const result = await response.json();
-
-      if (result.success) {
-        setIsSuccess(true);
-        setTimeout(() => navigate("/"), 3500);
-      } else {
-        throw new Error(result.error || 'Order creation failed');
-      }
+      
+      redirectToWooCheckout(
+        lineItems,
+        window.location.hostname,
+        country.currency
+      );
+      
+      // Clear cart after successful redirect
+      clearCart();
+      setIsSuccess(true);
+      setTimeout(() => navigate("/"), 3500);
     } catch (error) {
       console.error('Checkout error:', error);
       alert('Checkout failed. Please try again.');
@@ -92,12 +61,22 @@ const Checkout = () => {
 
   const handlePayPal = () => {
     setIsProcessing(true);
-    // Simulate PayPal redirect & callback
-    setTimeout(() => {
-      setIsProcessing(false);
-      setIsSuccess(true);
-      setTimeout(() => navigate("/"), 3500);
-    }, 2500);
+    
+    // Redirect to WooCommerce checkout with PayPal
+    const lineItems = items.map(item => ({
+      product_id: Number(item.product.id),
+      quantity: item.qty,
+    }));
+    
+    redirectToWooCheckout(
+      lineItems,
+      window.location.hostname,
+      country.currency
+    );
+    
+    clearCart();
+    setIsSuccess(true);
+    setTimeout(() => navigate("/"), 3500);
   };
 
   if (isSuccess) {
@@ -125,10 +104,10 @@ const Checkout = () => {
     <Layout>
       <section className="container pt-32 pb-16">
         <Link
-          to={directBuyProduct ? `/product/${directBuyProduct.slug}` : "/cart"}
+          to="/cart"
           className="inline-flex items-center text-sm text-muted-foreground hover:text-foreground mb-8 transition-colors"
         >
-          <ArrowLeft className="h-4 w-4 mr-2" /> Back
+          <ArrowLeft className="h-4 w-4 mr-2" /> Back to Cart
         </Link>
 
         <h1 className="font-display font-bold text-4xl sm:text-5xl tracking-tight mb-4">
@@ -270,7 +249,7 @@ const Checkout = () => {
             </div>
 
             <div className="space-y-4 mb-6">
-              {orderItems.map(({ product, qty }) => (
+              {items.map(({ product, qty }) => (
                 <div key={product.id} className="flex items-start gap-4">
                   <div className="h-16 w-16 rounded-xl bg-secondary/40 flex items-center justify-center flex-shrink-0 p-2">
                     <img src={product.image} alt={product.name} className="object-contain" />
