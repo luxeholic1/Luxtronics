@@ -92,11 +92,25 @@ const Shop = () => {
     // Filter by category
     if (activeCat !== "all") {
       const selectedCategory = categories.find((c) => c.slug === activeCat);
+      console.log('[Shop] Filtering by category:', {
+        activeCat,
+        selectedCategory,
+        totalProducts: p.length,
+        sampleProductCategories: p[0]?.categories
+      });
+      
       if (selectedCategory) {
-        p = p.filter((x) => 
-          x.categories.some(cat => cat.id === selectedCategory.id) || 
-          x.categories.some(cat => cat.name.toLowerCase().trim() === selectedCategory.name.toLowerCase().trim())
-        );
+        p = p.filter((x) => {
+          // Check if product has any matching category
+          const hasMatch = x.categories && Array.isArray(x.categories) && x.categories.some(cat => 
+            cat.id === selectedCategory.id || 
+            cat.slug === selectedCategory.slug ||
+            cat.name.toLowerCase().trim() === selectedCategory.name.toLowerCase().trim()
+          );
+          return hasMatch;
+        });
+        
+        console.log('[Shop] After filter:', p.length, 'products');
       }
     }
 
