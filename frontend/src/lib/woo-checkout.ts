@@ -17,6 +17,29 @@ export interface CartLineItem {
   variation_id?: number;
 }
 
+export interface CheckoutCustomerData {
+  billing?: {
+    first_name?: string;
+    last_name?: string;
+    email?: string;
+    phone?: string;
+    address_1?: string;
+    city?: string;
+    state?: string;
+    postcode?: string;
+    country?: string;
+  };
+  shipping?: {
+    first_name?: string;
+    last_name?: string;
+    address_1?: string;
+    city?: string;
+    state?: string;
+    postcode?: string;
+    country?: string;
+  };
+}
+
 /**
  * Redirects the browser to the WooCommerce checkout page for the current store.
  *
@@ -26,7 +49,7 @@ export interface CartLineItem {
  *     /?add-to-cart=<id>&quantity=<qty>&return_to=checkout
  *
  *  2. For multiple items (full cart) → link directly to
- *     /checkout/ with source_domain + currency.
+ *     /checkout/ with source_domain + currency + customer data.
  *
  * The checkout URL is automatically determined based on the current domain:
  * - luxtronics.in → luxtronics.luxtronics.in
@@ -36,7 +59,8 @@ export interface CartLineItem {
 export function redirectToWooCheckout(
   items: CartLineItem[],
   sourceDomain: string,
-  currency: string
+  currency: string,
+  customerData?: CheckoutCustomerData
 ): void {
   if (items.length === 0) return;
 
@@ -45,9 +69,16 @@ export function redirectToWooCheckout(
     currency,
   });
 
+  // Add customer data if provided
+  if (customerData) {
+    if (customerData.billing) {
+      params.set('customer_data', JSON.stringify(customerData));
+    }
+  }
+
   let url: string;
 
-  if (items.length === 1) {
+  if (items.length === 1 && !customerData) {
     // Single product shortcut — WooCommerce adds to cart and
     // immediately opens /checkout/
     const { product_id, quantity, variation_id } = items[0];

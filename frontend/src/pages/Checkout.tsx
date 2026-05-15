@@ -20,6 +20,17 @@ const Checkout = () => {
   const [isProcessing, setIsProcessing] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState<"card" | "paypal">("card");
+  
+  // Form state for customer data
+  const [formData, setFormData] = useState({
+    firstName: '',
+    lastName: '',
+    email: '',
+    phone: '',
+    address: '',
+    city: '',
+    zipCode: '',
+  });
 
   // Redirect to cart if empty
   if (items.length === 0 && !isSuccess) {
@@ -30,22 +41,53 @@ const Checkout = () => {
   const subtotal = items.reduce((sum, i) => sum + i.product.price * i.qty, 0);
   const shipping = subtotal > 200 ? 0 : 15;
   const total = subtotal + shipping;
+  
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setFormData({
+      ...formData,
+      [e.target.name]: e.target.value
+    });
+  };
 
   const handleCheckout = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsProcessing(true);
 
     try {
-      // Redirect to WooCommerce checkout with cart items
+      // Prepare line items
       const lineItems = items.map(item => ({
         product_id: Number(item.product.id),
         quantity: item.qty,
       }));
       
+      // Prepare customer data
+      const customerData = {
+        billing: {
+          first_name: formData.firstName,
+          last_name: formData.lastName,
+          email: formData.email,
+          phone: formData.phone,
+          address_1: formData.address,
+          city: formData.city,
+          postcode: formData.zipCode,
+          country: country.code,
+        },
+        shipping: {
+          first_name: formData.firstName,
+          last_name: formData.lastName,
+          address_1: formData.address,
+          city: formData.city,
+          postcode: formData.zipCode,
+          country: country.code,
+        }
+      };
+      
+      // Redirect to WooCommerce checkout with cart items and customer data
       redirectToWooCheckout(
         lineItems,
         window.location.hostname,
-        country.currency
+        country.currency,
+        customerData
       );
       
       // Clear cart after successful redirect
@@ -62,16 +104,40 @@ const Checkout = () => {
   const handlePayPal = () => {
     setIsProcessing(true);
     
-    // Redirect to WooCommerce checkout with PayPal
+    // Prepare line items
     const lineItems = items.map(item => ({
       product_id: Number(item.product.id),
       quantity: item.qty,
     }));
     
+    // Prepare customer data
+    const customerData = {
+      billing: {
+        first_name: formData.firstName,
+        last_name: formData.lastName,
+        email: formData.email,
+        phone: formData.phone,
+        address_1: formData.address,
+        city: formData.city,
+        postcode: formData.zipCode,
+        country: country.code,
+      },
+      shipping: {
+        first_name: formData.firstName,
+        last_name: formData.lastName,
+        address_1: formData.address,
+        city: formData.city,
+        postcode: formData.zipCode,
+        country: country.code,
+      }
+    };
+    
+    // Redirect to WooCommerce checkout with PayPal
     redirectToWooCheckout(
       lineItems,
       window.location.hostname,
-      country.currency
+      country.currency,
+      customerData
     );
     
     clearCart();
@@ -138,25 +204,90 @@ const Checkout = () => {
                 <h2 className="font-display font-bold text-2xl">Shipping Information</h2>
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                {[
-                  { label: "First Name", ph: "John", type: "text", span: "" },
-                  { label: "Last Name", ph: "Doe", type: "text", span: "" },
-                  { label: "Email Address", ph: "john@example.com", type: "email", span: "sm:col-span-2" },
-                  { label: "Phone", ph: "+1 (555) 000-0000", type: "tel", span: "sm:col-span-2" },
-                  { label: "Address", ph: "123 Luxury Ave", type: "text", span: "sm:col-span-2" },
-                  { label: "City", ph: "New York", type: "text", span: "" },
-                  { label: "ZIP Code", ph: "10001", type: "text", span: "" },
-                ].map((f) => (
-                  <div key={f.label} className={`space-y-2 ${f.span}`}>
-                    <label className="text-sm font-medium text-foreground">{f.label}</label>
-                    <input
-                      required
-                      type={f.type}
-                      placeholder={f.ph}
-                      className="w-full rounded-xl border border-border bg-background/50 px-4 py-3 text-sm outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all"
-                    />
-                  </div>
-                ))}
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-foreground">First Name</label>
+                  <input
+                    required
+                    type="text"
+                    name="firstName"
+                    value={formData.firstName}
+                    onChange={handleInputChange}
+                    placeholder="John"
+                    className="w-full rounded-xl border border-border bg-background/50 px-4 py-3 text-sm outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-foreground">Last Name</label>
+                  <input
+                    required
+                    type="text"
+                    name="lastName"
+                    value={formData.lastName}
+                    onChange={handleInputChange}
+                    placeholder="Doe"
+                    className="w-full rounded-xl border border-border bg-background/50 px-4 py-3 text-sm outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all"
+                  />
+                </div>
+                <div className="space-y-2 sm:col-span-2">
+                  <label className="text-sm font-medium text-foreground">Email Address</label>
+                  <input
+                    required
+                    type="email"
+                    name="email"
+                    value={formData.email}
+                    onChange={handleInputChange}
+                    placeholder="john@example.com"
+                    className="w-full rounded-xl border border-border bg-background/50 px-4 py-3 text-sm outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all"
+                  />
+                </div>
+                <div className="space-y-2 sm:col-span-2">
+                  <label className="text-sm font-medium text-foreground">Phone</label>
+                  <input
+                    required
+                    type="tel"
+                    name="phone"
+                    value={formData.phone}
+                    onChange={handleInputChange}
+                    placeholder="+1 (555) 000-0000"
+                    className="w-full rounded-xl border border-border bg-background/50 px-4 py-3 text-sm outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all"
+                  />
+                </div>
+                <div className="space-y-2 sm:col-span-2">
+                  <label className="text-sm font-medium text-foreground">Address</label>
+                  <input
+                    required
+                    type="text"
+                    name="address"
+                    value={formData.address}
+                    onChange={handleInputChange}
+                    placeholder="123 Luxury Ave"
+                    className="w-full rounded-xl border border-border bg-background/50 px-4 py-3 text-sm outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-foreground">City</label>
+                  <input
+                    required
+                    type="text"
+                    name="city"
+                    value={formData.city}
+                    onChange={handleInputChange}
+                    placeholder="New York"
+                    className="w-full rounded-xl border border-border bg-background/50 px-4 py-3 text-sm outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-foreground">ZIP Code</label>
+                  <input
+                    required
+                    type="text"
+                    name="zipCode"
+                    value={formData.zipCode}
+                    onChange={handleInputChange}
+                    placeholder="10001"
+                    className="w-full rounded-xl border border-border bg-background/50 px-4 py-3 text-sm outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all"
+                  />
+                </div>
               </div>
             </div>
 
