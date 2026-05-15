@@ -1,8 +1,9 @@
 import { ReactNode } from "react";
 import Navbar from "./Navbar";
 import Footer from "./Footer";
+import ChatBot from "./ChatBot";
 
-// WhatsApp number — update this to your actual number (with country code, no + or spaces)
+// WhatsApp number — update to your actual number (country code + number, no + or spaces)
 const WHATSAPP_NUMBER = import.meta.env.VITE_WHATSAPP_NUMBER || "919999999999";
 const WHATSAPP_MESSAGE = encodeURIComponent("Hi! I have a question about a product.");
 
@@ -15,7 +16,6 @@ const WhatsAppButton = () => (
     className="fixed bottom-6 right-6 z-50 flex items-center justify-center w-14 h-14 rounded-full shadow-lg transition-transform duration-200 hover:scale-110 active:scale-95"
     style={{ backgroundColor: "#25D366" }}
   >
-    {/* WhatsApp SVG icon */}
     <svg
       xmlns="http://www.w3.org/2000/svg"
       viewBox="0 0 32 32"
@@ -34,6 +34,8 @@ const Layout = ({ children }: { children: ReactNode }) => (
     <Navbar />
     <main className="flex-1 w-full overflow-x-hidden">{children}</main>
     <Footer />
+    {/* Floating buttons — stacked: ChatBot above WhatsApp */}
+    <ChatBot />
     <WhatsAppButton />
   </div>
 );
