@@ -24,8 +24,8 @@ const Contact = () => {
       <section className="container pb-16 sm:pb-20 lg:pb-24 grid grid-cols-1 lg:grid-cols-3 gap-8">
         <div className="space-y-4 lg:col-span-1">
           {[
-            { Icon: Mail, label: "Email", value: "hello@luxtronics.shop" },
-            { Icon: Phone, label: "Phone", value: "+1 (555) 010-2025" },
+            { Icon: Mail, label: "Email", value: "accounts@luxtronics.in" },
+            { Icon: Phone, label: "Phone", value: "+91 " },
             { Icon: MapPin, label: "Office", value: "221B Baker Street, London" },
           ].map(({ Icon, label, value }) => (
             <div key={label} className="p-6 rounded-2xl bg-gradient-card border border-border flex items-start gap-4">
