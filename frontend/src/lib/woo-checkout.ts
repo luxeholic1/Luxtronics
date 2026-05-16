@@ -85,8 +85,9 @@ export function redirectToWooCheckout(
     params.set("add-to-cart", String(product_id));
     params.set("quantity", String(quantity));
     if (variation_id) params.set("variation_id", String(variation_id));
-    params.set("return_to", "checkout");
-    url = `${WOO_BASE}/?${params.toString()}`;
+    
+    // Redirect directly to checkout page which will process the add-to-cart param
+    url = `${WOO_BASE}/checkout/?${params.toString()}`;
   } else {
     // Multi-item: encode cart as JSON in query param.
     // The WooMultiDomain / custom snippet on WP side will read

@@ -427,6 +427,7 @@ const ProductDetail = () => {
             <div className="mt-6 flex flex-col sm:flex-row gap-3">
               <button
                 onClick={() => {
+                  // Buy Now - Direct to WooCommerce checkout
                   redirectToWooCheckout(
                     [{
                       product_id: Number(product.id),
@@ -456,7 +457,7 @@ const ProductDetail = () => {
                 {addedToCart ? (
                   <>
                     <Check className="h-4 w-4" />
-                    Added!
+                    Added to Cart!
                   </>
                 ) : (
                   "Add to Cart"

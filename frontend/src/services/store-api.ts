@@ -1,5 +1,12 @@
 import type { Product } from '@/data/products';
 import { storeConfig } from '@/config/storeConfig';
+import { 
+  fetchProductsFromFirebase, 
+  fetchProductFromFirebase,
+  fetchCategoriesFromFirebase,
+  searchProductsInFirebase,
+  checkFirebaseAvailability 
+} from './firebase-products';
 
 // Backend API URL - only used if backend is available
 const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || '';
@@ -118,6 +125,26 @@ async function fetchJson<T>(url: string): Promise<T> {
 }
 
 export async function fetchStoreProducts(page = 1, perPage = 100, search?: string): Promise<StoreProduct[]> {
+  // Try Firebase first (10-30x faster)
+  try {
+    const isFirebaseAvailable = await checkFirebaseAvailability();
+    
+    if (isFirebaseAvailable) {
+      console.log('[Store API] Fetching from Firebase (fast)');
+      const products = await fetchProductsFromFirebase(page, perPage, search);
+      
+      if (products.length > 0) {
+        console.log(`[Store API] Firebase returned ${products.length} products`);
+        return products;
+      }
+    }
+  } catch (error) {
+    console.warn('[Store API] Firebase fetch failed, falling back to WooCommerce:', error);
+  }
+
+  // Fallback to WooCommerce API (slower but always works)
+  console.log('[Store API] Fetching from WooCommerce API (fallback)');
+  
   // Direct WooCommerce API call using store-specific credentials
   const { apiUrl } = storeConfig;
   const { key, secret } = getStoreCredentials();
@@ -206,6 +233,51 @@ function getStoreCredentials() {
 }
 
 export async function fetchStoreProduct(slug: string): Promise<StoreProduct | null> {
+  // Try Firebase first (10-30x faster)
+  try {
+    const isFirebaseAvailable = await checkFirebaseAvailability();
+    
+    if (isFirebaseAvailable) {
+      console.log('[Store API] Fetching product from Firebase (fast)');
+      const product = await fetchProductFromFirebase(slug);
+      
+      if (product) {
+        console.log(`[Store API] Firebase returned product: ${product.name}`);
+        
+        // If it's a variable product, fetch variations from WooCommerce
+        if (product.type === 'variable' && product.id) {
+          try {
+            const { apiUrl } = storeConfig;
+            const { key, secret } = getStoreCredentials();
+            const variationsUrl = `${apiUrl}/products/${product.id}/variations?per_page=100`;
+            const authHeader = 'Basic ' + btoa(`${key}:${secret}`);
+            
+            const variationsResponse = await fetch(variationsUrl, {
+              headers: {
+                'Authorization': authHeader,
+                'Content-Type': 'application/json',
+              },
+            });
+            
+            if (variationsResponse.ok) {
+              const variations = await variationsResponse.json();
+              product.variations = Array.isArray(variations) ? variations : [];
+            }
+          } catch (error) {
+            console.error('Failed to fetch variations:', error);
+          }
+        }
+        
+        return product;
+      }
+    }
+  } catch (error) {
+    console.warn('[Store API] Firebase fetch failed, falling back to WooCommerce:', error);
+  }
+
+  // Fallback to WooCommerce API
+  console.log('[Store API] Fetching product from WooCommerce API (fallback)');
+  
   try {
     // Direct WooCommerce API call
     const { apiUrl } = storeConfig;
@@ -259,6 +331,34 @@ export async function fetchStoreCategories(page = 1, perPage = 20): Promise<{
   data: StoreCategory[];
   pagination: { page: number; perPage: number; total: number; totalPages: number };
 }> {
+  // Try Firebase first (10-30x faster)
+  try {
+    const isFirebaseAvailable = await checkFirebaseAvailability();
+    
+    if (isFirebaseAvailable) {
+      console.log('[Store API] Fetching categories from Firebase (fast)');
+      const categories = await fetchCategoriesFromFirebase();
+      
+      if (categories.length > 0) {
+        console.log(`[Store API] Firebase returned ${categories.length} categories`);
+        return {
+          data: categories,
+          pagination: { 
+            page: 1, 
+            perPage: categories.length, 
+            total: categories.length, 
+            totalPages: 1 
+          },
+        };
+      }
+    }
+  } catch (error) {
+    console.warn('[Store API] Firebase fetch failed, falling back to WooCommerce:', error);
+  }
+
+  // Fallback to WooCommerce API
+  console.log('[Store API] Fetching categories from WooCommerce API (fallback)');
+  
   // Direct WooCommerce API call
   const { apiUrl } = storeConfig;
   const { key, secret } = getStoreCredentials();
@@ -292,6 +392,26 @@ export async function fetchStoreCategories(page = 1, perPage = 20): Promise<{
  */
 export async function fetchSearchSuggestions(query: string): Promise<Product[]> {
   if (!query || query.length < 2) return [];
+  
+  // Try Firebase first (10-30x faster)
+  try {
+    const isFirebaseAvailable = await checkFirebaseAvailability();
+    
+    if (isFirebaseAvailable) {
+      console.log('[Store API] Searching in Firebase (fast)');
+      const products = await searchProductsInFirebase(query);
+      
+      if (products.length > 0) {
+        console.log(`[Store API] Firebase search returned ${products.length} results`);
+        return products.slice(0, 5).map(mapStoreProductToLocalProduct);
+      }
+    }
+  } catch (error) {
+    console.warn('[Store API] Firebase search failed, falling back to WooCommerce:', error);
+  }
+
+  // Fallback to WooCommerce API
+  console.log('[Store API] Searching in WooCommerce API (fallback)');
   
   // Direct WooCommerce API call
   const { apiUrl } = storeConfig;
@@ -391,8 +511,9 @@ export async function fetchCustomerOrders(customerEmail: string): Promise<WooCom
     const { apiUrl } = storeConfig;
     const { key, secret } = getStoreCredentials();
     
-    // Search orders by customer email
-    const url = `${apiUrl}/orders?customer=${encodeURIComponent(customerEmail)}&per_page=100&orderby=date&order=desc`;
+    // Search orders by customer email using the 'search' parameter
+    // This is more reliable than 'customer' (which expects an ID)
+    const url = `${apiUrl}/orders?search=${encodeURIComponent(customerEmail)}&per_page=100&orderby=date&order=desc`;
     const authHeader = 'Basic ' + btoa(`${key}:${secret}`);
     
     const response = await fetch(url, {

@@ -6,10 +6,11 @@ import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious
 import { useCurrency } from "@/context/CurrencyContext";
 import { useCart } from "@/context/CartContext";
 import { fetchStoreProducts, mapStoreProductToLocalProduct } from "@/services/store-api";
+import { redirectToWooCheckout } from "@/lib/woo-checkout";
 import type { Product } from "@/data/products";
 
 const Cart = () => {
-  const { formatPrice } = useCurrency();
+  const { formatPrice, country } = useCurrency();
   const { items, updateQty, removeItem } = useCart();
   const [relatedProducts, setRelatedProducts] = useState<Product[]>([]);
 
@@ -127,11 +128,27 @@ const Cart = () => {
                 </div>
               </div>
               <Link
-                to="/checkout"
-                className="mt-6 w-full inline-flex items-center justify-center gap-2 rounded-full bg-gradient-brand px-7 py-3.5 text-sm font-semibold text-primary-foreground shadow-glow hover:shadow-glow-pink transition-all"
+                to="/shop"
+                className="mt-6 w-full inline-flex items-center justify-center gap-2 rounded-full border border-border px-7 py-3.5 text-sm font-semibold hover:border-primary/40 transition-all"
+              >
+                Continue Shopping
+              </Link>
+              <button
+                onClick={() => {
+                  const lineItems = items.map(item => ({
+                    product_id: Number(item.product.id),
+                    quantity: item.qty,
+                  }));
+                  redirectToWooCheckout(
+                    lineItems,
+                    window.location.hostname,
+                    country.currency
+                  );
+                }}
+                className="mt-3 w-full inline-flex items-center justify-center gap-2 rounded-full bg-gradient-brand px-7 py-3.5 text-sm font-semibold text-primary-foreground shadow-glow hover:shadow-glow-pink transition-all"
               >
                 Proceed to Checkout <ArrowRight className="h-4 w-4" />
-              </Link>
+              </button>
               <p className="text-xs text-muted-foreground text-center mt-4">
                 Free shipping on orders over $200
               </p>

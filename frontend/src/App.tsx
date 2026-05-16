@@ -18,7 +18,6 @@ import ProductDetail from "./pages/ProductDetail.tsx";
 // Lazy load non-critical pages
 const Categories = lazy(() => import("./pages/Categories.tsx"));
 const Cart = lazy(() => import("./pages/Cart.tsx"));
-const Checkout = lazy(() => import("./pages/Checkout.tsx"));
 const Blog = lazy(() => import("./pages/Blog.tsx"));
 const BlogPost = lazy(() => import("./pages/BlogPost.tsx"));
 const Contact = lazy(() => import("./pages/Contact.tsx"));
@@ -74,7 +73,6 @@ const App = () => {
                         <Route path="/product/:slug" element={<ProductDetail />} />
                         <Route path="/categories" element={<Categories />} />
                         <Route path="/cart" element={<Cart />} />
-                        <Route path="/checkout" element={<Checkout />} />
                         <Route path="/blog" element={<Blog />} />
                         <Route path="/blog/:slug" element={<BlogPost />} />
                         <Route path="/contact" element={<Contact />} />

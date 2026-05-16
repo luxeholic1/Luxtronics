@@ -1,0 +1,53 @@
+name: Sync Products to Firebase
+
+on:
+  # Run every 15 minutes
+  schedule:
+    - cron: '*/15 * * * *'
+  
+  # Allow manual trigger
+  workflow_dispatch:
+  
+  # Run on push to main (for testing)
+  push:
+    branches:
+      - main
+    paths:
+      - 'backend/scripts/sync-to-firebase.ts'
+      - '.github/workflows/sync-firebase.yml'
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+          cache: 'npm'
+          cache-dependency-path: backend/package-lock.json
+      
+      - name: Install dependencies
+        run: |
+          cd backend
+          npm ci
+      
+      - name: Run Firebase sync
+        env:
+          VITE_WOOCOMMERCE_URL: ${{ secrets.VITE_WOOCOMMERCE_URL }}
+          VITE_WOOCOMMERCE_KEY: ${{ secrets.VITE_WOOCOMMERCE_KEY }}
+          VITE_WOOCOMMERCE_SECRET: ${{ secrets.VITE_WOOCOMMERCE_SECRET }}
+          FIREBASE_SERVICE_ACCOUNT_KEY: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_KEY }}
+        run: |
+          cd backend
+          npx ts-node scripts/sync-to-firebase.ts
+      
+      - name: Notify on failure
+        if: failure()
+        run: |
+          echo "❌ Firebase sync failed!"
+          echo "Check the logs above for details."

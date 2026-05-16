@@ -7,6 +7,19 @@
     "start": "node ../node_modules/tsx/dist/cli.mjs server/index.ts",
     "sync:products": "node ../node_modules/tsx/dist/cli.mjs scripts/sync-products.ts",
     "sync:full": "node ../node_modules/tsx/dist/cli.mjs scripts/sync-full.ts",
-    "sync:to-target": "node ../node_modules/tsx/dist/cli.mjs scripts/sync-to-target.ts"
+    "sync:to-target": "node ../node_modules/tsx/dist/cli.mjs scripts/sync-to-target.ts",
+    "sync:firebase": "node ../node_modules/tsx/dist/cli.mjs scripts/sync-to-firebase.ts",
+    "test:woo": "node ../node_modules/tsx/dist/cli.mjs scripts/test-woo-connection.ts"
+  },
+  "devDependencies": {
+    "firebase-admin": "^13.10.0"
+  },
+  "dependencies": {
+    "@woocommerce/woocommerce-rest-api": "^1.0.1",
+    "dotenv": "^16.4.7"
+  },
+  "dependencies": {
+    "@woocommerce/woocommerce-rest-api": "^1.0.2",
+    "dotenv": "^17.4.2"
   }
 }
