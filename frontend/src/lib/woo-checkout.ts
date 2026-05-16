@@ -64,36 +64,38 @@ export function redirectToWooCheckout(
 ): void {
   if (items.length === 0) return;
 
-  const params = new URLSearchParams({
-    source_domain: sourceDomain,
-    currency,
-  });
-
-  // Add customer data if provided
-  if (customerData) {
-    if (customerData.billing) {
-      params.set('customer_data', JSON.stringify(customerData));
-    }
-  }
-
   let url: string;
 
   if (items.length === 1 && !customerData) {
-    // Single product shortcut — WooCommerce adds to cart and
-    // immediately opens /checkout/
+    // ── Single product (Buy Now) ──────────────────────────────────────────
+    // Use WooCommerce's native ?add-to-cart= on the ROOT URL.
+    // WooCommerce processes this param on ANY page load, adds the product
+    // to the session cart, then the wc_add_to_cart_redirect filter sends
+    // the user to /checkout/ automatically.
+    // DO NOT send to /checkout/?add-to-cart= — WooCommerce ignores it there.
     const { product_id, quantity, variation_id } = items[0];
-    params.set("add-to-cart", String(product_id));
-    params.set("quantity", String(quantity));
-    if (variation_id) params.set("variation_id", String(variation_id));
-    
-    // Redirect directly to checkout page which will process the add-to-cart param
-    url = `${WOO_BASE}/checkout/?${params.toString()}`;
+    const params = new URLSearchParams({
+      'add-to-cart': String(product_id),
+      'quantity':    String(quantity),
+    });
+    if (variation_id) params.set('variation_id', String(variation_id));
+    // redirect_to tells WooCommerce where to go after adding to cart
+    params.set('redirect_to', `${WOO_BASE}/checkout/`);
+
+    url = `${WOO_BASE}/?${params.toString()}`;
+
   } else {
-    // Multi-item: encode cart as JSON in query param.
-    // The WooMultiDomain / custom snippet on WP side will read
-    // `cart_items` and populate the WC session before checkout.
-    params.set("cart_items", JSON.stringify(items));
-    url = `${WOO_BASE}/checkout/?${params.toString()}`;
+    // ── Multi-item (Cart → Proceed to Checkout) ───────────────────────────
+    // Encode all items as JSON. The WordPress snippet reads this param,
+    // clears the WC cart, adds all items, then redirects to /checkout/.
+    const params = new URLSearchParams({
+      'lux_cart': JSON.stringify(items),
+    });
+    if (customerData?.billing) {
+      params.set('lux_customer', JSON.stringify(customerData));
+    }
+    // Go to a neutral WP page that triggers the snippet (root URL works fine)
+    url = `${WOO_BASE}/?${params.toString()}`;
   }
 
   window.location.href = url;
