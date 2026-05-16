@@ -132,6 +132,7 @@ const Shop = () => {
   const [sort,       setSort]       = useState("featured");
   const [categories, setCategories] = useState<CategoryFilter[]>([]);
   const [products,   setProducts]   = useState<Product[]>([]);
+  const [totalCount, setTotalCount] = useState(0); // real total from source
   const [loading,    setLoading]    = useState(true);
   const [error,      setError]      = useState<string | null>(null);
 
@@ -147,11 +148,12 @@ const Shop = () => {
           fetchStoreCategories(),
           debouncedQuery
             ? fetchStoreProducts(1, 500, debouncedQuery)
-            : fetchStoreProducts(1, 1000),
+            : fetchStoreProducts(1, 0),   // 0 = fetch ALL (Firebase ignores limit; WooCommerce paginates)
         ]);
         if (!mounted) return;
         setCategories(catData.data.filter(c => c.name.toLowerCase() !== "uncategorized" || c.count > 0));
         setProducts(prodData.map(mapStoreProductToLocalProduct));
+        setTotalCount(prodData.length); // real count from source
         setError(null);
       } catch (e) {
         if (!mounted) return;
@@ -249,7 +251,7 @@ const Shop = () => {
     <Layout>
       <SEO
         title={pageTitle}
-        description={`Browse ${list.length} premium electronics. Free shipping, 2-year warranty, 30-day returns.`}
+        description={`Browse ${totalCount.toLocaleString()} premium electronics. Free shipping, 2-year warranty, 30-day returns.`}
         keywords={searchQuery ? `${searchQuery}, electronics, gadgets` : "electronics, gadgets, smartphones, laptops"}
         url={`https://luxtronics.com/shop`}
         structuredData={{
@@ -297,7 +299,10 @@ const Shop = () => {
                 }
               </h1>
               <p className="mt-4 text-muted-foreground text-lg max-w-lg">
-                {loading ? "Loading…" : `${list.length.toLocaleString()} premium electronics — free shipping, 2-year warranty.`}
+                {loading
+                  ? "Loading products…"
+                  : `${totalCount.toLocaleString()} premium electronics — free shipping, 2-year warranty.`
+                }
               </p>
             </div>
           )}
@@ -309,7 +314,7 @@ const Shop = () => {
         {/* ── Category pills ── */}
         {!searchQuery && (
           <div className="mb-8 flex flex-wrap gap-2">
-            {[{ id: 0, name: "All", slug: "all", count: products.length }, ...categories].map(cat => {
+            {[{ id: 0, name: "All", slug: "all", count: totalCount }, ...categories].map(cat => {
               const active = cat.slug === activeCat;
               return (
                 <button

@@ -1,4 +1,5 @@
 import Layout from "@/components/Layout";
+import SEO from "@/components/SEO";
 
 const faqs = [
   {
@@ -26,6 +27,21 @@ const faqs = [
 const FAQ = () => {
   return (
     <Layout>
+      <SEO
+        title="FAQ — Frequently Asked Questions | Luxtronics"
+        description="Answers to common questions about Luxtronics shipping, returns, warranty, payments and customer support."
+        keywords="luxtronics faq, electronics store questions, shipping policy, return policy, warranty"
+        url="https://luxtronics.in/faq"
+        structuredData={{
+          "@context": "https://schema.org",
+          "@type": "FAQPage",
+          "mainEntity": faqs.map(f => ({
+            "@type": "Question",
+            "name": f.q,
+            "acceptedAnswer": { "@type": "Answer", "text": f.a }
+          }))
+        }}
+      />
       <section className="container pt-32 pb-16">
         <p className="text-sm text-primary font-medium uppercase tracking-widest mb-3">Support</p>
         <h1 className="font-display font-bold text-5xl sm:text-6xl tracking-tight">

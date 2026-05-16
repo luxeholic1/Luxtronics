@@ -1,16 +1,24 @@
-# Luxtronics - Robots.txt
-# Allow all search engines to crawl the site
-
 User-agent: *
 Allow: /
 
-# Disallow admin and account pages
-Disallow: /account/
+# Block admin and account pages from indexing
+Disallow: /admin
 Disallow: /admin/
+Disallow: /account/login
+Disallow: /account/register
+Disallow: /account/profile
 Disallow: /cart
-Disallow: /checkout
 
-# Sitemap location
+# Allow product and shop pages
+Allow: /shop
+Allow: /product/
+Allow: /categories
+Allow: /blog
+
+# Sitemaps
 Sitemap: https://luxtronics.in/sitemap.xml
 Sitemap: https://luxtronics.com.au/sitemap.xml
 Sitemap: https://luxtronics.co.nz/sitemap.xml
+
+# Crawl delay (be nice to server)
+Crawl-delay: 1

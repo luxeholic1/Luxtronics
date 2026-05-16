@@ -11,62 +11,43 @@ import {
   query, 
   where, 
   orderBy,
-  limit as firestoreLimit,
-  QueryConstraint
 } from 'firebase/firestore';
 import { productsDb, COLLECTIONS } from '@/lib/firebase-config';
 import type { Product } from '@/data/products';
 import type { StoreProduct, StoreCategory } from './store-api';
 
 /**
- * Fetch all products from Firebase
- * Much faster than WooCommerce API (50-200ms vs 1-2s)
+ * Fetch all products from Firebase — no artificial limit
  */
 export async function fetchProductsFromFirebase(
   page = 1,
-  perPage = 100,
+  perPage = 0,          // 0 = fetch ALL
   searchQuery?: string
 ): Promise<StoreProduct[]> {
   try {
     const productsRef = collection(productsDb, COLLECTIONS.PRODUCTS);
-    const constraints: QueryConstraint[] = [];
 
-    // Add search filter if provided
-    if (searchQuery) {
-      const searchLower = searchQuery.toLowerCase();
-      // Firebase doesn't support full-text search, so we'll fetch all and filter client-side
-      // For better search, consider using Algolia or Meilisearch
-      constraints.push(orderBy('name'));
-    } else {
-      constraints.push(orderBy('name'));
-    }
-
-    // Add pagination
-    if (perPage > 0) {
-      constraints.push(firestoreLimit(perPage));
-    }
-
-    const q = query(productsRef, ...constraints);
+    // Always fetch ALL docs — pagination is done client-side in Shop.tsx
+    const q = query(productsRef, orderBy('name'));
     const snapshot = await getDocs(q);
-    
-    let products = snapshot.docs.map(doc => ({
-      id: parseInt(doc.id),
-      ...doc.data()
+
+    let products = snapshot.docs.map(docSnap => ({
+      id: parseInt(docSnap.id),
+      ...docSnap.data()
     })) as StoreProduct[];
 
-    // Client-side search filtering if search query provided
+    // Client-side search pre-filter (full scoring done in Shop.tsx)
     if (searchQuery) {
       const searchLower = searchQuery.toLowerCase();
-      products = products.filter(product => 
+      products = products.filter(product =>
         product.name.toLowerCase().includes(searchLower) ||
-        product.categories?.some(cat => cat.name.toLowerCase().includes(searchLower))
+        product.categories?.some((cat: any) => cat.name?.toLowerCase().includes(searchLower))
       );
     }
 
     return products;
   } catch (error) {
     console.error('Error fetching products from Firebase:', error);
-    // Fallback to empty array on error
     return [];
   }
 }
@@ -208,10 +189,10 @@ export async function checkFirebaseAvailability(): Promise<boolean> {
       return false;
     }
 
-    // Check if last sync was within 1 hour
-    const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000);
-    if (lastSync < oneHourAgo) {
-      console.warn('Firebase data is stale (last sync > 1 hour ago)');
+    // Check if last sync was within 24 hours (was 1 hour — too strict)
+    const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
+    if (lastSync < oneDayAgo) {
+      console.warn('Firebase data is stale (last sync > 24 hours ago)');
       return false;
     }
 

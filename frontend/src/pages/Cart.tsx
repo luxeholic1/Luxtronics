@@ -138,6 +138,10 @@ const Cart = () => {
                   const lineItems = items.map(item => ({
                     product_id: Number(item.product.id),
                     quantity: item.qty,
+                    // Pass variation_id if it was stored when adding to cart
+                    ...(((item.product as any).woo_variation_id)
+                      ? { variation_id: (item.product as any).woo_variation_id }
+                      : {}),
                   }));
                   redirectToWooCheckout(
                     lineItems,

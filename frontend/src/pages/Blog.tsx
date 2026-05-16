@@ -2,9 +2,24 @@ import Layout from "@/components/Layout";
 import { Calendar, ArrowRight } from "lucide-react";
 import { Link } from "react-router-dom";
 import { blogPosts } from "@/data/blog-posts";
+import SEO from "@/components/SEO";
 
 const Blog = () => (
   <Layout>
+    <SEO
+      title="Blog — Electronics Guides & Reviews | Luxtronics"
+      description="Expert guides, buying advice and reviews on smartphones, laptops, audio, cameras and wearables from the Luxtronics team."
+      keywords="electronics blog, tech guides, smartphone reviews, laptop buying guide, audio reviews"
+      url="https://luxtronics.in/blog"
+      structuredData={{
+        "@context": "https://schema.org",
+        "@type": "Blog",
+        "name": "Luxtronics Blog",
+        "url": "https://luxtronics.in/blog",
+        "description": "Expert guides and reviews on premium electronics.",
+        "publisher": { "@type": "Organization", "name": "Luxtronics", "url": "https://luxtronics.in" }
+      }}
+    />
     <section className="container pt-24 sm:pt-28 lg:pt-32 pb-12 sm:pb-16">
       <p className="text-sm text-primary font-medium uppercase tracking-widest mb-3">Blog</p>
       <h1 className="font-display font-bold text-5xl sm:text-6xl tracking-tight">

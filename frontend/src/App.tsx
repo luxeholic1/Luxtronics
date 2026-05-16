@@ -14,6 +14,7 @@ import { StoreProvider } from "./context/StoreContext.tsx";
 import Index from "./pages/Index.tsx";
 import Shop from "./pages/Shop.tsx";
 import ProductDetail from "./pages/ProductDetail.tsx";
+import GeoRedirectPopup from "./components/GeoRedirectPopup.tsx";
 
 // Lazy load non-critical pages
 const Categories = lazy(() => import("./pages/Categories.tsx"));
@@ -66,6 +67,7 @@ const App = () => {
                   <Toaster />
                   <Sonner />
                   <BrowserRouter>
+                    <GeoRedirectPopup />
                     <Suspense fallback={<PageLoader />}>
                       <Routes>
                         <Route path="/" element={<Index />} />

@@ -2,6 +2,7 @@ import Layout from "@/components/Layout";
 import { Calendar, ArrowLeft, ArrowRight } from "lucide-react";
 import { Link, useParams } from "react-router-dom";
 import { getBlogPost } from "@/data/blog-posts";
+import SEO from "@/components/SEO";
 
 const BlogPost = () => {
   const { slug = "" } = useParams();
@@ -27,6 +28,25 @@ const BlogPost = () => {
 
   return (
     <Layout>
+      <SEO
+        title={`${post.title} | Luxtronics Blog`}
+        description={post.excerpt}
+        keywords={`${post.tag}, electronics, tech guide, luxtronics`}
+        url={`https://luxtronics.in/blog/${post.slug}`}
+        type="article"
+        publishedTime={post.date}
+        image={typeof post.img === 'string' ? post.img : undefined}
+        structuredData={{
+          "@context": "https://schema.org",
+          "@type": "Article",
+          "headline": post.title,
+          "description": post.excerpt,
+          "datePublished": post.date,
+          "author": { "@type": "Organization", "name": "Luxtronics" },
+          "publisher": { "@type": "Organization", "name": "Luxtronics", "url": "https://luxtronics.in" },
+          "url": `https://luxtronics.in/blog/${post.slug}`
+        }}
+      />
       <section className="container pt-32 pb-10">
         <Link to="/blog" className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground">
           <ArrowLeft className="h-4 w-4" />

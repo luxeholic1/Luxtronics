@@ -145,61 +145,53 @@ export async function fetchStoreProducts(page = 1, perPage = 100, search?: strin
   // Fallback to WooCommerce API (slower but always works)
   console.log('[Store API] Fetching from WooCommerce API (fallback)');
   
-  // Direct WooCommerce API call using store-specific credentials
   const { apiUrl } = storeConfig;
   const { key, secret } = getStoreCredentials();
-  
-  // If perPage is more than 100, fetch multiple pages
-  if (perPage > 100) {
+  const authHeader = 'Basic ' + btoa(`${key}:${secret}`);
+
+  // perPage=0 means "fetch ALL" — paginate through WooCommerce 100 at a time
+  if (perPage === 0 || perPage > 100) {
     const allProducts: StoreProduct[] = [];
-    const maxPerPage = 100; // WooCommerce API limit
-    const totalPages = Math.ceil(perPage / maxPerPage);
-    
-    for (let currentPage = 1; currentPage <= totalPages; currentPage++) {
+    const maxPerPage = 100;
+    let currentPage = 1;
+
+    while (true) {
       let url = `${apiUrl}/products?per_page=${maxPerPage}&page=${currentPage}&status=publish`;
       if (search) url += `&search=${encodeURIComponent(search)}`;
-      
-      const authHeader = 'Basic ' + btoa(`${key}:${secret}`);
-      
+
       const response = await fetch(url, {
-        headers: {
-          'Authorization': authHeader,
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Authorization': authHeader, 'Content-Type': 'application/json' },
       });
-      
-      if (!response.ok) {
-        throw new Error(`Failed to fetch products: ${response.statusText}`);
-      }
-      
+
+      if (!response.ok) throw new Error(`Failed to fetch products: ${response.statusText}`);
+
       const products = await response.json();
-      if (Array.isArray(products) && products.length > 0) {
-        allProducts.push(...products);
-      } else {
-        break; // No more products
-      }
+      if (!Array.isArray(products) || products.length === 0) break;
+
+      allProducts.push(...products);
+
+      // If we got fewer than maxPerPage, we've reached the last page
+      if (products.length < maxPerPage) break;
+
+      // If perPage is a specific number (not 0), stop when we have enough
+      if (perPage > 0 && allProducts.length >= perPage) break;
+
+      currentPage++;
     }
-    
+
     return allProducts;
   }
-  
-  // Single page fetch
+
+  // Single page fetch (perPage ≤ 100)
   let url = `${apiUrl}/products?per_page=${perPage}&page=${page}&status=publish`;
   if (search) url += `&search=${encodeURIComponent(search)}`;
-  
-  const authHeader = 'Basic ' + btoa(`${key}:${secret}`);
-  
+
   const response = await fetch(url, {
-    headers: {
-      'Authorization': authHeader,
-      'Content-Type': 'application/json',
-    },
+    headers: { 'Authorization': authHeader, 'Content-Type': 'application/json' },
   });
-  
-  if (!response.ok) {
-    throw new Error(`Failed to fetch products: ${response.statusText}`);
-  }
-  
+
+  if (!response.ok) throw new Error(`Failed to fetch products: ${response.statusText}`);
+
   const products = await response.json();
   return Array.isArray(products) ? products : [];
 }

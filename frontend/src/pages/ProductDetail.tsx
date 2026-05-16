@@ -11,6 +11,7 @@ import { fetchStoreProduct, fetchStoreProducts, mapStoreProductToLocalProduct } 
 import { sanitizeHtml } from "@/lib/sanitize";
 import { redirectToWooCheckout } from "@/lib/woo-checkout";
 import { toast } from "sonner";
+import SEO from "@/components/SEO";
 import type { Product } from "@/data/products";
 
 type Variation = NonNullable<Product["variations"]>[0];
@@ -119,13 +120,14 @@ const ProductDetail = () => {
   const handleAddToCart = () => {
     if (!product) return;
     
-    // Add product to cart with selected variation
+    // Add product to cart with selected variation and correct qty
     const productToAdd = {
       ...product,
-      selectedVariation: selectedVariation || undefined,
+      // Store variation_id on the product so Cart can pass it to WooCommerce
+      woo_variation_id: selectedVariation ? Number(selectedVariation.id) : undefined,
     };
     
-    addItem(productToAdd, 1);
+    addItem(productToAdd, qty); // ← use qty state, not hardcoded 1
     
     // Show success animation
     setAddedToCart(true);
@@ -197,6 +199,72 @@ const ProductDetail = () => {
 
   return (
     <Layout>
+      {/* ── Full Product Schema for Google Shopping ── */}
+      <SEO
+        title={`${product.name} — Buy Online | Luxtronics`}
+        description={product.description
+          ? product.description.replace(/<[^>]+>/g, '').slice(0, 160)
+          : `Buy ${product.name} online at Luxtronics. Free shipping, 2-year warranty, 30-day returns.`
+        }
+        keywords={`${product.name}, ${product.category}, buy ${product.name} online, luxtronics`}
+        url={`https://luxtronics.in/product/${slug}`}
+        image={product.image}
+        type="product"
+        structuredData={{
+          "@context": "https://schema.org",
+          "@type": "Product",
+          "name": product.name,
+          "description": product.description?.replace(/<[^>]+>/g, '') || product.name,
+          "image": [product.image, ...(product.images || [])].filter(Boolean),
+          "sku": product.id,
+          "brand": {
+            "@type": "Brand",
+            "name": "Luxtronics"
+          },
+          "offers": {
+            "@type": "Offer",
+            "url": `https://luxtronics.in/product/${slug}`,
+            "priceCurrency": "INR",
+            "price": currentPrice,
+            "priceValidUntil": new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+            "availability": inStock
+              ? "https://schema.org/InStock"
+              : "https://schema.org/OutOfStock",
+            "seller": {
+              "@type": "Organization",
+              "name": "Luxtronics",
+              "url": "https://luxtronics.in"
+            },
+            "shippingDetails": {
+              "@type": "OfferShippingDetails",
+              "shippingRate": {
+                "@type": "MonetaryAmount",
+                "value": "0",
+                "currency": "INR"
+              },
+              "deliveryTime": {
+                "@type": "ShippingDeliveryTime",
+                "handlingTime": { "@type": "QuantitativeValue", "minValue": 1, "maxValue": 2, "unitCode": "DAY" },
+                "transitTime": { "@type": "QuantitativeValue", "minValue": 3, "maxValue": 7, "unitCode": "DAY" }
+              }
+            },
+            "hasMerchantReturnPolicy": {
+              "@type": "MerchantReturnPolicy",
+              "returnPolicyCategory": "https://schema.org/MerchantReturnFiniteReturnWindow",
+              "merchantReturnDays": 30,
+              "returnMethod": "https://schema.org/ReturnByMail"
+            }
+          },
+          "aggregateRating": product.reviews > 0 ? {
+            "@type": "AggregateRating",
+            "ratingValue": product.rating,
+            "reviewCount": product.reviews,
+            "bestRating": 5,
+            "worstRating": 1
+          } : undefined,
+          "category": product.category
+        }}
+      />
       <section className="container pt-32 pb-20">
         {/* Breadcrumb */}
         <Link

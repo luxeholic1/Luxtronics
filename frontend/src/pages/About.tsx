@@ -1,9 +1,29 @@
 import Layout from "@/components/Layout";
 import { Sparkles, ShieldCheck, Truck, Headphones } from "lucide-react";
+import SEO from "@/components/SEO";
 
 const About = () => {
   return (
     <Layout>
+      <SEO
+        title="About Luxtronics — Premium Electronics Store"
+        description="Luxtronics curates premium electronics for India, Australia and New Zealand. We bridge high-performance technology with refined lifestyle aesthetics."
+        keywords="about luxtronics, premium electronics store, tech store India, electronics Australia"
+        url="https://luxtronics.in/about"
+        structuredData={{
+          "@context": "https://schema.org",
+          "@type": "AboutPage",
+          "name": "About Luxtronics",
+          "url": "https://luxtronics.in/about",
+          "description": "Luxtronics curates premium electronics for India, Australia and New Zealand.",
+          "publisher": {
+            "@type": "Organization",
+            "name": "Luxtronics",
+            "url": "https://luxtronics.in",
+            "logo": { "@type": "ImageObject", "url": "https://luxtronics.in/logo.png" }
+          }
+        }}
+      />
       <section className="container pt-24 sm:pt-28 lg:pt-32 pb-12 sm:pb-16">
         <p className="text-sm text-primary font-medium uppercase tracking-widest mb-3">About</p>
         <h1 className="font-display font-bold text-5xl sm:text-6xl tracking-tight">
