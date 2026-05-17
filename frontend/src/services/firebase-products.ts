@@ -22,10 +22,13 @@ import { productsDb, COLLECTIONS } from '@/lib/firebase-config';
 import type { StoreProduct, StoreCategory } from './store-api';
 
 // ── In-memory cache ───────────────────────────────────────────────────────────
-let _productsCache: StoreProduct[] | null = null;
-let _categoriesCache: StoreCategory[] | null = null;
+const PRODUCTS_TTL    = 30 * 60 * 1000;  // 30 minutes
+const CATEGORIES_TTL  = 60 * 60 * 1000;  // 1 hour
+const AVAILABILITY_TTL = 5 * 60 * 1000;  // 5 minutes
+
+let _productsCache:    { data: StoreProduct[]; ts: number } | null = null;
+let _categoriesCache:  { data: StoreCategory[]; ts: number } | null = null;
 let _availabilityCache: { value: boolean; ts: number } | null = null;
-const AVAILABILITY_TTL = 5 * 60 * 1000; // 5 minutes
 
 /**
  * Check if Firebase has fresh data — result cached for 5 minutes
@@ -76,19 +79,23 @@ export async function fetchProductsFromFirebase(
   searchQuery?: string
 ): Promise<StoreProduct[]> {
   try {
-    // Use cache if available
-    if (!_productsCache) {
+    // Use cache if still fresh (within 30 minutes)
+    const now = Date.now();
+    if (!_productsCache || now - _productsCache.ts > PRODUCTS_TTL) {
       const productsRef = collection(productsDb, COLLECTIONS.PRODUCTS);
       const q = query(productsRef, orderBy('name'));
       const snapshot = await getDocs(q);
 
-      _productsCache = snapshot.docs.map(docSnap => ({
-        id: parseInt(docSnap.id),
-        ...docSnap.data()
-      })) as StoreProduct[];
+      _productsCache = {
+        data: snapshot.docs.map(docSnap => ({
+          id: parseInt(docSnap.id),
+          ...docSnap.data()
+        })) as StoreProduct[],
+        ts: now,
+      };
     }
 
-    let products = _productsCache;
+    let products = _productsCache.data;
 
     // Light pre-filter for search (full scoring done in Shop.tsx)
     if (searchQuery) {
@@ -111,9 +118,9 @@ export async function fetchProductsFromFirebase(
  */
 export async function fetchProductFromFirebase(slug: string): Promise<StoreProduct | null> {
   try {
-    // Check in-memory cache first
-    if (_productsCache) {
-      const cached = _productsCache.find((p: any) => p.slug === slug);
+    // Check in-memory cache first (if still fresh)
+    if (_productsCache && Date.now() - _productsCache.ts <= PRODUCTS_TTL) {
+      const cached = _productsCache.data.find((p: any) => p.slug === slug);
       if (cached) return cached;
     }
 
@@ -138,18 +145,22 @@ export async function fetchProductFromFirebase(slug: string): Promise<StoreProdu
  */
 export async function fetchCategoriesFromFirebase(): Promise<StoreCategory[]> {
   try {
-    if (_categoriesCache) return _categoriesCache;
+    const now = Date.now();
+    if (!_categoriesCache || now - _categoriesCache.ts > CATEGORIES_TTL) {
+      const categoriesRef = collection(productsDb, COLLECTIONS.CATEGORIES);
+      const q = query(categoriesRef, orderBy('name'));
+      const snapshot = await getDocs(q);
 
-    const categoriesRef = collection(productsDb, COLLECTIONS.CATEGORIES);
-    const q = query(categoriesRef, orderBy('name'));
-    const snapshot = await getDocs(q);
+      _categoriesCache = {
+        data: snapshot.docs.map(docSnap => ({
+          id: parseInt(docSnap.id),
+          ...docSnap.data()
+        })) as StoreCategory[],
+        ts: now,
+      };
+    }
 
-    _categoriesCache = snapshot.docs.map(docSnap => ({
-      id: parseInt(docSnap.id),
-      ...docSnap.data()
-    })) as StoreCategory[];
-
-    return _categoriesCache;
+    return _categoriesCache.data;
   } catch (error) {
     console.error('Firebase fetchCategories error:', error);
     return [];
@@ -161,11 +172,11 @@ export async function fetchCategoriesFromFirebase(): Promise<StoreCategory[]> {
  */
 export async function searchProductsInFirebase(searchQuery: string): Promise<StoreProduct[]> {
   try {
-    // Ensure cache is populated
-    if (!_productsCache) {
+    // Ensure cache is populated (respects TTL)
+    if (!_productsCache || Date.now() - _productsCache.ts > PRODUCTS_TTL) {
       await fetchProductsFromFirebase();
     }
-    const products = _productsCache || [];
+    const products = _productsCache?.data || [];
 
     const q     = searchQuery.toLowerCase().trim();
     const words = q.match(/[a-z0-9]+/g) || [];
@@ -216,7 +227,7 @@ export async function searchProductsInFirebase(searchQuery: string): Promise<Sto
   }
 }
 
-/** Clear cache (call after Firebase sync) */
+/** Clear cache manually (e.g. after Firebase sync) */
 export function clearFirebaseCache() {
   _productsCache    = null;
   _categoriesCache  = null;
