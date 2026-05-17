@@ -56,17 +56,14 @@ function luxtronics_handle_react_cart() {
 }
 
 
-// ── 2. After Buy Now (?add-to-cart=ID) → force redirect to checkout ──────────
-add_filter( 'woocommerce_add_to_cart_redirect', 'luxtronics_buynow_redirect', 10, 2 );
+// ── 2. After Buy Now (?add-to-cart=ID on /shop/) → force redirect to checkout ─
+add_filter( 'woocommerce_add_to_cart_redirect', 'luxtronics_buynow_redirect', 99, 2 );
 
 function luxtronics_buynow_redirect( $url, $product ) {
-    // Only redirect to checkout when redirect_to param is set
-    if ( isset( $_GET['redirect_to'] ) ) {
-        $redirect = esc_url_raw( $_GET['redirect_to'] );
-        // Safety: only allow redirects to our own checkout
-        if ( strpos( $redirect, '/checkout' ) !== false ) {
-            return wc_get_checkout_url();
-        }
+    // If the request came from our React app (has add-to-cart in GET)
+    // always redirect straight to checkout — skip the cart page
+    if ( isset( $_GET['add-to-cart'] ) ) {
+        return wc_get_checkout_url();
     }
     return $url;
 }

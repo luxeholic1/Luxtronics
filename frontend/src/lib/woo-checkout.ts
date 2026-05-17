@@ -68,33 +68,29 @@ export function redirectToWooCheckout(
 
   if (items.length === 1 && !customerData) {
     // ── Single product (Buy Now) ──────────────────────────────────────────
-    // Use WooCommerce's native ?add-to-cart= on the ROOT URL.
-    // WooCommerce processes this param on ANY page load, adds the product
-    // to the session cart, then the wc_add_to_cart_redirect filter sends
-    // the user to /checkout/ automatically.
-    // DO NOT send to /checkout/?add-to-cart= — WooCommerce ignores it there.
+    // WooCommerce native: ?add-to-cart=ID&quantity=N
+    // Works on ANY WP page. WC adds to session cart then redirects.
+    // We use the shop page as the landing page so WC session is active.
     const { product_id, quantity, variation_id } = items[0];
     const params = new URLSearchParams({
       'add-to-cart': String(product_id),
       'quantity':    String(quantity),
     });
     if (variation_id) params.set('variation_id', String(variation_id));
-    // redirect_to tells WooCommerce where to go after adding to cart
-    params.set('redirect_to', `${WOO_BASE}/checkout/`);
 
-    url = `${WOO_BASE}/?${params.toString()}`;
+    // Use shop page — WC always processes add-to-cart here
+    url = `${WOO_BASE}/shop/?${params.toString()}`;
 
   } else {
     // ── Multi-item (Cart → Proceed to Checkout) ───────────────────────────
-    // Encode all items as JSON. The WordPress snippet reads this param,
-    // clears the WC cart, adds all items, then redirects to /checkout/.
+    // Custom param — WordPress snippet (WORDPRESS_CART_SNIPPET.php) reads
+    // lux_cart, empties WC cart, adds all items, redirects to /checkout/
     const params = new URLSearchParams({
       'lux_cart': JSON.stringify(items),
     });
     if (customerData?.billing) {
       params.set('lux_customer', JSON.stringify(customerData));
     }
-    // Go to a neutral WP page that triggers the snippet (root URL works fine)
     url = `${WOO_BASE}/?${params.toString()}`;
   }
 
