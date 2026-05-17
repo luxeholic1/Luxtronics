@@ -502,37 +502,73 @@ export function mapStoreProductToLocalProduct(product: StoreProduct): Product {
 }
 
 
+// All 3 store configs for cross-store order fetching
+const ALL_STORES = [
+  {
+    label: 'India',
+    apiUrl: 'https://luxtronics.luxtronics.in/wp-json/wc/v3',
+    storeBase: 'https://luxtronics.luxtronics.in',
+    getKey:    () => import.meta.env.VITE_WOOCOMMERCE_KEY_INDIA    || '',
+    getSecret: () => import.meta.env.VITE_WOOCOMMERCE_SECRET_INDIA || '',
+  },
+  {
+    label: 'Australia',
+    apiUrl: 'https://storeau.luxtronics.luxtronics.in/wp-json/wc/v3',
+    storeBase: 'https://storeau.luxtronics.luxtronics.in',
+    getKey:    () => import.meta.env.VITE_WOOCOMMERCE_KEY_AUSTRALIA    || '',
+    getSecret: () => import.meta.env.VITE_WOOCOMMERCE_SECRET_AUSTRALIA || '',
+  },
+  {
+    label: 'New Zealand',
+    apiUrl: 'https://storenz.luxtronics.luxtronics.in/wp-json/wc/v3',
+    storeBase: 'https://storenz.luxtronics.luxtronics.in',
+    getKey:    () => import.meta.env.VITE_WOOCOMMERCE_KEY_NEWZEALAND    || '',
+    getSecret: () => import.meta.env.VITE_WOOCOMMERCE_SECRET_NEWZEALAND || '',
+  },
+];
+
 /**
- * Fetch customer orders from WooCommerce
+ * Fetch customer orders from ALL 3 stores and merge them.
+ * Each order gets a `storeBase` field so Track Order links to the correct store.
  */
-export async function fetchCustomerOrders(customerEmail: string): Promise<WooCommerceOrder[]> {
-  try {
-    const { apiUrl } = storeConfig;
-    const { key, secret } = getStoreCredentials();
-    
-    // Search orders by customer email using the 'search' parameter
-    // This is more reliable than 'customer' (which expects an ID)
-    const url = `${apiUrl}/orders?search=${encodeURIComponent(customerEmail)}&per_page=100&orderby=date&order=desc`;
-    const authHeader = 'Basic ' + btoa(`${key}:${secret}`);
-    
-    const response = await fetch(url, {
-      headers: {
-        'Authorization': authHeader,
-        'Content-Type': 'application/json',
-      },
-    });
-    
-    if (!response.ok) {
-      console.error('Failed to fetch orders:', response.statusText);
-      return [];
-    }
-    
-    const orders = await response.json();
-    return Array.isArray(orders) ? orders : [];
-  } catch (error) {
-    console.error('Error fetching customer orders:', error);
-    return [];
-  }
+export async function fetchCustomerOrders(customerEmail: string): Promise<(WooCommerceOrder & { storeBase: string; storeLabel: string })[]> {
+  const results = await Promise.allSettled(
+    ALL_STORES.map(async (store) => {
+      const key    = store.getKey();
+      const secret = store.getSecret();
+      if (!key || !secret) return [];
+
+      const url = `${store.apiUrl}/orders?search=${encodeURIComponent(customerEmail)}&per_page=100&orderby=date&order=desc`;
+      const authHeader = 'Basic ' + btoa(`${key}:${secret}`);
+
+      const response = await fetch(url, {
+        headers: { 'Authorization': authHeader, 'Content-Type': 'application/json' },
+      });
+
+      if (!response.ok) return [];
+
+      const orders = await response.json();
+      if (!Array.isArray(orders)) return [];
+
+      // Tag each order with which store it came from
+      return orders.map((o: WooCommerceOrder) => ({
+        ...o,
+        storeBase:  store.storeBase,
+        storeLabel: store.label,
+      }));
+    })
+  );
+
+  // Flatten all fulfilled results, sort by date descending
+  const allOrders = results
+    .filter((r): r is PromiseFulfilledResult<any[]> => r.status === 'fulfilled')
+    .flatMap(r => r.value);
+
+  allOrders.sort((a, b) =>
+    new Date(b.date_created).getTime() - new Date(a.date_created).getTime()
+  );
+
+  return allOrders;
 }
 
 /**

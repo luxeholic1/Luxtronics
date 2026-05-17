@@ -5,9 +5,6 @@ import { useAuth } from "@/context/AuthContext";
 import { useCurrency } from "@/context/CurrencyContext";
 import { fetchCustomerOrders, type WooCommerceOrder } from "@/services/store-api";
 import { Package, Clock, CheckCircle, XCircle, Truck, ExternalLink, RefreshCw } from "lucide-react";
-import { storeConfig } from "@/config/storeConfig";
-
-const WOO_BASE = storeConfig.apiUrl.replace('/wp-json/wc/v3', '');
 
 const statusConfig = {
   'pending':    { label: 'Pending Payment', icon: Clock,         color: 'text-yellow-500', bg: 'bg-yellow-500/10 border-yellow-500/20' },
@@ -30,7 +27,7 @@ function safePrice(val: any): number {
 const AccountOrders = () => {
   const { isLoaded, isSignedIn, user } = useAuth();
   const { formatPrice } = useCurrency();
-  const [orders, setOrders]   = useState<WooCommerceOrder[]>([]);
+  const [orders, setOrders]   = useState<(WooCommerceOrder & { storeBase: string; storeLabel: string })[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError]     = useState<string | null>(null);
 
@@ -86,9 +83,9 @@ const AccountOrders = () => {
   const getStatus = (s: string) =>
     statusConfig[s as keyof typeof statusConfig] ?? statusConfig.pending;
 
-  /** WooCommerce order tracking URL */
-  const trackingUrl = (order: WooCommerceOrder) =>
-    `${WOO_BASE}/my-account/view-order/${order.id}/`;
+  /** WooCommerce order tracking URL — uses the store the order was placed on */
+  const trackingUrl = (order: WooCommerceOrder & { storeBase: string }) =>
+    `${order.storeBase}/my-account/view-order/${order.id}/`;
 
   return (
     <Layout>
@@ -158,6 +155,12 @@ const AccountOrders = () => {
                         <StatusIcon className="h-3 w-3" />
                         {status.label}
                       </span>
+                      {/* Store badge */}
+                      {(order as any).storeLabel && (
+                        <span className="text-xs px-2 py-0.5 rounded-full bg-secondary border border-border text-muted-foreground">
+                          {(order as any).storeLabel === 'India' ? '🇮🇳' : (order as any).storeLabel === 'Australia' ? '🇦🇺' : '🇳🇿'} {(order as any).storeLabel}
+                        </span>
+                      )}
                     </div>
                     <div className="flex items-center gap-3">
                       <span className="text-sm text-muted-foreground">{formatDate(order.date_created)}</span>
