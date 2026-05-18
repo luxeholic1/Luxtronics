@@ -425,7 +425,7 @@ const Shop = () => {
           <>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
               {paginated.map(p => (
-                <ImageCursorCard key={p.id} imageUrl={p.image}>
+                <ImageCursorCard key={p.id} imageUrl={p.image} category={p.category}>
                   <ProductCard product={p} />
                 </ImageCursorCard>
               ))}
