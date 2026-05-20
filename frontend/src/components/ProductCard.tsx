@@ -121,9 +121,23 @@ const ProductCard = ({ product }: { product: Product }) => {
             </h3>
 
             <div className="flex items-center gap-1 sm:gap-1.5 text-[11px] sm:text-xs text-muted-foreground" itemProp="aggregateRating" itemScope itemType="https://schema.org/AggregateRating">
-              <Star className="h-3 w-3 sm:h-3.5 sm:w-3.5 fill-primary text-primary" />
-              <span className="font-medium text-foreground text-[11px] sm:text-xs" itemProp="ratingValue">{product.rating}</span>
-              <span className="text-[10px] sm:text-xs" itemProp="reviewCount">({product.reviews.toLocaleString()} reviews)</span>
+              <div className="flex items-center gap-0.5">
+                {[1,2,3,4,5].map((star) => (
+                  <Star
+                    key={star}
+                    className={cn(
+                      "h-3 w-3 sm:h-3.5 sm:w-3.5",
+                      star <= Math.round(product.rating)
+                        ? "fill-amber-400 text-amber-400"
+                        : star - 0.5 <= product.rating
+                        ? "fill-amber-400/50 text-amber-400"
+                        : "fill-gray-200 text-gray-200 dark:fill-gray-700 dark:text-gray-700"
+                    )}
+                  />
+                ))}
+              </div>
+              <span className="font-semibold text-foreground text-[11px] sm:text-xs" itemProp="ratingValue">{product.rating.toFixed(1)}</span>
+              <span className="text-[10px] sm:text-xs" itemProp="reviewCount">({product.reviews >= 1000 ? `${(product.reviews / 1000).toFixed(1)}k` : product.reviews})</span>
             </div>
 
             <div className="flex items-end justify-between pt-1.5 sm:pt-2">

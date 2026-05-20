@@ -109,7 +109,7 @@ const Hero = () => {
       aria-label="Promotional banner slider"
     >
       {/* Slide container */}
-      <div className="relative w-full h-[320px] sm:h-[420px] md:h-[500px] lg:h-[560px] xl:h-[620px]">
+      <div className="relative w-full h-[480px] sm:h-[420px] md:h-[500px] lg:h-[560px] xl:h-[620px]">
         <AnimatePresence initial={false} custom={direction} mode="popLayout">
           <motion.div
             key={slide.id}
@@ -134,12 +134,110 @@ const Hero = () => {
               aria-hidden="true"
             />
 
-            <div className="relative h-full max-w-[1400px] mx-auto px-4 sm:px-8 md:px-12 lg:px-16 flex items-center">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 md:gap-10 items-center w-full">
+            <div className="relative h-full max-w-[1400px] mx-auto px-5 sm:px-8 md:px-12 lg:px-16">
 
-                {/* ── Text content ── */}
-                <div className="flex flex-col items-start text-left z-10 order-2 md:order-1">
-                  {/* Badge */}
+              {/* ── MOBILE layout (< sm): stacked, image floats top-right ── */}
+              <div className="flex flex-col h-full pt-7 pb-4 sm:hidden">
+                {/* Top row: text left + image right */}
+                <div className="flex items-start justify-between gap-3 flex-1">
+                  {/* Text */}
+                  <div className="flex flex-col items-start flex-1 min-w-0 pt-1">
+                    <motion.span
+                      initial={{ opacity: 0, y: -8 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: 0.1 }}
+                      className={`inline-flex items-center gap-1 text-[11px] font-bold text-white px-2.5 py-1 rounded-full mb-2.5 ${slide.tagColor}`}
+                    >
+                      {slide.badge}
+                    </motion.span>
+
+                    <motion.h1
+                      initial={{ opacity: 0, y: 12 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: 0.15 }}
+                      className="font-display font-extrabold leading-tight tracking-tight text-gray-900 dark:text-white"
+                    >
+                      <span className={`bg-gradient-to-r ${slide.accent} bg-clip-text text-transparent text-2xl`}>
+                        {slide.headline}
+                      </span>
+                      <br />
+                      <span className="text-gray-800 dark:text-gray-100 text-lg font-bold">
+                        {slide.subheadline}
+                      </span>
+                    </motion.h1>
+
+                    <motion.p
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      transition={{ delay: 0.22 }}
+                      className="mt-2 text-xs text-gray-600 dark:text-gray-300 leading-relaxed line-clamp-2"
+                    >
+                      {slide.description}
+                    </motion.p>
+                  </div>
+
+                  {/* Product image — right side, tall */}
+                  <motion.div
+                    initial={{ opacity: 0, scale: 0.85, x: 20 }}
+                    animate={{ opacity: 1, scale: 1, x: 0 }}
+                    transition={{ delay: 0.08, duration: 0.5, ease: [0.34, 1.56, 0.64, 1] }}
+                    className="relative flex-shrink-0 w-[140px] h-[160px] flex items-center justify-center"
+                  >
+                    <div className={`absolute inset-0 rounded-full bg-gradient-to-br ${slide.accent} opacity-15 blur-2xl`} />
+                    <img
+                      src={slide.image}
+                      alt={slide.imageAlt}
+                      className="relative z-10 h-full w-full object-contain drop-shadow-xl"
+                      loading="eager"
+                    />
+                    <span className={`absolute top-0 right-0 z-20 text-[9px] font-bold text-white px-1.5 py-0.5 rounded-md ${slide.tagColor} shadow`}>
+                      {slide.tag}
+                    </span>
+                  </motion.div>
+                </div>
+
+                {/* CTAs */}
+                <motion.div
+                  initial={{ opacity: 0, y: 8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.28 }}
+                  className="flex items-center gap-2.5 mt-4"
+                >
+                  <Link
+                    to={slide.cta.to}
+                    className={`flex-1 inline-flex items-center justify-center gap-1.5 rounded-full bg-gradient-to-r ${slide.accent} px-4 py-2.5 text-xs font-bold text-white shadow-lg active:scale-95 transition-all`}
+                  >
+                    {slide.cta.label}
+                    <ArrowRight className="h-3.5 w-3.5" />
+                  </Link>
+                  <Link
+                    to={slide.secondary.to}
+                    className="inline-flex items-center rounded-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-4 py-2.5 text-xs font-medium text-gray-700 dark:text-gray-200 whitespace-nowrap"
+                  >
+                    {slide.secondary.label}
+                  </Link>
+                </motion.div>
+
+                {/* Trust badges */}
+                <motion.div
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  transition={{ delay: 0.36 }}
+                  className="flex items-center gap-3 mt-3 text-[10px] text-gray-500 dark:text-gray-400"
+                >
+                  {["Free Shipping", "2-Yr Warranty", "Easy Returns"].map((t) => (
+                    <span key={t} className="flex items-center gap-1">
+                      <span className="h-1.5 w-1.5 rounded-full bg-green-500 shrink-0" />
+                      {t}
+                    </span>
+                  ))}
+                </motion.div>
+              </div>
+
+              {/* ── DESKTOP layout (≥ sm): side by side ── */}
+              <div className="hidden sm:grid grid-cols-2 gap-6 md:gap-10 items-center h-full">
+                {/* Text */}
+                <div className="flex flex-col items-start text-left z-10">
                   <motion.span
                     initial={{ opacity: 0, y: -10 }}
                     animate={{ opacity: 1, y: 0 }}
@@ -149,23 +247,21 @@ const Hero = () => {
                     {slide.badge}
                   </motion.span>
 
-                  {/* Headline */}
                   <motion.h1
                     initial={{ opacity: 0, y: 16 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: 0.15 }}
-                    className="font-display font-extrabold text-3xl sm:text-4xl md:text-5xl lg:text-6xl leading-tight tracking-tight text-gray-900 dark:text-white"
+                    className="font-display font-extrabold text-4xl md:text-5xl lg:text-6xl leading-tight tracking-tight text-gray-900 dark:text-white"
                   >
                     <span className={`bg-gradient-to-r ${slide.accent} bg-clip-text text-transparent`}>
                       {slide.headline}
                     </span>
                     <br />
-                    <span className="text-gray-800 dark:text-gray-100 text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-bold">
+                    <span className="text-gray-800 dark:text-gray-100 text-3xl md:text-4xl lg:text-5xl font-bold">
                       {slide.subheadline}
                     </span>
                   </motion.h1>
 
-                  {/* Description */}
                   <motion.p
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
@@ -175,7 +271,6 @@ const Hero = () => {
                     {slide.description}
                   </motion.p>
 
-                  {/* CTAs */}
                   <motion.div
                     initial={{ opacity: 0, y: 10 }}
                     animate={{ opacity: 1, y: 0 }}
@@ -197,7 +292,6 @@ const Hero = () => {
                     </Link>
                   </motion.div>
 
-                  {/* Trust badges */}
                   <motion.div
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
@@ -213,14 +307,13 @@ const Hero = () => {
                   </motion.div>
                 </div>
 
-                {/* ── Product image ── */}
+                {/* Product image */}
                 <motion.div
                   initial={{ opacity: 0, scale: 0.88 }}
                   animate={{ opacity: 1, scale: 1 }}
                   transition={{ delay: 0.1, duration: 0.6, ease: [0.34, 1.56, 0.64, 1] }}
-                  className="relative flex items-center justify-center order-1 md:order-2 h-[160px] sm:h-[220px] md:h-[300px] lg:h-[360px]"
+                  className="relative flex items-center justify-center h-[220px] md:h-[300px] lg:h-[360px]"
                 >
-                  {/* Soft glow behind image */}
                   <div className={`absolute inset-0 rounded-full bg-gradient-to-br ${slide.accent} opacity-10 blur-3xl scale-75`} />
                   <img
                     src={slide.image}
@@ -228,13 +321,12 @@ const Hero = () => {
                     className="relative z-10 h-full w-full object-contain drop-shadow-2xl"
                     loading="eager"
                   />
-                  {/* Sale tag */}
                   <span className={`absolute top-2 right-2 sm:top-4 sm:right-4 z-20 text-[10px] sm:text-xs font-bold text-white px-2 py-1 rounded-lg ${slide.tagColor} shadow-lg`}>
                     {slide.tag}
                   </span>
                 </motion.div>
-
               </div>
+
             </div>
           </motion.div>
         </AnimatePresence>

@@ -1,5 +1,6 @@
 import type { Product } from '@/data/products';
 import { storeConfig } from '@/config/storeConfig';
+import { getMarketRating } from '@/lib/market-ratings';
 import { 
   fetchProductsFromFirebase, 
   fetchProductFromFirebase,
@@ -475,8 +476,17 @@ export function mapStoreProductToLocalProduct(product: StoreProduct): Product {
     oldPrice: regularPrice > price ? Math.round(regularPrice) : undefined,
     image: mainImage,
     images: allImages.length > 0 ? allImages : [mainImage],
-    rating: Number((product as any).average_rating || product.rating || 5),
-    reviews: Number((product as any).rating_count || product.reviewCount || 0),
+    ...(() => {
+      const wooRating = Number((product as any).average_rating || product.rating || 0);
+      const wooReviews = Number((product as any).rating_count || product.reviewCount || 0);
+      const slug = product.slug || '';
+      const catSlug = product.categories?.[0]?.slug || product.categories?.[0]?.name || '';
+      const market = getMarketRating(product.name || '', slug, catSlug, wooRating);
+      return {
+        rating: market ? market.rating : (wooRating > 0 ? wooRating : 4.2),
+        reviews: market ? market.reviews : (wooReviews > 0 ? wooReviews : 4800),
+      };
+    })(),
     description: (product as any).short_description || product.description || product.shortDescription || '',
     badge: regularPrice > price ? '-20%' : undefined,
     variations: (Array.isArray(product.variations) ? product.variations : [])
