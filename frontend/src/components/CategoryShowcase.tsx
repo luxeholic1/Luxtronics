@@ -152,26 +152,7 @@ const CategoryShowcase = () => {
                     </div>
                   </div>
 
-                  {/* Floating particles */}
-                  {[...Array(3)].map((_, i) => (
-                    <motion.div
-                      key={i}
-                      className={`absolute h-1 w-1 rounded-full bg-gradient-to-br ${category.color}`}
-                      style={{
-                        left: `${20 + i * 20}%`,
-                        top: `${30 + i * 10}%`,
-                      }}
-                      animate={{
-                        y: [0, -10, 0],
-                        opacity: [0.3, 0.7, 0.3],
-                      }}
-                      transition={{
-                        duration: 2 + i,
-                        repeat: Infinity,
-                        delay: i * 0.5,
-                      }}
-                    />
-                  ))}
+                  {/* Floating particles removed — caused unnecessary repaints */}
                 </Link>
               </motion.div>
             );

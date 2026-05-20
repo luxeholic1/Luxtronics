@@ -31,10 +31,10 @@ const Contact = () => {
             "telephone": "+91-92664-33722",
             "address": {
               "@type": "PostalAddress",
-              "streetAddress": "Plot No. 12, Sector 63",
+              "streetAddress": "Suite NP 004, Tower N, Amarpali Zodiac",
               "addressLocality": "Noida",
               "addressRegion": "Uttar Pradesh",
-              "postalCode": "201301",
+              "postalCode": "201307",
               "addressCountry": "IN"
             },
             "contactPoint": [
@@ -119,8 +119,9 @@ const Contact = () => {
             </div>
             <div>
               <p className="text-xs uppercase tracking-wider text-muted-foreground">Office Address</p>
-              <p className="font-medium mt-1">Plot No. 12, Sector 63</p>
-              <p className="text-sm text-muted-foreground">Noida, Uttar Pradesh 201301</p>
+              <p className="font-medium mt-1">Suite NP 004, Tower N</p>
+              <p className="text-sm text-muted-foreground">Amarpali Zodiac, Noida</p>
+              <p className="text-sm text-muted-foreground">Uttar Pradesh 201307</p>
               <p className="text-sm text-muted-foreground">India</p>
             </div>
           </div>

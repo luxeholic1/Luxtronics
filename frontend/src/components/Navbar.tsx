@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Link, NavLink as RouterNavLink, useLocation, useNavigate } from "react-router-dom";
-import { Search, ShoppingBag, User, Menu, X, Zap, ChevronDown, LogOut } from "lucide-react";
+import { Search, ShoppingBag, User, Menu, X, Zap, ChevronDown, LogOut, Smartphone, Tv, Headphones, Camera, Laptop, Watch, Gamepad2, Home as HomeIcon, Cpu, Battery } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useCurrency, countries } from "@/context/CurrencyContext";
 import { useCart } from "@/context/CartContext";
@@ -10,14 +10,88 @@ import { useQuery } from "@tanstack/react-query";
 import { fetchSearchSuggestions } from "@/services/store-api";
 import { motion, AnimatePresence } from "framer-motion";
 
-const links = [
+// ─── Megamenu data ─────────────────────────────────────────────────────────────
+const megaMenuData = {
+  Shop: {
+    sections: [
+      {
+        title: "Mobile & Tablets",
+        items: [
+          { label: "Smartphones", to: "/shop?category=smartphones", icon: Smartphone },
+          { label: "Tablets", to: "/shop?category=tablets", icon: Cpu },
+          { label: "Mobile Accessories", to: "/shop?category=mobile-accessories", icon: Battery },
+        ],
+      },
+      {
+        title: "Audio & Video",
+        items: [
+          { label: "Headphones & Earbuds", to: "/shop?category=headphones", icon: Headphones },
+          { label: "Smart TVs", to: "/shop?category=smart-tv", icon: Tv },
+          { label: "Cameras", to: "/shop?category=cameras", icon: Camera },
+        ],
+      },
+      {
+        title: "Computing",
+        items: [
+          { label: "Laptops", to: "/shop?category=laptops", icon: Laptop },
+          { label: "Gaming", to: "/shop?category=gaming", icon: Gamepad2 },
+          { label: "Smart Watches", to: "/shop?category=smartwatches", icon: Watch },
+        ],
+      },
+      {
+        title: "Home & Living",
+        items: [
+          { label: "Smart Home", to: "/shop?category=smart-home", icon: HomeIcon },
+          { label: "All Products", to: "/shop", icon: Zap },
+        ],
+      },
+    ],
+    featured: {
+      label: "New Arrivals",
+      description: "Check out the latest gadgets just landed in store.",
+      to: "/shop?sort=newest",
+      badge: "New",
+    },
+  },
+  Categories: {
+    sections: [
+      {
+        title: "Top Categories",
+        items: [
+          { label: "Smartphones", to: "/categories?filter=smartphones", icon: Smartphone },
+          { label: "Laptops", to: "/categories?filter=laptops", icon: Laptop },
+          { label: "Headphones", to: "/categories?filter=headphones", icon: Headphones },
+          { label: "Smart TVs", to: "/categories?filter=smart-tv", icon: Tv },
+        ],
+      },
+      {
+        title: "Trending",
+        items: [
+          { label: "Gaming Gear", to: "/categories?filter=gaming", icon: Gamepad2 },
+          { label: "Smart Watches", to: "/categories?filter=smartwatches", icon: Watch },
+          { label: "Smart Home", to: "/categories?filter=smart-home", icon: HomeIcon },
+          { label: "Cameras", to: "/categories?filter=cameras", icon: Camera },
+        ],
+      },
+    ],
+    featured: {
+      label: "Deals of the Day",
+      description: "Limited-time offers on top electronics.",
+      to: "/shop?sort=sale",
+      badge: "Sale",
+    },
+  },
+};
+
+const simpleLinks = [
   { to: "/", label: "Home" },
-  { to: "/shop", label: "Shop" },
-  { to: "/categories", label: "Categories" },
   { to: "/about", label: "About" },
   { to: "/blog", label: "Blog" },
   { to: "/contact", label: "Contact" },
 ];
+
+const megaLinks = ["Shop", "Categories"] as const;
+type MegaKey = typeof megaLinks[number];
 
 const Navbar = () => {
   const [scrolled, setScrolled] = useState(false);
@@ -26,6 +100,9 @@ const Navbar = () => {
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [debouncedQuery, setDebouncedQuery] = useState("");
+  const [activeMega, setActiveMega] = useState<MegaKey | null>(null);
+  const [mobileExpanded, setMobileExpanded] = useState<MegaKey | null>(null);
+  const megaTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -57,6 +134,7 @@ const Navbar = () => {
     setSearchQuery("");
     setDebouncedQuery("");
     setCurrencyOpen(false);
+    setActiveMega(null);
   }, [location.pathname]);
 
   // Lock body scroll when mobile menu is open
@@ -81,6 +159,15 @@ const Navbar = () => {
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, []);
+
+  const handleMegaEnter = (key: MegaKey) => {
+    if (megaTimeoutRef.current) clearTimeout(megaTimeoutRef.current);
+    setActiveMega(key);
+  };
+
+  const handleMegaLeave = () => {
+    megaTimeoutRef.current = setTimeout(() => setActiveMega(null), 120);
+  };
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
@@ -123,13 +210,114 @@ const Navbar = () => {
             </span>
           </Link>
 
-          {/* ── Desktop nav ── */}
+          {/* ── Desktop nav with Megamenu ── */}
           <nav className="hidden lg:flex items-center gap-0.5" aria-label="Main navigation">
-            {links.map((l) => (
+            {/* Simple links */}
+            <RouterNavLink
+              to="/"
+              end
+              className={({ isActive }) =>
+                cn(
+                  "relative px-3 py-2 text-sm font-medium rounded-lg transition-colors",
+                  isActive
+                    ? "text-orange-600 dark:text-orange-400 bg-orange-50 dark:bg-orange-950/30"
+                    : "text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-800"
+                )
+              }
+            >
+              Home
+            </RouterNavLink>
+
+            {/* Megamenu triggers */}
+            {megaLinks.map((key) => (
+              <div
+                key={key}
+                className="relative"
+                onMouseEnter={() => handleMegaEnter(key)}
+                onMouseLeave={handleMegaLeave}
+              >
+                <button
+                  className={cn(
+                    "flex items-center gap-1 px-3 py-2 text-sm font-medium rounded-lg transition-colors",
+                    activeMega === key
+                      ? "text-orange-600 dark:text-orange-400 bg-orange-50 dark:bg-orange-950/30"
+                      : "text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-800"
+                  )}
+                >
+                  {key}
+                  <ChevronDown className={cn("h-3.5 w-3.5 transition-transform duration-200", activeMega === key && "rotate-180")} />
+                </button>
+
+                <AnimatePresence>
+                  {activeMega === key && (
+                    <motion.div
+                      initial={{ opacity: 0, y: 8 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: 8 }}
+                      transition={{ duration: 0.15 }}
+                      onMouseEnter={() => handleMegaEnter(key)}
+                      onMouseLeave={handleMegaLeave}
+                      className="absolute top-full left-1/2 -translate-x-1/2 mt-2 z-50 w-[680px] rounded-2xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 shadow-2xl overflow-hidden"
+                    >
+                      <div className="flex">
+                        {/* Sections */}
+                        <div className="flex-1 grid grid-cols-2 gap-0 p-5">
+                          {megaMenuData[key].sections.map((section) => (
+                            <div key={section.title} className="mb-4">
+                              <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400 dark:text-gray-500 mb-2 px-2">
+                                {section.title}
+                              </p>
+                              {section.items.map((item) => {
+                                const Icon = item.icon;
+                                return (
+                                  <Link
+                                    key={item.label}
+                                    to={item.to}
+                                    onClick={() => setActiveMega(null)}
+                                    className="flex items-center gap-2.5 px-2 py-2 rounded-lg text-sm text-gray-700 dark:text-gray-200 hover:bg-orange-50 dark:hover:bg-orange-950/20 hover:text-orange-600 dark:hover:text-orange-400 transition-colors group"
+                                  >
+                                    <Icon className="h-4 w-4 text-gray-400 group-hover:text-orange-500 transition-colors shrink-0" />
+                                    {item.label}
+                                  </Link>
+                                );
+                              })}
+                            </div>
+                          ))}
+                        </div>
+
+                        {/* Featured panel */}
+                        <div className="w-48 bg-gradient-to-br from-orange-500 to-pink-600 p-5 flex flex-col justify-between shrink-0">
+                          <div>
+                            <span className="inline-block text-[10px] font-bold uppercase tracking-widest bg-white/20 text-white rounded-full px-2 py-0.5 mb-3">
+                              {megaMenuData[key].featured.badge}
+                            </span>
+                            <p className="text-white font-bold text-base leading-snug mb-2">
+                              {megaMenuData[key].featured.label}
+                            </p>
+                            <p className="text-white/80 text-xs leading-relaxed">
+                              {megaMenuData[key].featured.description}
+                            </p>
+                          </div>
+                          <Link
+                            to={megaMenuData[key].featured.to}
+                            onClick={() => setActiveMega(null)}
+                            className="mt-4 inline-flex items-center gap-1.5 text-xs font-semibold text-white bg-white/20 hover:bg-white/30 rounded-full px-3 py-1.5 transition-colors w-fit"
+                          >
+                            Shop now →
+                          </Link>
+                        </div>
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </div>
+            ))}
+
+            {/* Remaining simple links */}
+            {simpleLinks.filter(l => l.to !== "/").map((l) => (
               <RouterNavLink
                 key={l.to}
                 to={l.to}
-                end={l.to === "/"}
                 className={({ isActive }) =>
                   cn(
                     "relative px-3 py-2 text-sm font-medium rounded-lg transition-colors",
@@ -396,11 +584,76 @@ const Navbar = () => {
 
               {/* Nav links */}
               <nav className="flex-1 overflow-y-auto px-3 py-3" aria-label="Mobile navigation">
-                {links.map((l) => (
+                {/* Home */}
+                <RouterNavLink
+                  to="/"
+                  end
+                  onClick={() => setMobileOpen(false)}
+                  className={({ isActive }) =>
+                    cn(
+                      "flex items-center px-4 py-3.5 rounded-xl text-base font-medium transition-colors mb-1",
+                      isActive
+                        ? "bg-orange-50 dark:bg-orange-950/30 text-orange-600 dark:text-orange-400"
+                        : "text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800"
+                    )
+                  }
+                >
+                  Home
+                </RouterNavLink>
+
+                {/* Expandable megamenu items */}
+                {megaLinks.map((key) => (
+                  <div key={key} className="mb-1">
+                    <button
+                      onClick={() => setMobileExpanded(mobileExpanded === key ? null : key)}
+                      className="w-full flex items-center justify-between px-4 py-3.5 rounded-xl text-base font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+                    >
+                      {key}
+                      <ChevronDown className={cn("h-4 w-4 transition-transform duration-200", mobileExpanded === key && "rotate-180")} />
+                    </button>
+                    <AnimatePresence>
+                      {mobileExpanded === key && (
+                        <motion.div
+                          initial={{ height: 0, opacity: 0 }}
+                          animate={{ height: "auto", opacity: 1 }}
+                          exit={{ height: 0, opacity: 0 }}
+                          transition={{ duration: 0.2 }}
+                          className="overflow-hidden"
+                        >
+                          <div className="pl-4 pb-2 space-y-0.5">
+                            {megaMenuData[key].sections.map((section) => (
+                              <div key={section.title}>
+                                <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400 px-3 pt-3 pb-1">
+                                  {section.title}
+                                </p>
+                                {section.items.map((item) => {
+                                  const Icon = item.icon;
+                                  return (
+                                    <Link
+                                      key={item.label}
+                                      to={item.to}
+                                      onClick={() => { setMobileOpen(false); setMobileExpanded(null); }}
+                                      className="flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-sm text-gray-600 dark:text-gray-300 hover:bg-orange-50 dark:hover:bg-orange-950/20 hover:text-orange-600 transition-colors"
+                                    >
+                                      <Icon className="h-4 w-4 text-gray-400 shrink-0" />
+                                      {item.label}
+                                    </Link>
+                                  );
+                                })}
+                              </div>
+                            ))}
+                          </div>
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+                  </div>
+                ))}
+
+                {/* Remaining simple links */}
+                {simpleLinks.filter(l => l.to !== "/").map((l) => (
                   <RouterNavLink
                     key={l.to}
                     to={l.to}
-                    end={l.to === "/"}
                     onClick={() => setMobileOpen(false)}
                     className={({ isActive }) =>
                       cn(

@@ -130,9 +130,10 @@ const Categories = () => {
                       src={image}
                       alt={cat.name}
                       loading="lazy"
+                      decoding="async"
                       width={160}
                       height={160}
-                      className="absolute right-4 bottom-14 h-32 w-32 object-contain group-hover:scale-110 group-hover:-rotate-3 transition-transform duration-700 opacity-90"
+                      className="absolute right-4 bottom-14 h-32 w-32 object-contain group-hover:scale-110 group-hover:-rotate-3 transition-transform duration-500 opacity-90"
                     />
                   ) : (
                     <div className="absolute right-6 bottom-14 h-28 w-28 rounded-2xl bg-white/3 border border-white/5 flex items-center justify-center">

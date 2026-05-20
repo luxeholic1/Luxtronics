@@ -141,7 +141,10 @@ export async function fetchProductFromFirebase(slug: string): Promise<StoreProdu
 }
 
 /**
- * Fetch categories — cached in memory
+ * Fetch categories — cached in memory.
+ * Enriches each category with a `sampleImage` from the products cache so the
+ * Categories page can show a real product photo even when WooCommerce category
+ * images are not set.
  */
 export async function fetchCategoriesFromFirebase(): Promise<StoreCategory[]> {
   try {
@@ -160,7 +163,31 @@ export async function fetchCategoriesFromFirebase(): Promise<StoreCategory[]> {
       };
     }
 
-    return _categoriesCache.data;
+    // Enrich with sample images from products cache (if available)
+    const categories = _categoriesCache.data;
+    const products = _productsCache?.data || [];
+
+    if (products.length > 0) {
+      return categories.map(cat => {
+        // Already has an image — keep it
+        if (cat.sampleImage || cat.image?.src) return cat;
+
+        // Find first product that belongs to this category
+        const match = products.find(p =>
+          Array.isArray(p.categories) &&
+          p.categories.some((c: any) =>
+            String(c.id) === String(cat.id) ||
+            c.slug === cat.slug ||
+            c.name?.toLowerCase() === cat.name?.toLowerCase()
+          )
+        );
+
+        const sampleImage = match?.images?.[0]?.src || null;
+        return sampleImage ? { ...cat, sampleImage } : cat;
+      });
+    }
+
+    return categories;
   } catch (error) {
     console.error('Firebase fetchCategories error:', error);
     return [];

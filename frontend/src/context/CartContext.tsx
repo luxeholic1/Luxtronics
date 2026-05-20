@@ -41,10 +41,12 @@ export const CartProvider = ({ children }: { children: ReactNode }) => {
 
   const addItem = (product: Product, qty = 1) => {
     setItems((prev) => {
-      const existing = prev.find((i) => i.product.id === product.id);
+      // Normalise id to string for reliable comparison (guards against number/string mismatch)
+      const pid = String(product.id);
+      const existing = prev.find((i) => String(i.product.id) === pid);
       if (existing) {
         return prev.map((i) =>
-          i.product.id === product.id ? { ...i, qty: i.qty + qty } : i
+          String(i.product.id) === pid ? { ...i, qty: i.qty + qty } : i
         );
       }
       return [...prev, { product, qty }];
@@ -52,12 +54,12 @@ export const CartProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const removeItem = (id: string) =>
-    setItems((prev) => prev.filter((i) => i.product.id !== id));
+    setItems((prev) => prev.filter((i) => String(i.product.id) !== String(id)));
 
   const updateQty = (id: string, delta: number) => {
     setItems((prev) =>
       prev
-        .map((i) => (i.product.id === id ? { ...i, qty: Math.max(0, i.qty + delta) } : i))
+        .map((i) => (String(i.product.id) === String(id) ? { ...i, qty: Math.max(0, i.qty + delta) } : i))
         .filter((i) => i.qty > 0)
     );
   };

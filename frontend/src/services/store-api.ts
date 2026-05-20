@@ -23,7 +23,9 @@ export interface StoreCategory {
   slug: string;
   description?: string;
   image?: StoreImage;
+  sampleImage?: string;   // first product image for this category (used in UI)
   count: number;
+  productCount?: number;
 }
 
 export interface StoreProduct {
@@ -329,6 +331,10 @@ export async function fetchStoreCategories(page = 1, perPage = 20): Promise<{
     
     if (isFirebaseAvailable) {
       console.log('[Store API] Fetching categories from Firebase (fast)');
+
+      // Pre-load products cache so fetchCategoriesFromFirebase can enrich with sample images
+      try { await fetchProductsFromFirebase(); } catch { /* non-fatal */ }
+
       const categories = await fetchCategoriesFromFirebase();
       
       if (categories.length > 0) {
