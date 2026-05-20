@@ -480,8 +480,9 @@ export function mapStoreProductToLocalProduct(product: StoreProduct): Product {
       const wooRating = Number((product as any).average_rating || product.rating || 0);
       const wooReviews = Number((product as any).rating_count || product.reviewCount || 0);
       const slug = product.slug || '';
-      const catSlug = product.categories?.[0]?.slug || product.categories?.[0]?.name || '';
-      const market = getMarketRating(product.name || '', slug, catSlug, wooRating);
+      // Pass category name (more reliable than slug for matching)
+      const catName = product.categories?.[0]?.name || product.categories?.[0]?.slug || '';
+      const market = getMarketRating(product.name || '', slug, catName, wooRating);
       return {
         rating: market ? market.rating : (wooRating > 0 ? wooRating : 4.2),
         reviews: market ? market.reviews : (wooReviews > 0 ? wooReviews : 4800),
