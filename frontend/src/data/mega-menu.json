@@ -1,0 +1,208 @@
+[
+  {
+    "title": "Apple Parts",
+    "slug": "apple-parts",
+    "children": [
+      { "title": "iPhone 17 Pro Max Parts", "slug": "iphone-17-pro-max-parts" },
+      { "title": "iPhone 17 Pro Parts", "slug": "iphone-17-pro-parts" },
+      { "title": "iPhone Air Parts", "slug": "iphone-air-parts" },
+      { "title": "iPhone 16 Pro Parts", "slug": "iphone-16-pro-parts" },
+      { "title": "iPhone 16 Plus Parts", "slug": "iphone-16-plus-parts" },
+      { "title": "iPhone 16 Pro Max Parts", "slug": "iphone-16-pro-max-parts" },
+      { "title": "iPhone 15 Pro Max Parts", "slug": "iphone-15-pro-max-parts" },
+      { "title": "iPhone 15 Pro Parts", "slug": "iphone-15-pro-parts" },
+      { "title": "iPhone 15 Plus Parts", "slug": "iphone-15-plus-parts" },
+      { "title": "iPhone 14 Pro Max Parts", "slug": "iphone-14-pro-max-parts" },
+      { "title": "iPhone 14 Pro Parts", "slug": "iphone-14-pro-parts" },
+      { "title": "iPhone 13 Pro Max Parts", "slug": "iphone-13-pro-max-parts" },
+      { "title": "iPad Pro Series Parts", "slug": "ipad-pro-series-parts" },
+      { "title": "Mac Parts", "slug": "mac-parts" }
+    ]
+  },
+  {
+    "title": "Samsung Parts",
+    "slug": "samsung-parts",
+    "children": [
+      { "title": "Galaxy S26 Ultra Parts", "slug": "galaxy-s26-ultra-parts" },
+      { "title": "Galaxy S25 FE Parts", "slug": "galaxy-s25-fe-parts" },
+      { "title": "Galaxy S24 Ultra Parts", "slug": "galaxy-s24-ultra-parts" },
+      { "title": "Galaxy S23 Ultra Parts", "slug": "galaxy-s23-ultra-parts" },
+      { "title": "Galaxy S Series Parts", "slug": "galaxy-s-series-parts" },
+      { "title": "Galaxy Note Series Parts", "slug": "galaxy-note-series-parts" },
+      { "title": "Galaxy Z Series Parts", "slug": "galaxy-z-series-parts" },
+      { "title": "Samsung Watch Parts", "slug": "samsung-watch-parts" }
+    ]
+  },
+  {
+    "title": "Mobile Parts",
+    "slug": "mobile-parts",
+    "children": [
+      { "title": "Huawei Spare Parts", "slug": "huawei-spare-parts" },
+      { "title": "Honor Spare Parts", "slug": "honor-spare-parts" },
+      { "title": "Xiaomi Spare Parts", "slug": "xiaomi-spare-parts" },
+      { "title": "vivo Spare Parts", "slug": "vivo-spare-parts" },
+      { "title": "OPPO Spare Parts", "slug": "oppo-spare-parts" },
+      { "title": "OnePlus Spare Parts", "slug": "oneplus-spare-parts" },
+      { "title": "Motorola Spare Parts", "slug": "motorola-spare-parts" },
+      { "title": "Nokia Spare Parts", "slug": "nokia-spare-parts" },
+      { "title": "Repair Tools", "slug": "repair-tools" }
+    ]
+  },
+  {
+    "title": "Apple Accessories",
+    "slug": "apple-accessories",
+    "children": [
+      { "title": "iPhone 17", "slug": "iphone-17" },
+      { "title": "AirPods Protective Case", "slug": "airpods-protective-case" },
+      { "title": "Mac Accessories", "slug": "mac-accessories" },
+      { "title": "Screen Protector", "slug": "screen-protector" },
+      { "title": "Bluetooth Speakers", "slug": "bluetooth-speakers" },
+      { "title": "Cable & Charger", "slug": "cable-charger" },
+      { "title": "Gaming Accessories", "slug": "gaming-accessories" }
+    ]
+  },
+  {
+    "title": "Samsung Accessories",
+    "slug": "samsung-accessories",
+    "children": [
+      { "title": "Galaxy S26 5G", "slug": "galaxy-s26-5g" },
+      { "title": "Galaxy S25 Ultra 5G", "slug": "galaxy-s25-ultra-5g" },
+      { "title": "Galaxy Z Fold8 5G", "slug": "galaxy-z-fold8-5g" },
+      { "title": "Galaxy Tab S11", "slug": "galaxy-tab-s11" },
+      { "title": "Galaxy SmartTag Accessories", "slug": "galaxy-smarttag-accessories" }
+    ]
+  },
+  {
+    "title": "Xiaomi Accessories",
+    "slug": "xiaomi-accessories",
+    "children": [
+      { "title": "Xiaomi 17", "slug": "xiaomi-17" },
+      { "title": "Redmi Note 15", "slug": "redmi-note-15" },
+      { "title": "Xiaomi 15 Ultra", "slug": "xiaomi-15-ultra" },
+      { "title": "Redmi K90", "slug": "redmi-k90" },
+      { "title": "More Xiaomi Cases", "slug": "more-xiaomi-cases" }
+    ]
+  },
+  {
+    "title": "OnePlus & OPPO Accessories",
+    "slug": "oneplus-oppo-accessories",
+    "children": [
+      { "title": "OnePlus 15", "slug": "oneplus-15" },
+      { "title": "OPPO Reno14 Pro", "slug": "oppo-reno14-pro" },
+      { "title": "OPPO Find X9", "slug": "oppo-find-x9" },
+      { "title": "vivo X300", "slug": "vivo-x300" },
+      { "title": "Realme Accessories", "slug": "realme-accessories" }
+    ]
+  },
+  {
+    "title": "Mobile Accessories",
+    "slug": "mobile-accessories",
+    "children": [
+      { "title": "Motorola", "slug": "motorola" },
+      { "title": "Google", "slug": "google" },
+      { "title": "Huawei", "slug": "huawei" },
+      { "title": "Screen Protector", "slug": "screen-protector-mobile" },
+      { "title": "Cable & Charger", "slug": "cable-charger-mobile" },
+      { "title": "Camera Lens Protector", "slug": "camera-lens-protector" }
+    ]
+  },
+  {
+    "title": "Smart Wear",
+    "slug": "smart-wear",
+    "children": [
+      { "title": "Apple Watch", "slug": "apple-watch" },
+      { "title": "Samsung Watch", "slug": "samsung-watch" },
+      { "title": "Huawei Watch", "slug": "huawei-watch" },
+      { "title": "Fitbit Watch", "slug": "fitbit-watch" },
+      { "title": "Garmin Watch", "slug": "garmin-watch" }
+    ]
+  },
+  {
+    "title": "Smart Phones",
+    "slug": "smart-phones",
+    "children": [
+      { "title": "Smart Phones", "slug": "smart-phones-child" },
+      { "title": "Second Hand iPhone", "slug": "second-hand-iphone" },
+      { "title": "Feature Phones", "slug": "feature-phones" },
+      { "title": "Android Tablet PC", "slug": "android-tablet-pc" }
+    ]
+  },
+  {
+    "title": "DJI & Insta360 Accessories",
+    "slug": "dji-insta360-accessories",
+    "children": [
+      { "title": "DJI Mavic Series", "slug": "dji-mavic-series" },
+      { "title": "DJI Air Series", "slug": "dji-air-series" },
+      { "title": "Osmo Pocket Accessories", "slug": "osmo-pocket-accessories" },
+      { "title": "Insta360 X Series", "slug": "insta360-x-series" },
+      { "title": "GoPro Combo Kits", "slug": "gopro-combo-kits" }
+    ]
+  },
+  {
+    "title": "Camera Accessories",
+    "slug": "camera-accessories",
+    "children": [
+      { "title": "Photo Studio", "slug": "photo-studio" },
+      { "title": "Camera Filters", "slug": "camera-filters" },
+      { "title": "Tripods & Monopods", "slug": "tripods-monopods" },
+      { "title": "Bags, Cases & Straps", "slug": "bags-cases-straps" },
+      { "title": "Photographic Supplies", "slug": "photographic-supplies" }
+    ]
+  },
+  {
+    "title": "Game Accessories",
+    "slug": "game-accessories",
+    "children": [
+      { "title": "Nintendo Accessories", "slug": "nintendo-accessories" },
+      { "title": "Sony Accessories", "slug": "sony-accessories" },
+      { "title": "Steam Deck Accessories", "slug": "steam-deck-accessories" },
+      { "title": "Pocket Console & Accessories", "slug": "pocket-console-accessories" }
+    ]
+  },
+  {
+    "title": "Consumer Electronics",
+    "slug": "consumer-electronics",
+    "children": [
+      { "title": "Live Equipment", "slug": "live-equipment" },
+      { "title": "Projector", "slug": "projector" },
+      { "title": "Android TV Boxes", "slug": "android-tv-boxes" },
+      { "title": "VR & AR", "slug": "vr-ar" },
+      { "title": "3D Printer Machines", "slug": "3d-printer-machines" },
+      { "title": "Arduino & SCM Supplies", "slug": "arduino-scm-supplies" }
+    ]
+  },
+  {
+    "title": "In Car",
+    "slug": "in-car",
+    "children": [
+      { "title": "Car DVRs & Accessories", "slug": "car-dvrs-accessories" },
+      { "title": "GPS Tracker & Accessories", "slug": "gps-tracker-accessories" },
+      { "title": "Parking Sensor", "slug": "parking-sensor" },
+      { "title": "Diagnostic Scan Tools", "slug": "diagnostic-scan-tools" },
+      { "title": "Replacement Parts", "slug": "replacement-parts" }
+    ]
+  },
+  {
+    "title": "Security",
+    "slug": "security",
+    "children": [
+      { "title": "IP Camera", "slug": "ip-camera" },
+      { "title": "CCTV Accessories", "slug": "cctv-accessories" },
+      { "title": "Security Alarm", "slug": "security-alarm" },
+      { "title": "Access Control System", "slug": "access-control-system" },
+      { "title": "Signal Detector", "slug": "signal-detector" }
+    ]
+  },
+  {
+    "title": "Outdoor & Sports",
+    "slug": "outdoor-sports",
+    "children": [
+      { "title": "Bicycle Accessories", "slug": "bicycle-accessories" },
+      { "title": "Camping", "slug": "camping" },
+      { "title": "Fishing", "slug": "fishing" },
+      { "title": "Survival & Emergency Gear", "slug": "survival-emergency-gear" },
+      { "title": "Scooters", "slug": "scooters" },
+      { "title": "Yoga", "slug": "yoga" }
+    ]
+  }
+]

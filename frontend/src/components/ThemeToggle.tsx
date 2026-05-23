@@ -40,7 +40,7 @@ export default function ThemeToggle() {
     );
   }
 
-  const CurrentIcon = resolvedTheme === "dark" ? Moon : Sun;
+  const CurrentIcon = resolvedTheme === "light" ? Moon : Sun;
 
   return (
     <div ref={ref} className="relative">

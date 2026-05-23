@@ -9,6 +9,7 @@
     "sync:full": "node ../node_modules/tsx/dist/cli.mjs scripts/sync-full.ts",
     "sync:to-target": "node ../node_modules/tsx/dist/cli.mjs scripts/sync-to-target.ts",
     "sync:firebase": "node ../node_modules/tsx/dist/cli.mjs scripts/sync-to-firebase.ts",
+    "create:categories": "node ../node_modules/tsx/dist/cli.mjs scripts/create-categories.ts",
     "test:woo": "node ../node_modules/tsx/dist/cli.mjs scripts/test-woo-connection.ts"
   },
   "devDependencies": {
