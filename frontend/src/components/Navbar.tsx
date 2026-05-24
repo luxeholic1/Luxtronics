@@ -1,13 +1,14 @@
 import { useEffect, useRef, useState } from "react";
 import { Link, NavLink as RouterNavLink, useLocation, useNavigate } from "react-router-dom";
-import { Search, ShoppingBag, User, Menu, X, Zap, ChevronDown, LogOut, Smartphone, Tv, Headphones, Camera, Laptop, Watch, Gamepad2, Home as HomeIcon, Cpu, Battery, Globe } from "lucide-react";
+import { Search, ShoppingBag, User, Menu, X, Zap, ChevronDown, LogOut, Smartphone, Tv, Headphones, Camera, Laptop, Watch, Gamepad2, Home as HomeIcon, Cpu, Battery, Globe, Package } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useCurrency } from "@/context/CurrencyContext";
 import { useCart } from "@/context/CartContext";
 import { useAuth } from "@/context/AuthContext";
 import ThemeToggle from "@/components/ThemeToggle";
 import { useQuery } from "@tanstack/react-query";
-import { fetchSearchSuggestions } from "@/services/store-api";
+import { fetchSearchSuggestions, fetchStoreCategories } from "@/services/store-api";
+import type { StoreCategory } from "@/services/store-api";
 import { motion, AnimatePresence } from "framer-motion";
 
 // ─── Store domains ─────────────────────────────────────────────────────────────
@@ -58,78 +59,33 @@ function getCurrentStore() {
   return STORES.find(s => s.domain === host) ?? STORES[0];
 }
 
-// ─── Megamenu data ─────────────────────────────────────────────────────────────
-const megaMenuData = {
-  Shop: {
-    sections: [
-      {
-        title: "Mobile & Tablets",
-        items: [
-          { label: "Smartphones", to: "/shop?category=smartphones", icon: Smartphone },
-          { label: "Tablets", to: "/shop?category=tablets", icon: Cpu },
-          { label: "Mobile Accessories", to: "/shop?category=mobile-accessories", icon: Battery },
-        ],
-      },
-      {
-        title: "Audio & Video",
-        items: [
-          { label: "Headphones & Earbuds", to: "/shop?category=headphones", icon: Headphones },
-          { label: "Smart TVs", to: "/shop?category=smart-tv", icon: Tv },
-          { label: "Cameras", to: "/shop?category=cameras", icon: Camera },
-        ],
-      },
-      {
-        title: "Computing",
-        items: [
-          { label: "Laptops", to: "/shop?category=laptops", icon: Laptop },
-          { label: "Gaming", to: "/shop?category=gaming", icon: Gamepad2 },
-          { label: "Smart Watches", to: "/shop?category=smartwatches", icon: Watch },
-        ],
-      },
-      {
-        title: "Home & Living",
-        items: [
-          { label: "Smart Home", to: "/shop?category=smart-home", icon: HomeIcon },
-          { label: "All Products", to: "/shop", icon: Zap },
-        ],
-      },
-    ],
-    featured: {
-      label: "New Arrivals",
-      description: "Check out the latest gadgets just landed in store.",
-      to: "/shop?sort=newest",
-      badge: "New",
-    },
-  },
-  Categories: {
-    sections: [
-      {
-        title: "Top Categories",
-        items: [
-          { label: "Smartphones", to: "/categories?filter=smartphones", icon: Smartphone },
-          { label: "Laptops", to: "/categories?filter=laptops", icon: Laptop },
-          { label: "Headphones", to: "/categories?filter=headphones", icon: Headphones },
-          { label: "Smart TVs", to: "/categories?filter=smart-tv", icon: Tv },
-        ],
-      },
-      {
-        title: "Trending",
-        items: [
-          { label: "Gaming Gear", to: "/categories?filter=gaming", icon: Gamepad2 },
-          { label: "Smart Watches", to: "/categories?filter=smartwatches", icon: Watch },
-          { label: "Smart Home", to: "/categories?filter=smart-home", icon: HomeIcon },
-          { label: "Cameras", to: "/categories?filter=cameras", icon: Camera },
-        ],
-      },
-    ],
-    featured: {
-      label: "Deals of the Day",
-      description: "Limited-time offers on top electronics.",
-      to: "/shop?sort=sale",
-      badge: "Sale",
-    },
-  },
+// ─── Category icon map ─────────────────────────────────────────────────────────
+const CAT_ICON_MAP: Record<string, React.ComponentType<{ className?: string }>> = {
+  audio: Headphones,
+  camera: Camera,
+  cameras: Camera,
+  smartphone: Smartphone,
+  "smart phone": Smartphone,
+  smartphones: Smartphone,
+  wearables: Watch,
+  iphone: Smartphone,
+  laptops: Laptop,
+  laptop: Laptop,
+  gaming: Gamepad2,
+  "gaming accessories": Gamepad2,
+  tv: Tv,
+  "smart tv": Tv,
+  "android tv boxes": Tv,
+  tablets: Cpu,
+  "android tablet pc": Cpu,
+  "mobile accessories": Battery,
+  "apple accessories": Smartphone,
+  "samsung accessories": Smartphone,
 };
+
+function getCatIcon(name: string): React.ComponentType<{ className?: string }> {
+  return CAT_ICON_MAP[name.toLowerCase()] ?? Package;
+}
 
 const simpleLinks = [
   { to: "/", label: "Home" },
@@ -217,6 +173,22 @@ const Navbar = () => {
     megaTimeoutRef.current = setTimeout(() => setActiveMega(null), 120);
   };
 
+  // ── Fetch real categories for megamenu ──
+  const { data: catResult } = useQuery({
+    queryKey: ["navbar-categories"],
+    queryFn: () => fetchStoreCategories(1, 100),
+    staleTime: 1000 * 60 * 30,
+  });
+
+  // Top 12 categories by count (exclude uncategorized)
+  const navCategories: StoreCategory[] = (catResult?.data ?? [])
+    .filter(c => c.name.toLowerCase() !== "uncategorized")
+    .sort((a, b) => b.count - a.count)
+    .slice(0, 12);
+
+  const col1 = navCategories.slice(0, 6);
+  const col2 = navCategories.slice(6, 12);
+
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
     const q = searchQuery.trim();
@@ -277,89 +249,153 @@ const Navbar = () => {
             </RouterNavLink>
 
             {/* Megamenu triggers */}
-            {megaLinks.map((key) => (
-              <div
-                key={key}
-                className="relative"
-                onMouseEnter={() => handleMegaEnter(key)}
-                onMouseLeave={handleMegaLeave}
-              >
-                <button
-                  className={cn(
-                    "flex items-center gap-1 px-3 py-2 text-sm font-medium rounded-lg transition-colors",
+            {megaLinks.map((key) => {
+              const linkTo = key === "Shop" ? "/shop" : "/categories";
+              return (
+                <div
+                  key={key}
+                  className="relative"
+                  onMouseEnter={() => handleMegaEnter(key)}
+                  onMouseLeave={handleMegaLeave}
+                >
+                  {/* Clickable link + chevron */}
+                  <div className={cn(
+                    "flex items-center rounded-lg transition-colors",
                     activeMega === key
                       ? "text-orange-600 dark:text-orange-400 bg-orange-50 dark:bg-orange-950/30"
                       : "text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-800"
-                  )}
-                >
-                  {key}
-                  <ChevronDown className={cn("h-3.5 w-3.5 transition-transform duration-200", activeMega === key && "rotate-180")} />
-                </button>
-
-                <AnimatePresence>
-                  {activeMega === key && (
-                    <motion.div
-                      initial={{ opacity: 0, y: 8 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      exit={{ opacity: 0, y: 8 }}
-                      transition={{ duration: 0.15 }}
-                      onMouseEnter={() => handleMegaEnter(key)}
-                      onMouseLeave={handleMegaLeave}
-                      className="absolute top-full left-1/2 -translate-x-1/2 mt-2 z-50 w-[680px] rounded-2xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 shadow-2xl overflow-hidden"
+                  )}>
+                    <Link
+                      to={linkTo}
+                      onClick={() => setActiveMega(null)}
+                      className="px-3 py-2 text-sm font-medium"
                     >
-                      <div className="flex">
-                        {/* Sections */}
-                        <div className="flex-1 grid grid-cols-2 gap-0 p-5">
-                          {megaMenuData[key].sections.map((section) => (
-                            <div key={section.title} className="mb-4">
-                              <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400 dark:text-gray-500 mb-2 px-2">
-                                {section.title}
-                              </p>
-                              {section.items.map((item) => {
-                                const Icon = item.icon;
-                                return (
-                                  <Link
-                                    key={item.label}
-                                    to={item.to}
-                                    onClick={() => setActiveMega(null)}
-                                    className="flex items-center gap-2.5 px-2 py-2 rounded-lg text-sm text-gray-700 dark:text-gray-200 hover:bg-orange-50 dark:hover:bg-orange-950/20 hover:text-orange-600 dark:hover:text-orange-400 transition-colors group"
-                                  >
-                                    <Icon className="h-4 w-4 text-gray-400 group-hover:text-orange-500 transition-colors shrink-0" />
-                                    {item.label}
-                                  </Link>
-                                );
-                              })}
-                            </div>
-                          ))}
-                        </div>
+                      {key}
+                    </Link>
+                    <button
+                      onClick={() => setActiveMega(activeMega === key ? null : key)}
+                      className="pr-2 py-2"
+                      aria-label={`${key} submenu`}
+                    >
+                      <ChevronDown className={cn("h-3.5 w-3.5 transition-transform duration-200", activeMega === key && "rotate-180")} />
+                    </button>
+                  </div>
 
-                        {/* Featured panel */}
-                        <div className="w-48 bg-gradient-to-br from-orange-500 to-pink-600 p-5 flex flex-col justify-between shrink-0">
-                          <div>
-                            <span className="inline-block text-[10px] font-bold uppercase tracking-widest bg-white/20 text-white rounded-full px-2 py-0.5 mb-3">
-                              {megaMenuData[key].featured.badge}
-                            </span>
-                            <p className="text-white font-bold text-base leading-snug mb-2">
-                              {megaMenuData[key].featured.label}
-                            </p>
-                            <p className="text-white/80 text-xs leading-relaxed">
-                              {megaMenuData[key].featured.description}
-                            </p>
+                  <AnimatePresence>
+                    {activeMega === key && (
+                      <motion.div
+                        initial={{ opacity: 0, y: 8 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: 8 }}
+                        transition={{ duration: 0.15 }}
+                        onMouseEnter={() => handleMegaEnter(key)}
+                        onMouseLeave={handleMegaLeave}
+                        className="absolute top-full left-1/2 -translate-x-1/2 mt-2 z-50 w-[640px] rounded-2xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 shadow-2xl overflow-hidden"
+                      >
+                        <div className="flex">
+                          {/* Two-column category grid */}
+                          <div className="flex-1 p-5">
+                            {navCategories.length === 0 ? (
+                              /* Loading skeleton */
+                              <div className="grid grid-cols-2 gap-1">
+                                {Array.from({ length: 8 }).map((_, i) => (
+                                  <div key={i} className="h-9 rounded-lg bg-gray-100 dark:bg-gray-800 animate-pulse" />
+                                ))}
+                              </div>
+                            ) : (
+                              <div className="grid grid-cols-2 gap-0">
+                                {/* Column 1 */}
+                                <div>
+                                  <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400 dark:text-gray-500 mb-2 px-2">
+                                    Top Categories
+                                  </p>
+                                  {col1.map((cat) => {
+                                    const Icon = getCatIcon(cat.name);
+                                    return (
+                                      <Link
+                                        key={cat.slug}
+                                        to={`/shop?cat=${cat.slug}`}
+                                        onClick={() => setActiveMega(null)}
+                                        className="flex items-center gap-2.5 px-2 py-2 rounded-lg text-sm text-gray-700 dark:text-gray-200 hover:bg-orange-50 dark:hover:bg-orange-950/20 hover:text-orange-600 dark:hover:text-orange-400 transition-colors group"
+                                      >
+                                        <Icon className="h-4 w-4 text-gray-400 group-hover:text-orange-500 transition-colors shrink-0" />
+                                        <span className="truncate">{cat.name}</span>
+                                        {cat.count > 0 && (
+                                          <span className="ml-auto text-[10px] text-gray-400 shrink-0">{cat.count}</span>
+                                        )}
+                                      </Link>
+                                    );
+                                  })}
+                                </div>
+                                {/* Column 2 */}
+                                <div>
+                                  <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400 dark:text-gray-500 mb-2 px-2">
+                                    More Categories
+                                  </p>
+                                  {col2.map((cat) => {
+                                    const Icon = getCatIcon(cat.name);
+                                    return (
+                                      <Link
+                                        key={cat.slug}
+                                        to={`/shop?cat=${cat.slug}`}
+                                        onClick={() => setActiveMega(null)}
+                                        className="flex items-center gap-2.5 px-2 py-2 rounded-lg text-sm text-gray-700 dark:text-gray-200 hover:bg-orange-50 dark:hover:bg-orange-950/20 hover:text-orange-600 dark:hover:text-orange-400 transition-colors group"
+                                      >
+                                        <Icon className="h-4 w-4 text-gray-400 group-hover:text-orange-500 transition-colors shrink-0" />
+                                        <span className="truncate">{cat.name}</span>
+                                        {cat.count > 0 && (
+                                          <span className="ml-auto text-[10px] text-gray-400 shrink-0">{cat.count}</span>
+                                        )}
+                                      </Link>
+                                    );
+                                  })}
+                                </div>
+                              </div>
+                            )}
+
+                            {/* View all link */}
+                            <div className="mt-3 pt-3 border-t border-gray-100 dark:border-gray-800">
+                              <Link
+                                to={linkTo}
+                                onClick={() => setActiveMega(null)}
+                                className="flex items-center gap-1.5 text-xs font-semibold text-orange-600 hover:text-orange-700 transition-colors"
+                              >
+                                <Zap className="h-3.5 w-3.5" />
+                                View all {key === "Shop" ? "products" : "categories"} →
+                              </Link>
+                            </div>
                           </div>
-                          <Link
-                            to={megaMenuData[key].featured.to}
-                            onClick={() => setActiveMega(null)}
-                            className="mt-4 inline-flex items-center gap-1.5 text-xs font-semibold text-white bg-white/20 hover:bg-white/30 rounded-full px-3 py-1.5 transition-colors w-fit"
-                          >
-                            Shop now →
-                          </Link>
+
+                          {/* Featured panel */}
+                          <div className="w-44 bg-gradient-to-br from-orange-500 to-pink-600 p-5 flex flex-col justify-between shrink-0">
+                            <div>
+                              <span className="inline-block text-[10px] font-bold uppercase tracking-widest bg-white/20 text-white rounded-full px-2 py-0.5 mb-3">
+                                {key === "Shop" ? "New" : "Sale"}
+                              </span>
+                              <p className="text-white font-bold text-base leading-snug mb-2">
+                                {key === "Shop" ? "New Arrivals" : "Deals of the Day"}
+                              </p>
+                              <p className="text-white/80 text-xs leading-relaxed">
+                                {key === "Shop"
+                                  ? "Check out the latest gadgets just landed in store."
+                                  : "Limited-time offers on top electronics."}
+                              </p>
+                            </div>
+                            <Link
+                              to={key === "Shop" ? "/shop" : "/shop?sort=sale"}
+                              onClick={() => setActiveMega(null)}
+                              className="mt-4 inline-flex items-center gap-1.5 text-xs font-semibold text-white bg-white/20 hover:bg-white/30 rounded-full px-3 py-1.5 transition-colors w-fit"
+                            >
+                              Shop now →
+                            </Link>
+                          </div>
                         </div>
-                      </div>
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-              </div>
-            ))}
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                </div>
+              );
+            })}
 
             {/* Remaining simple links */}
             {simpleLinks.filter(l => l.to !== "/").map((l) => (
@@ -688,52 +724,77 @@ const Navbar = () => {
                 </RouterNavLink>
 
                 {/* Expandable megamenu items */}
-                {megaLinks.map((key) => (
-                  <div key={key} className="mb-1">
-                    <button
-                      onClick={() => setMobileExpanded(mobileExpanded === key ? null : key)}
-                      className="w-full flex items-center justify-between px-4 py-3.5 rounded-xl text-base font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
-                    >
-                      {key}
-                      <ChevronDown className={cn("h-4 w-4 transition-transform duration-200", mobileExpanded === key && "rotate-180")} />
-                    </button>
-                    <AnimatePresence>
-                      {mobileExpanded === key && (
-                        <motion.div
-                          initial={{ height: 0, opacity: 0 }}
-                          animate={{ height: "auto", opacity: 1 }}
-                          exit={{ height: 0, opacity: 0 }}
-                          transition={{ duration: 0.2 }}
-                          className="overflow-hidden"
+                {megaLinks.map((key) => {
+                  const linkTo = key === "Shop" ? "/shop" : "/categories";
+                  return (
+                    <div key={key} className="mb-1">
+                      {/* Row: link + expand toggle */}
+                      <div className="flex items-center rounded-xl hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors">
+                        <Link
+                          to={linkTo}
+                          onClick={() => { setMobileOpen(false); setMobileExpanded(null); }}
+                          className="flex-1 px-4 py-3.5 text-base font-medium text-gray-700 dark:text-gray-200"
                         >
-                          <div className="pl-4 pb-2 space-y-0.5">
-                            {megaMenuData[key].sections.map((section) => (
-                              <div key={section.title}>
-                                <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400 px-3 pt-3 pb-1">
-                                  {section.title}
-                                </p>
-                                {section.items.map((item) => {
-                                  const Icon = item.icon;
+                          {key}
+                        </Link>
+                        <button
+                          onClick={() => setMobileExpanded(mobileExpanded === key ? null : key)}
+                          className="px-4 py-3.5 text-gray-500"
+                          aria-label={`Expand ${key}`}
+                        >
+                          <ChevronDown className={cn("h-4 w-4 transition-transform duration-200", mobileExpanded === key && "rotate-180")} />
+                        </button>
+                      </div>
+                      <AnimatePresence>
+                        {mobileExpanded === key && (
+                          <motion.div
+                            initial={{ height: 0, opacity: 0 }}
+                            animate={{ height: "auto", opacity: 1 }}
+                            exit={{ height: 0, opacity: 0 }}
+                            transition={{ duration: 0.2 }}
+                            className="overflow-hidden"
+                          >
+                            <div className="pl-4 pb-2 space-y-0.5">
+                              {navCategories.length === 0 ? (
+                                <div className="px-3 py-4 space-y-2">
+                                  {Array.from({ length: 4 }).map((_, i) => (
+                                    <div key={i} className="h-8 rounded-lg bg-gray-100 dark:bg-gray-800 animate-pulse" />
+                                  ))}
+                                </div>
+                              ) : (
+                                navCategories.map((cat) => {
+                                  const Icon = getCatIcon(cat.name);
                                   return (
                                     <Link
-                                      key={item.label}
-                                      to={item.to}
+                                      key={cat.slug}
+                                      to={`/shop?cat=${cat.slug}`}
                                       onClick={() => { setMobileOpen(false); setMobileExpanded(null); }}
                                       className="flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-sm text-gray-600 dark:text-gray-300 hover:bg-orange-50 dark:hover:bg-orange-950/20 hover:text-orange-600 transition-colors"
                                     >
                                       <Icon className="h-4 w-4 text-gray-400 shrink-0" />
-                                      {item.label}
+                                      <span className="flex-1">{cat.name}</span>
+                                      {cat.count > 0 && (
+                                        <span className="text-[10px] text-gray-400">{cat.count}</span>
+                                      )}
                                     </Link>
                                   );
-                                })}
-                              </div>
-                            ))}
-                          </div>
-                        </motion.div>
-                      )}
-                    </AnimatePresence>
-                  </div>
-                ))}
+                                })
+                              )}
+                              <Link
+                                to={linkTo}
+                                onClick={() => { setMobileOpen(false); setMobileExpanded(null); }}
+                                className="flex items-center gap-2 px-3 py-2.5 rounded-lg text-sm font-semibold text-orange-600 hover:bg-orange-50 transition-colors"
+                              >
+                                <Zap className="h-4 w-4" />
+                                View all {key === "Shop" ? "products" : "categories"}
+                              </Link>
+                            </div>
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
+                    </div>
+                  );
+                })}
 
                 {/* Remaining simple links */}
                 {simpleLinks.filter(l => l.to !== "/").map((l) => (

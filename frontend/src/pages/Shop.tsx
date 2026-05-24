@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
-import { SlidersHorizontal, ChevronLeft, ChevronRight, X, Search, Sparkles } from "lucide-react";
+import { SlidersHorizontal, ChevronLeft, ChevronRight, X, Search, Sparkles, ChevronDown } from "lucide-react";
 import Layout from "@/components/Layout";
 import ProductCard from "@/components/ProductCard";
 import ImageCursorCard from "@/components/ImageCursorCard";
@@ -63,6 +63,201 @@ const CAT_EMOJI: Record<string, string> = {
 };
 function catEmoji(name: string) {
   return CAT_EMOJI[name.toLowerCase()] ?? "🛍️";
+}
+
+// ─── Category Pills with Megamenu ────────────────────────────────────────────
+const VISIBLE_CATS = 6;
+
+function CategoryPills({
+  categories,
+  totalCount,
+  activeCat,
+  onSelect,
+}: {
+  categories: CategoryFilter[];
+  totalCount: number;
+  activeCat: string;
+  onSelect: (slug: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [search, setSearch] = useState("");
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  // Sort by count descending, pick top 6 (excluding "All")
+  const sorted = useMemo(
+    () => [...categories].sort((a, b) => b.count - a.count),
+    [categories]
+  );
+  const topCats = sorted.slice(0, VISIBLE_CATS);
+  const moreCats = sorted.slice(VISIBLE_CATS);
+
+  // Is active cat in the "more" list?
+  const activeInMore = moreCats.some(c => c.slug === activeCat);
+
+  // Filtered more cats based on search
+  const filteredMore = useMemo(() => {
+    if (!search.trim()) return moreCats;
+    const q = search.toLowerCase();
+    return moreCats.filter(c => c.name.toLowerCase().includes(q));
+  }, [moreCats, search]);
+
+  // Group filtered more cats alphabetically
+  const grouped = useMemo(() => {
+    const map: Record<string, CategoryFilter[]> = {};
+    filteredMore.forEach(c => {
+      const letter = c.name[0]?.toUpperCase() || "#";
+      if (!map[letter]) map[letter] = [];
+      map[letter].push(c);
+    });
+    return Object.entries(map).sort(([a], [b]) => a.localeCompare(b));
+  }, [filteredMore]);
+
+  // Close on outside click
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
+        setOpen(false);
+        setSearch("");
+      }
+    };
+    if (open) document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [open]);
+
+  const handleSelect = (slug: string) => {
+    onSelect(slug);
+    setOpen(false);
+    setSearch("");
+  };
+
+  const allCats = [{ id: 0, name: "All", slug: "all", count: totalCount }, ...topCats];
+
+  return (
+    <div className="mb-8 flex flex-wrap items-center gap-2">
+      {/* All + top 6 pills */}
+      {allCats.map(cat => {
+        const active = cat.slug === activeCat;
+        return (
+          <button
+            key={cat.slug}
+            onClick={() => handleSelect(cat.slug)}
+            className={`inline-flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium border transition-all duration-200 ${
+              active
+                ? "bg-gradient-brand text-primary-foreground border-transparent shadow-glow scale-105"
+                : "border-border hover:border-primary/50 hover:bg-secondary/50 text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            <span>{catEmoji(cat.name)}</span>
+            <span>{cat.name}</span>
+            <span className={`text-xs px-1.5 py-0.5 rounded-full ${active ? "bg-white/20" : "bg-secondary"}`}>
+              {cat.count.toLocaleString()}
+            </span>
+          </button>
+        );
+      })}
+
+      {/* More button + megamenu */}
+      {moreCats.length > 0 && (
+        <div className="relative" ref={dropdownRef}>
+          <button
+            onClick={() => setOpen(v => !v)}
+            className={`inline-flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium border transition-all duration-200 ${
+              open || activeInMore
+                ? "bg-gradient-brand text-primary-foreground border-transparent shadow-glow scale-105"
+                : "border-border hover:border-primary/50 hover:bg-secondary/50 text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            <span>🗂️</span>
+            <span>More</span>
+            <span className={`text-xs px-1.5 py-0.5 rounded-full ${open || activeInMore ? "bg-white/20" : "bg-secondary"}`}>
+              {moreCats.length}
+            </span>
+            <ChevronDown className={`h-3.5 w-3.5 transition-transform duration-200 ${open ? "rotate-180" : ""}`} />
+          </button>
+
+          {/* Megamenu dropdown */}
+          {open && (
+            <div className="absolute left-0 top-full mt-2 z-50 w-[min(92vw,680px)] rounded-2xl border border-border bg-background shadow-2xl overflow-hidden">
+              {/* Search bar */}
+              <div className="p-3 border-b border-border">
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+                  <input
+                    autoFocus
+                    type="text"
+                    placeholder="Search categories…"
+                    value={search}
+                    onChange={e => setSearch(e.target.value)}
+                    className="w-full h-9 pl-9 pr-3 rounded-full border border-border bg-secondary/50 text-sm focus:outline-none focus:border-primary placeholder:text-muted-foreground"
+                  />
+                  {search && (
+                    <button
+                      onClick={() => setSearch("")}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                    >
+                      <X className="h-3.5 w-3.5" />
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {/* Category grid grouped by letter */}
+              <div className="max-h-[60vh] overflow-y-auto p-4">
+                {grouped.length === 0 ? (
+                  <p className="text-center text-sm text-muted-foreground py-8">No categories found</p>
+                ) : (
+                  <div className="space-y-4">
+                    {grouped.map(([letter, cats]) => (
+                      <div key={letter}>
+                        <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground mb-2 px-1">
+                          {letter}
+                        </p>
+                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5">
+                          {cats.map(cat => {
+                            const active = cat.slug === activeCat;
+                            return (
+                              <button
+                                key={cat.slug}
+                                onClick={() => handleSelect(cat.slug)}
+                                className={`flex items-center gap-2 px-3 py-2 rounded-xl text-sm text-left transition-all duration-150 ${
+                                  active
+                                    ? "bg-gradient-brand text-primary-foreground shadow-glow"
+                                    : "hover:bg-secondary/70 text-muted-foreground hover:text-foreground"
+                                }`}
+                              >
+                                <span className="text-base leading-none">{catEmoji(cat.name)}</span>
+                                <span className="flex-1 truncate font-medium">{cat.name}</span>
+                                <span className={`text-xs shrink-0 ${active ? "text-white/70" : "text-muted-foreground"}`}>
+                                  {cat.count > 0 ? cat.count : ""}
+                                </span>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Footer */}
+              <div className="p-3 border-t border-border flex items-center justify-between">
+                <span className="text-xs text-muted-foreground">
+                  {moreCats.length} more categories
+                </span>
+                <button
+                  onClick={() => { handleSelect("all"); }}
+                  className="text-xs text-primary hover:underline font-medium"
+                >
+                  View all products
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
 }
 
 // ─── Pagination component ─────────────────────────────────────────────────────
@@ -311,30 +506,14 @@ const Shop = () => {
 
       <section className="container py-8 sm:py-10 lg:py-12">
 
-        {/* ── Category pills ── */}
+        {/* ── Category pills with megamenu ── */}
         {!searchQuery && (
-          <div className="mb-8 flex flex-wrap gap-2">
-            {[{ id: 0, name: "All", slug: "all", count: totalCount }, ...categories].map(cat => {
-              const active = cat.slug === activeCat;
-              return (
-                <button
-                  key={cat.slug}
-                  onClick={() => setCat(cat.slug)}
-                  className={`inline-flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium border transition-all duration-200 ${
-                    active
-                      ? "bg-gradient-brand text-primary-foreground border-transparent shadow-glow scale-105"
-                      : "border-border hover:border-primary/50 hover:bg-secondary/50 text-muted-foreground hover:text-foreground"
-                  }`}
-                >
-                  <span>{catEmoji(cat.name)}</span>
-                  <span>{cat.name}</span>
-                  <span className={`text-xs px-1.5 py-0.5 rounded-full ${active ? "bg-white/20" : "bg-secondary"}`}>
-                    {cat.count.toLocaleString()}
-                  </span>
-                </button>
-              );
-            })}
-          </div>
+          <CategoryPills
+            categories={categories}
+            totalCount={totalCount}
+            activeCat={activeCat}
+            onSelect={setCat}
+          />
         )}
 
         {/* ── Toolbar ── */}
@@ -344,16 +523,30 @@ const Shop = () => {
             <div className="flex items-center gap-2">
               <SlidersHorizontal className="h-4 w-4 text-muted-foreground" />
               {!searchQuery ? (
-                <select
-                  value={sort}
-                  onChange={e => { setSort(e.target.value); setPage(1); }}
-                  className="h-9 rounded-full border border-border bg-background px-3 pr-8 text-sm focus:outline-none focus:border-primary appearance-none cursor-pointer"
-                >
-                  <option value="featured">Featured</option>
-                  <option value="low">Price: Low → High</option>
-                  <option value="high">Price: High → Low</option>
-                  <option value="rating">Top Rated</option>
-                </select>
+                <div className="flex items-center gap-2">
+                  <select
+                    value={activeCat}
+                    onChange={e => { setCat(e.target.value); setPage(1); }}
+                    aria-label="Select category"
+                    className="h-9 rounded-full border border-border bg-background px-3 text-sm focus:outline-none focus:border-primary appearance-none cursor-pointer"
+                  >
+                    <option value="all">All ({totalCount.toLocaleString()})</option>
+                    {categories.map(c => (
+                      <option key={c.slug} value={c.slug}>{`${c.name} (${c.count.toLocaleString()})`}</option>
+                    ))}
+                  </select>
+
+                  <select
+                    value={sort}
+                    onChange={e => { setSort(e.target.value); setPage(1); }}
+                    className="h-9 rounded-full border border-border bg-background px-3 pr-8 text-sm focus:outline-none focus:border-primary appearance-none cursor-pointer"
+                  >
+                    <option value="featured">Featured</option>
+                    <option value="low">Price: Low → High</option>
+                    <option value="high">Price: High → Low</option>
+                    <option value="rating">Top Rated</option>
+                  </select>
+                </div>
               ) : (
                 <span className="text-sm text-muted-foreground italic">Sorted by relevance</span>
               )}
