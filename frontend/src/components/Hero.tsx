@@ -282,11 +282,11 @@ const Hero = () => {
                     >
                       <div className={`absolute inset-0 rounded-full bg-gradient-to-br ${spotlight.accent} opacity-15 blur-2xl`} />
                       <img
-                        src={spotlight.image}
-                        alt={spotlight.alt}
-                        className="relative z-10 h-full w-full object-contain drop-shadow-xl"
-                        loading="eager"
-                      />
+  src={spotlight.image}
+  alt={spotlight.alt}
+  className="relative z-10 h-full w-full object-contain rounded-2xl drop-shadow-xl"
+  loading="eager"
+/>
                     </motion.div>
                   </AnimatePresence>
                 </div>
