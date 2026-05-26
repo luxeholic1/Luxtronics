@@ -6,7 +6,6 @@ import heroBgDesktop from "@/assets/hero.jpg";
 import heroBgMobile from "@/assets/mob1.jpg";
 import heroGadget from "@/assets/hero-gadget.png";
 import heroWatch from "@/assets/product-watch.png";
-import heroHeadphones from "@/assets/product-headphones.png";
 import { fetchStoreProducts, mapStoreProductToLocalProduct } from "@/services/store-api";
 
 type SpotlightItem = {
@@ -15,6 +14,19 @@ type SpotlightItem = {
   alt: string;
   accent: string;
 };
+
+const GLASSES_FALLBACK_IMAGE =
+  "data:image/svg+xml;charset=UTF-8," +
+  encodeURIComponent(`
+    <svg xmlns="http://www.w3.org/2000/svg" width="960" height="960" viewBox="0 0 960 960" fill="none">
+      <rect width="960" height="960" rx="180" fill="transparent"/>
+      <path d="M260 520c-55 0-100-45-100-100s45-100 100-100h10c55 0 100 45 100 100s-45 100-100 100h-10Z" stroke="#111827" stroke-width="28" stroke-linecap="round" stroke-linejoin="round"/>
+      <path d="M700 520c-55 0-100-45-100-100s45-100 100-100h10c55 0 100 45 100 100s-45 100-100 100h-10Z" stroke="#111827" stroke-width="28" stroke-linecap="round" stroke-linejoin="round"/>
+      <path d="M360 420h240" stroke="#111827" stroke-width="28" stroke-linecap="round"/>
+      <path d="M160 390 110 350" stroke="#111827" stroke-width="24" stroke-linecap="round"/>
+      <path d="M800 390 850 350" stroke="#111827" stroke-width="24" stroke-linecap="round"/>
+    </svg>
+  `);
 
 // ─── Slide data — edit text/links/colors freely ───────────────────────────────
 const SLIDES = [
@@ -33,10 +45,11 @@ const SLIDES = [
     darkBg: "dark:from-orange-950/40 dark:via-gray-950 dark:to-pink-950/30",
     tag: "SALE",
     tagColor: "bg-orange-500",
-    spotlights: [
+    spotlightQueries: ["iphone ring", "iphone case", "magsafe", "phone accessory"],
+    fallbackSpotlights: [
       { name: "iPhone Accessories", image: heroGadget, alt: "iPhone accessories", accent: "from-orange-500 to-pink-600" },
       { name: "Wearables", image: heroWatch, alt: "Smartwatch and wearable products", accent: "from-blue-500 to-violet-600" },
-      { name: "Audio", image: heroHeadphones, alt: "Premium headphones", accent: "from-emerald-500 to-cyan-600" },
+      { name: "Glasses", image: GLASSES_FALLBACK_IMAGE, alt: "Glasses and eyewear", accent: "from-slate-500 to-indigo-600" },
     ],
   },
   {
@@ -54,29 +67,31 @@ const SLIDES = [
     darkBg: "dark:from-blue-950/40 dark:via-gray-950 dark:to-violet-950/30",
     tag: "NEW",
     tagColor: "bg-blue-500",
-    spotlights: [
+    spotlightQueries: ["smartwatch", "wearable", "fitness band"],
+    fallbackSpotlights: [
       { name: "Wearables", image: heroWatch, alt: "Smartwatch and wearable products", accent: "from-blue-500 to-violet-600" },
       { name: "iPhone Accessories", image: heroGadget, alt: "iPhone accessories", accent: "from-orange-500 to-pink-600" },
-      { name: "Audio", image: heroHeadphones, alt: "Premium headphones", accent: "from-emerald-500 to-cyan-600" },
+      { name: "Glasses", image: GLASSES_FALLBACK_IMAGE, alt: "Glasses and eyewear", accent: "from-slate-500 to-indigo-600" },
     ],
   },
   {
     id: 3,
-    badge: "🎧 Audio Week",
-    headline: "Immersive Sound",
-    subheadline: "Headphones & Earbuds",
-    description: "Premium audio gear from Sony, Bose, JBL and more. Experience music like never before.",
-    cta: { label: "Shop Audio", to: "/shop?cat=audio" },
+    badge: "🕶️ Trending Now",
+    headline: "Glasses & Eyewear",
+    subheadline: "Blue light, style & everyday comfort",
+    description: "Glasses, frames and eyewear picks for work, screen time and style. Fast shipping + 2-year warranty.",
+    cta: { label: "Shop Glasses", to: "/shop?q=glasses" },
     secondary: { label: "Top Rated", to: "/shop?sort=rating" },
-    image: heroHeadphones,
-    imageAlt: "Premium headphones and earbuds",
-    accent: "from-emerald-500 to-cyan-600",
-    bg: "from-emerald-50 via-white to-cyan-50",
-    darkBg: "dark:from-emerald-950/40 dark:via-gray-950 dark:to-cyan-950/30",
-    tag: "TRENDING",
-    tagColor: "bg-emerald-500",
-    spotlights: [
-      { name: "Audio", image: heroHeadphones, alt: "Premium headphones and earbuds", accent: "from-emerald-500 to-cyan-600" },
+    image: GLASSES_FALLBACK_IMAGE,
+    imageAlt: "Glasses and eyewear collection",
+    accent: "from-slate-500 to-indigo-600",
+    bg: "from-slate-50 via-white to-indigo-50",
+    darkBg: "dark:from-slate-950/40 dark:via-gray-950 dark:to-indigo-950/30",
+    tag: "GLASSES",
+    tagColor: "bg-slate-700",
+    spotlightQueries: ["glasses", "eyewear", "sunglasses", "spectacles"],
+    fallbackSpotlights: [
+      { name: "Glasses", image: GLASSES_FALLBACK_IMAGE, alt: "Glasses and eyewear", accent: "from-slate-500 to-indigo-600" },
       { name: "iPhone Accessories", image: heroGadget, alt: "iPhone accessories", accent: "from-orange-500 to-pink-600" },
       { name: "Wearables", image: heroWatch, alt: "Smartwatch and wearable products", accent: "from-blue-500 to-violet-600" },
     ],
@@ -106,6 +121,8 @@ const Hero = () => {
     goTo((current - 1 + SLIDES.length) % SLIDES.length, -1);
   }, [current, goTo]);
 
+  const slide = SLIDES[current];
+
   // Autoplay
   useEffect(() => {
     if (paused) return;
@@ -118,10 +135,12 @@ const Hero = () => {
 
     const loadSpotlights = async () => {
       try {
-        const storeProducts = await fetchStoreProducts(1, 6);
+        const queries = slide.spotlightQueries.length > 0 ? slide.spotlightQueries : [slide.headline];
+        const storeProducts = await Promise.all(queries.map((query) => fetchStoreProducts(1, 6, query)));
         if (cancelled) return;
 
         const mapped = storeProducts
+          .flat()
           .map(mapStoreProductToLocalProduct)
           .filter((product) => Boolean(product.image))
           .slice(0, 3)
@@ -129,12 +148,12 @@ const Hero = () => {
             name: product.name,
             image: product.image,
             alt: product.name,
-            accent: ["from-orange-500 to-pink-600", "from-blue-500 to-violet-600", "from-emerald-500 to-cyan-600"][index % 3],
+            accent: ["from-slate-500 to-indigo-600", "from-blue-500 to-violet-600", "from-orange-500 to-pink-600"][index % 3],
           }));
 
-        setLiveSpotlights(mapped);
+        setLiveSpotlights(mapped.length > 0 ? mapped : slide.fallbackSpotlights);
       } catch {
-        if (!cancelled) setLiveSpotlights([]);
+        if (!cancelled) setLiveSpotlights(slide.fallbackSpotlights);
       }
     };
 
@@ -143,11 +162,10 @@ const Hero = () => {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [slide]);
 
-  const slide = SLIDES[current];
   const spotlightItems = useMemo(
-    () => liveSpotlights.length > 0 ? liveSpotlights : ((slide as typeof slide & { spotlights?: SpotlightItem[] }).spotlights ?? []),
+    () => liveSpotlights.length > 0 ? liveSpotlights : slide.fallbackSpotlights,
     [liveSpotlights, slide]
   );
 
