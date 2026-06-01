@@ -265,7 +265,7 @@ const ProductDetail = () => {
           "category": product.category
         }}
       />
-      <section className="container pt-32 pb-20">
+      <section className="container pt-10 pb-20">
         {/* Breadcrumb */}
         <Link
           to="/shop"

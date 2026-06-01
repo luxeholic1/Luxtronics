@@ -42,7 +42,7 @@ const FAQ = () => {
           }))
         }}
       />
-      <section className="container pt-32 pb-16">
+      <section className="container pt-10 pb-16">
         <p className="text-sm text-primary font-medium uppercase tracking-widest mb-3">Support</p>
         <h1 className="font-display font-bold text-5xl sm:text-6xl tracking-tight">
           Frequently asked <span className="text-gradient">questions</span>

@@ -25,9 +25,9 @@ const LimitedEditionSection = () => {
       discount: "Capture the extraordinary",
       image: headphonesImage,
       link: "/shop?cat=audio&sort=new",
-      color: "from-purple-500/20 to-pink-500/20",
-      textColor: "text-purple-400",
-      badgeColor: "bg-purple-500/20",
+      color: "from-primary/20 to-accent/20",
+      textColor: "text-primary",
+      badgeColor: "bg-primary/20",
     },
     {
       id: 3,
@@ -43,15 +43,29 @@ const LimitedEditionSection = () => {
   ];
 
   return (
-    <section className="w-full py-12 sm:py-16 md:py-20 lg:py-24 px-4 sm:px-6 md:px-8 lg:px-12 xl:px-16">
-      <div className="flex items-end justify-between mb-8 sm:mb-12 gap-3 sm:gap-4 flex-wrap">
+    <section className="relative w-full overflow-hidden py-12 sm:py-16 md:py-20 lg:py-24 px-4 sm:px-6 md:px-8 lg:px-12 xl:px-16">
+      <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-border to-transparent" />
+      <div className="absolute inset-x-0 bottom-0 h-px bg-gradient-to-r from-transparent via-border to-transparent" />
+      <div
+        className="absolute inset-0"
+        style={{
+          backgroundImage: `url("/a2.jpg")`,
+          backgroundRepeat: "no-repeat",
+          backgroundAttachment: "fixed",
+          backgroundSize: "cover",
+          backgroundPosition: "center",
+        }}
+      />
+
+      <div className="relative z-10 flex items-end justify-between mb-8 sm:mb-12 gap-3 sm:gap-4 flex-wrap">
+        
         <div>
           <p className="text-xs sm:text-sm text-primary font-medium uppercase tracking-widest mb-2 sm:mb-3">
             Exclusive Collections
           </p>
           <h2 className="font-display font-bold text-2xl sm:text-3xl md:text-4xl lg:text-5xl tracking-tight max-w-2xl">
             <span className="text-gradient">Limited Editions</span> &{" "}
-            <span className="bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text text-transparent">
+            <span className="text-gradient">
               New Drops
             </span>
           </h2>
@@ -69,7 +83,7 @@ const LimitedEditionSection = () => {
         </Link>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8">
+      <div className="relative z-10 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8">
         {limitedEditionItems.map((item, index) => (
           <motion.div
             key={item.id}
@@ -136,7 +150,7 @@ const LimitedEditionSection = () => {
       </div>
 
       {/* Stats bar */}
-      <div className="mt-12 sm:mt-16 grid grid-cols-2 md:grid-cols-4 gap-4 sm:gap-6">
+      <div className="relative z-10 mt-12 sm:mt-16 grid grid-cols-2 md:grid-cols-4 gap-4 sm:gap-6">
         {[
           { value: "24h", label: "Flash Sale", desc: "Ends soon" },
           { value: "500+", label: "Limited Items", desc: "In stock" },

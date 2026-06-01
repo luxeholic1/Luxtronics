@@ -60,20 +60,20 @@ function ensureFloatingEl() {
     position: 'fixed',
     top: '0',
     left: '0',
-    width: '88px',
-    height: '88px',
-    borderRadius: '16px',
+    width: '54px',
+    height: '54px',
+    borderRadius: '12px',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
     pointerEvents: 'none',
     zIndex: '2147483647',
     opacity: '0',
-    transition: 'opacity 0.18s ease, transform 0.18s cubic-bezier(0.34,1.56,0.64,1)',
-    transform: 'translate(-50%, -110%) scale(0.7)',
+    transition: 'opacity 0.16s ease, transform 0.16s cubic-bezier(0.34,1.56,0.64,1)',
+    transform: 'translate(14px, -120%) scale(0.86)',
     background: 'rgba(255,255,255,0.95)',
     backdropFilter: 'blur(12px)',
-    boxShadow: '0 12px 40px rgba(0,0,0,0.18), 0 0 0 1.5px rgba(249,115,22,0.35)',
+    boxShadow: '0 10px 26px rgba(0,0,0,0.16), 0 0 0 1px rgba(37,99,235,0.24)',
     willChange: 'left,top,opacity,transform',
     userSelect: 'none',
     overflow: 'hidden',
@@ -82,10 +82,10 @@ function ensureFloatingEl() {
   // Product image
   _img = document.createElement('img');
   Object.assign(_img.style, {
-    width: '72px',
-    height: '72px',
-    objectFit: 'contain',
-    padding: '6px',
+    width: '100%',
+    height: '100%',
+    objectFit: 'cover',
+    padding: '0',
     display: 'none',
   });
   _el.appendChild(_img);
@@ -93,7 +93,7 @@ function ensureFloatingEl() {
   // Emoji fallback
   _emoji = document.createElement('span');
   Object.assign(_emoji.style, {
-    fontSize: '36px',
+    fontSize: '24px',
     lineHeight: '1',
     display: 'none',
   });
@@ -103,13 +103,13 @@ function ensureFloatingEl() {
   const dot = document.createElement('div');
   Object.assign(dot.style, {
     position: 'absolute',
-    bottom: '5px',
-    right: '5px',
-    width: '8px',
-    height: '8px',
+    bottom: '4px',
+    right: '4px',
+    width: '6px',
+    height: '6px',
     borderRadius: '50%',
-    background: 'linear-gradient(135deg,#f97316,#ec4899)',
-    boxShadow: '0 0 6px rgba(249,115,22,0.6)',
+    background: 'linear-gradient(135deg,#111827,#2563eb)',
+    boxShadow: '0 0 6px rgba(37,99,235,0.45)',
   });
   _el.appendChild(dot);
 
@@ -136,7 +136,7 @@ function injectCursorCSS() {
   style.textContent = `
     .cat-cursor-zone,
     .cat-cursor-zone * {
-      cursor: none !important;
+      cursor: pointer !important;
     }
     @media (hover: none) {
       .cat-cursor-zone,
@@ -175,13 +175,13 @@ export default function ImageCursorCard({ imageUrl, category, children }: Props)
     }
 
     _el.style.opacity = '1';
-    _el.style.transform = 'translate(-50%, -110%) scale(1)';
+    _el.style.transform = 'translate(14px, -120%) scale(1)';
   }, [imageUrl, category]);
 
   const handleLeave = useCallback(() => {
     if (!_el) return;
     _el.style.opacity = '0';
-    _el.style.transform = 'translate(-50%, -110%) scale(0.7)';
+    _el.style.transform = 'translate(14px, -120%) scale(0.86)';
   }, []);
 
   return (

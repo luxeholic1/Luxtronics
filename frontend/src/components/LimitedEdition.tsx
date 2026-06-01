@@ -1,207 +1,227 @@
 import { Link } from "react-router-dom";
-import { ArrowRight, Zap, Star, Shield } from "lucide-react";
+import { ArrowRight, Cable, CheckCircle2, Phone, ShieldCheck, Sparkles, Zap } from "lucide-react";
 import { motion, useScroll, useTransform } from "framer-motion";
 import { useRef } from "react";
 
+type Variant = {
+  wattage: string;
+  color: string;
+  accent: string;
+  limit: string;
+  phone: string;
+  specs: Array<[string, string]>;
+};
+
+const variants: Variant[] = [
+  {
+    wattage: "80W",
+    color: "Orange",
+    accent: "from-orange-400 to-amber-500",
+    limit: "First 100 customers only",
+    phone: "9667078738",
+    specs: [
+      ["USB-C cable", "80W"],
+      ["USB-C2", "20W"],
+      ["USB-A", "18W"],
+    ],
+  },
+  {
+    wattage: "65W",
+    color: "Pink",
+    accent: "from-rose-300 to-pink-500",
+    limit: "First 120 customers only",
+    phone: "9266433722",
+    specs: [
+      ["USB-C cable", "65W"],
+      ["USB-C2", "20W"],
+      ["USB-A", "18W"],
+    ],
+  },
+];
+
+const highlights = [
+  ["80W", "Max output"],
+  ["3", "Charging ports"],
+  ["70cm", "Built-in cable"],
+  ["120g", "Ultra light"],
+  ["18mo", "Warranty"],
+];
+
+const features = [
+  { icon: Cable, label: "Retractable USB-C" },
+  { icon: Zap, label: "PD 3.0 + QC 3.0" },
+  { icon: ShieldCheck, label: "Multi-safe protection" },
+];
+
+const ProductMockup = ({ variant }: { variant: Variant }) => (
+  <div className="relative flex min-h-[250px] items-center justify-center">
+    <div className={`absolute h-44 w-44 rounded-full bg-gradient-to-br ${variant.accent} opacity-40 blur-3xl`} />
+    <motion.div
+      animate={{ y: [0, -8, 0] }}
+      transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
+      className="relative h-56 w-40 rounded-[1.8rem] border border-white/25 bg-white/15 p-3 shadow-2xl backdrop-blur-xl"
+    >
+      <div className={`absolute inset-3 rounded-[1.35rem] bg-gradient-to-br ${variant.accent}`} />
+      <div className="absolute inset-0 rounded-[1.8rem] bg-[linear-gradient(135deg,rgba(255,255,255,0.72)_0%,rgba(255,255,255,0.08)_46%,rgba(0,0,0,0.18)_100%)]" />
+      <div className="relative flex h-full flex-col justify-between rounded-[1.25rem] border border-white/25 bg-black/10 p-4 text-white">
+        <div className="flex items-center justify-between">
+          <span className="text-xs font-black uppercase tracking-[0.22em]">GaN</span>
+          <span className="rounded-full bg-white/20 px-2 py-1 text-[10px] font-bold">{variant.color}</span>
+        </div>
+        <div>
+          <div className="font-display text-5xl font-black">{variant.wattage}</div>
+          <p className="text-xs font-semibold text-white/75">Wall Charger</p>
+        </div>
+        <div className="grid grid-cols-3 gap-1.5">
+          {["C1", "C2", "A"].map((port) => (
+            <span key={port} className="rounded-full bg-black/30 px-2 py-1 text-center text-[10px] font-black">
+              {port}
+            </span>
+          ))}
+        </div>
+      </div>
+      <div className="absolute -right-10 top-16 h-16 w-20 rounded-full border-[8px] border-white/60 border-b-transparent border-l-transparent" />
+      <div className="absolute -right-12 top-28 h-3.5 w-9 rounded-full bg-white/70" />
+    </motion.div>
+  </div>
+);
+
 const LimitedEdition = () => {
-  const limitedProducts = [
-    {
-      id: 1,
-      title: "Pro Laptops",
-      subtitle: "up to 30% off",
-      description: "Powerful workstations for creators and professionals",
-      image: "https://images.unsplash.com/photo-1496181133206-80ce9b88a853?q=80&w=1200&auto=format&fit=crop",
-      color: "from-blue-500/20 to-purple-500/20",
-      textColor: "text-blue-400",
-      badge: "LIMITED EDITION",
-      link: "/shop?cat=laptops",
-    },
-    {
-      id: 2,
-      title: "NEW DROP",
-      subtitle: "Capture the extraordinary",
-      description: "Latest camera gear and photography equipment",
-      image: "https://images.unsplash.com/photo-1516035069371-29a1b244cc32?q=80&w=1200&auto=format&fit=crop",
-      color: "from-amber-500/20 to-red-500/20",
-      textColor: "text-amber-400",
-      badge: "JUST LAUNCHED",
-      link: "/shop?cat=cameras",
-    },
-    {
-      id: 3,
-      title: "Audio Elite",
-      subtitle: "Immersive sound experience",
-      description: "Premium headphones and speakers for audiophiles",
-      image: "https://images.unsplash.com/photo-1505740420928-5e560c06d30e?q=80&w-1200&auto=format&fit=crop",
-      color: "from-emerald-500/20 to-cyan-500/20",
-      textColor: "text-emerald-400",
-      badge: "EXCLUSIVE",
-      link: "/shop?cat=audio",
-    },
-  ];
+  const sectionRef = useRef<HTMLElement | null>(null);
+  const { scrollYProgress } = useScroll({
+    target: sectionRef,
+    offset: ["start end", "end start"],
+  });
+  const videoY = useTransform(scrollYProgress, [0, 1], ["-7%", "7%"]);
+  const videoScale = useTransform(scrollYProgress, [0, 0.5, 1], [1.12, 1.04, 1.12]);
+  const contentY = useTransform(scrollYProgress, [0, 1], ["18px", "-18px"]);
 
   return (
-    <section className="py-20 sm:py-28 lg:py-36 relative overflow-hidden bg-limited bg-cover bg-center section-bg-overlay" ref={useRef(null)}>
-      {/* Background effects */}
-      <div className="absolute inset-0 bg-gradient-to-b from-background via-background/95 to-background" />
-      
-      {/* Tech grid pattern */}
-      <motion.div 
-        className="absolute inset-0 opacity-30 dark:opacity-15"
-        style={{
-          backgroundImage: `
-            linear-gradient(90deg, rgba(255,107,53,0.1) 1px, transparent 1px),
-            linear-gradient(0deg, rgba(255,107,53,0.1) 1px, transparent 1px)
-          `,
-          backgroundSize: '50px 50px',
-        }}
-        animate={{
-          backgroundPosition: ['0 0', '50px 50px'],
-        }}
-        transition={{
-          duration: 20,
-          repeat: Infinity,
-          ease: "linear",
-        }}
+    <section ref={sectionRef} className="relative isolate w-full overflow-hidden">
+      <motion.video
+        style={{ y: videoY, scale: videoScale }}
+        className="absolute -inset-y-16 inset-x-0 h-[calc(100%+8rem)] w-full object-cover will-change-transform"
+        src="/v7.mp4"
+        autoPlay
+        muted
+        loop
+        playsInline
+        preload="metadata"
+        poster="/a3.jpg"
+        aria-hidden="true"
       />
-      
-      {/* Animated blob background */}
-      <motion.div 
-        className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 h-[800px] w-[800px] rounded-full bg-gradient-radial from-primary/5 via-transparent to-transparent"
-        animate={{
-          scale: [1, 1.1, 1],
-          opacity: [0.5, 0.8, 0.5],
-        }}
-        transition={{
-          duration: 8,
-          repeat: Infinity,
-          ease: "easeInOut",
-        }}
-      />
-      
-      <div className="container relative z-10">
-        {/* Section header */}
+      <div className="absolute inset-0 bg-black/42" />
+      <div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(0,0,0,0.74)_0%,rgba(0,0,0,0.42)_50%,rgba(0,0,0,0.14)_100%)]" />
+      <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/25 to-transparent" />
+      <div className="absolute inset-x-0 bottom-0 h-px bg-gradient-to-r from-transparent via-white/25 to-transparent" />
+
+      <motion.div
+        style={{ y: contentY }}
+        className="relative z-10 mx-auto grid min-h-[760px] w-full max-w-[1800px] gap-8 px-4 py-14 will-change-transform sm:px-6 sm:py-16 md:px-8 lg:grid-cols-[0.95fr_1.05fr] lg:items-center lg:px-12 xl:px-16"
+      >
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true }}
-          transition={{ duration: 0.6 }}
-          className="text-center mb-12 sm:mb-16 lg:mb-20"
+          transition={{ duration: 0.55 }}
+          className="max-w-2xl"
         >
-          <div className="inline-flex items-center gap-2 rounded-full border border-primary/20 bg-primary/5 px-4 py-1.5 mb-4">
-            <Zap className="h-3.5 w-3.5 text-primary" />
-            <span className="text-xs font-semibold uppercase tracking-widest text-primary">
-              Exclusive Collections
-            </span>
+          <div className="mb-5 inline-flex items-center gap-2 rounded-full border border-white/18 bg-white/10 px-4 py-2 text-xs font-black uppercase tracking-widest text-white shadow-2xl backdrop-blur-xl">
+            <Sparkles className="h-3.5 w-3.5" />
+            Limited offer - free shipping
           </div>
-          <h2 className="font-display font-bold text-3xl sm:text-4xl lg:text-5xl tracking-tight mb-4">
-            <span className="text-gradient">Limited Edition</span> Drops
+          <h2 className="font-display text-5xl font-black leading-[0.92] tracking-tight text-white sm:text-6xl lg:text-7xl xl:text-8xl">
+            One charger.
+            <span className="block text-white/62">Infinite devices.</span>
           </h2>
-          <p className="text-muted-foreground max-w-2xl mx-auto text-sm sm:text-base">
-            Discover exclusive products with special pricing. Limited quantities available.
+          <p className="mt-6 max-w-xl text-base leading-relaxed text-white/72 sm:text-lg">
+            65W and 80W GaN wall chargers with a built-in retractable USB-C cable. Three ports, laptop-grade power,
+            pocket-sized form.
           </p>
-        </motion.div>
 
-        {/* Product cards grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 lg:gap-8">
-          {limitedProducts.map((product, index) => (
-            <motion.div
-              key={product.id}
-              initial={{ opacity: 0, y: 30 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              transition={{ duration: 0.6, delay: index * 0.1 }}
-              className="group relative"
+          <div className="mt-7 flex flex-wrap gap-2">
+            {features.map((feature) => (
+              <span key={feature.label} className="inline-flex items-center gap-2 rounded-full border border-white/14 bg-white/10 px-3 py-2 text-xs font-bold text-white/82 backdrop-blur-xl">
+                <feature.icon className="h-3.5 w-3.5" />
+                {feature.label}
+              </span>
+            ))}
+          </div>
+
+          <div className="mt-8 flex flex-col gap-3 sm:flex-row">
+            <Link
+              to="/shop?search=gan%20charger"
+              className="inline-flex items-center justify-center gap-2 rounded-xl bg-white px-6 py-3.5 text-sm font-black text-black transition hover:bg-white/90"
             >
-              <Link
-                to={product.link}
-                className="block h-full rounded-3xl overflow-hidden border border-border bg-gradient-card hover:border-primary/40 transition-all duration-500 hover:shadow-elegant"
-              >
-                {/* Background gradient */}
-                <div className={`absolute inset-0 bg-gradient-to-br ${product.color} opacity-0 group-hover:opacity-100 transition-opacity duration-500`} />
-                
-                {/* Image container */}
-                <div className="relative h-48 sm:h-56 lg:h-64 overflow-hidden">
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent z-10" />
-                  <motion.img
-                    src={product.image}
-                    alt={product.title}
-                    className="h-full w-full object-cover will-change-transform"
-                    whileHover={{ scale: 1.15 }}
-                    initial={{ scale: 1 }}
-                  />
-                  
-                  {/* Badge */}
-                  <div className="absolute top-4 left-4 z-20">
-                    <span className="inline-flex items-center gap-1.5 rounded-full bg-black/80 backdrop-blur-sm px-3 py-1 text-[10px] font-bold uppercase tracking-widest text-white">
-                      <Star className="h-2.5 w-2.5" />
-                      {product.badge}
-                    </span>
-                  </div>
-                </div>
-
-                {/* Content */}
-                <div className="p-6 sm:p-8">
-                  <div className="mb-3">
-                    <h3 className={`font-display font-bold text-xl sm:text-2xl ${product.textColor} mb-1`}>
-                      {product.title}
-                    </h3>
-                    <p className="text-lg sm:text-xl font-semibold text-foreground">
-                      {product.subtitle}
-                    </p>
-                  </div>
-                  
-                  <p className="text-sm text-muted-foreground mb-6">
-                    {product.description}
-                  </p>
-
-                  {/* Features */}
-                  <div className="flex items-center gap-4 mb-6">
-                    <div className="flex items-center gap-1.5">
-                      <Shield className="h-3.5 w-3.5 text-primary" />
-                      <span className="text-xs text-muted-foreground">2-Year Warranty</span>
-                    </div>
-                    <div className="flex items-center gap-1.5">
-                      <Zap className="h-3.5 w-3.5 text-amber-400" />
-                      <span className="text-xs text-muted-foreground">Fast Shipping</span>
-                    </div>
-                  </div>
-
-                  {/* CTA Button */}
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm font-medium text-muted-foreground group-hover:text-foreground transition-colors">
-                      Shop now
-                    </span>
-                    <div className="h-10 w-10 rounded-full bg-secondary group-hover:bg-gradient-brand flex items-center justify-center transition-all duration-300 group-hover:shadow-glow">
-                      <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
-                    </div>
-                  </div>
-                </div>
-
-                {/* Hover effect line */}
-                <div className="absolute bottom-0 left-0 right-0 h-1 bg-gradient-brand scale-x-0 group-hover:scale-x-100 transition-transform duration-500 origin-left" />
-              </Link>
-            </motion.div>
-          ))}
-        </div>
-
-        {/* View all CTA */}
-        <motion.div
-          initial={{ opacity: 0 }}
-          whileInView={{ opacity: 1 }}
-          viewport={{ once: true }}
-          transition={{ delay: 0.4 }}
-          className="text-center mt-12 sm:mt-16"
-        >
-          <Link
-            to="/shop"
-            className="inline-flex items-center gap-2 rounded-full border border-border bg-background/50 backdrop-blur-sm px-8 py-3 text-sm font-semibold hover:border-primary/40 hover:bg-background transition-all duration-300 hover:shadow-elegant"
-          >
-            View All Collections
-            <ArrowRight className="h-4 w-4" />
-          </Link>
+              Shop Now - Rs. 3,999
+              <ArrowRight className="h-4 w-4" />
+            </Link>
+            <a
+              href="tel:9667078738"
+              className="inline-flex items-center justify-center gap-2 rounded-xl border border-white/18 bg-white/10 px-6 py-3.5 text-sm font-black text-white backdrop-blur-xl transition hover:bg-white/15"
+            >
+              <Phone className="h-4 w-4" />
+              Call 96670 78738
+            </a>
+          </div>
         </motion.div>
-      </div>
+
+        <div className="space-y-4">
+          <div className="grid gap-4 md:grid-cols-2">
+            {variants.map((variant, index) => (
+              <motion.article
+                key={variant.wattage}
+                initial={{ opacity: 0, y: 28 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true }}
+                transition={{ duration: 0.55, delay: index * 0.12 }}
+                className="overflow-hidden rounded-3xl border border-white/16 bg-white/10 shadow-2xl backdrop-blur-xl"
+              >
+                <ProductMockup variant={variant} />
+                <div className="border-t border-white/10 p-5 text-white">
+                  <div className="mb-3 flex items-center justify-between gap-3">
+                    <div>
+                      <p className="text-xs font-black uppercase tracking-widest text-white/55">GaN - {variant.color}</p>
+                      <h3 className="font-display text-3xl font-black">{variant.wattage} Charger</h3>
+                    </div>
+                    <span className="rounded-full bg-white/15 px-2.5 py-1 text-xs font-black">{variant.limit}</span>
+                  </div>
+                  <div className="mb-4 flex items-end gap-2">
+                    <span className="font-display text-3xl font-black">Rs. 3,999</span>
+                    <span className="pb-1 text-sm font-bold text-white/45 line-through">Rs. 5,999</span>
+                  </div>
+                  <div className="grid gap-2">
+                    {variant.specs.map(([label, value]) => (
+                      <div key={label} className="flex items-center justify-between rounded-xl bg-black/22 px-3 py-2 text-sm">
+                        <span className="text-white/62">{label}</span>
+                        <span className="font-black">{value}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </motion.article>
+            ))}
+          </div>
+
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
+            {highlights.map(([value, label]) => (
+              <div key={label} className="rounded-2xl border border-white/15 bg-white/10 p-4 text-center text-white shadow-xl backdrop-blur-xl">
+                <div className="font-display text-2xl font-black">{value}</div>
+                <div className="mt-1 text-[10px] font-bold uppercase tracking-wider text-white/55">{label}</div>
+              </div>
+            ))}
+          </div>
+
+          <div className="flex flex-wrap items-center justify-center gap-3 rounded-2xl border border-white/15 bg-white/10 p-4 text-sm font-bold text-white/72 backdrop-blur-xl">
+            {["Free shipping", "18-month warranty", "PC fireproof", "Universal voltage"].map((item) => (
+              <span key={item} className="inline-flex items-center gap-2">
+                <CheckCircle2 className="h-4 w-4 text-white" />
+                {item}
+              </span>
+            ))}
+          </div>
+        </div>
+      </motion.div>
     </section>
   );
 };

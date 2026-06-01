@@ -55,7 +55,7 @@ const AccountRegister = () => {
 
   return (
     <Layout>
-      <section className="container pt-24 sm:pt-28 lg:pt-32 pb-16 sm:pb-20 lg:pb-24 max-w-md">
+      <section className="container pt-10 sm:pt-12 lg:pt-14 pb-16 sm:pb-20 lg:pb-24 max-w-md">
         <p className="text-sm text-primary font-medium uppercase tracking-widest mb-3">Account</p>
         <h1 className="font-display font-bold text-5xl tracking-tight">
           Create <span className="text-gradient">your account</span>

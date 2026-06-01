@@ -15,7 +15,7 @@ const AccountProfile = () => {
   if (!isLoaded) {
     return (
       <Layout>
-        <section className="container pt-24 sm:pt-28 lg:pt-32 pb-16 sm:pb-20 lg:pb-24">
+        <section className="container pt-10 sm:pt-12 lg:pt-14 pb-16 sm:pb-20 lg:pb-24">
           <p className="text-muted-foreground">Loading profile...</p>
         </section>
       </Layout>
@@ -25,7 +25,7 @@ const AccountProfile = () => {
   if (!isSignedIn || !user) {
     return (
       <Layout>
-        <section className="container pt-24 sm:pt-28 lg:pt-32 pb-16 sm:pb-20 lg:pb-24 max-w-xl">
+        <section className="container pt-10 sm:pt-12 lg:pt-14 pb-16 sm:pb-20 lg:pb-24 max-w-xl">
           <h1 className="font-display font-bold text-4xl tracking-tight">Please sign in</h1>
           <p className="mt-3 text-muted-foreground">Sign in to manage your profile.</p>
           <div className="mt-6 flex gap-3 flex-wrap">
@@ -64,7 +64,7 @@ const AccountProfile = () => {
 
   return (
     <Layout>
-      <section className="container pt-24 sm:pt-28 lg:pt-32 pb-12 sm:pb-16 max-w-3xl">
+      <section className="container pt-10 sm:pt-12 lg:pt-14 pb-12 sm:pb-16 max-w-3xl">
         <p className="text-sm text-primary font-medium uppercase tracking-widest mb-3">My account</p>
         <h1 className="font-display font-bold text-5xl tracking-tight">
           Profile <span className="text-gradient">settings</span>

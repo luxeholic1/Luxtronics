@@ -20,7 +20,7 @@ const ShippingReturns = () => {
         }}
       />
 
-      <section className="container pt-24 sm:pt-28 lg:pt-32 pb-12 sm:pb-16">
+      <section className="container pt-10 sm:pt-12 lg:pt-14 pb-12 sm:pb-16">
         <p className="text-sm text-primary font-medium uppercase tracking-widest mb-3">Policy</p>
         <h1 className="font-display font-bold text-5xl sm:text-6xl tracking-tight">
           Shipping & <span className="text-gradient">Returns</span>

@@ -52,7 +52,7 @@ const AccountOrders = () => {
   if (!isLoaded || loading) {
     return (
       <Layout>
-        <section className="container pt-32 pb-24 flex items-center justify-center">
+        <section className="container pt-10 pb-24 flex items-center justify-center">
           <div className="flex flex-col items-center gap-4">
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary" />
             <p className="text-sm text-muted-foreground">Loading your orders…</p>
@@ -65,7 +65,7 @@ const AccountOrders = () => {
   if (!isSignedIn || !user) {
     return (
       <Layout>
-        <section className="container pt-32 pb-24 max-w-xl">
+        <section className="container pt-10 pb-24 max-w-xl">
           <h1 className="font-display font-bold text-4xl tracking-tight">Please sign in</h1>
           <p className="mt-3 text-muted-foreground">Sign in to view your orders.</p>
           <div className="mt-6 flex gap-3 flex-wrap">
@@ -89,7 +89,7 @@ const AccountOrders = () => {
 
   return (
     <Layout>
-      <section className="container pt-32 pb-10">
+      <section className="container pt-10 pb-10">
         <div className="flex items-center justify-between gap-4 flex-wrap">
           <div>
             <p className="text-sm text-primary font-medium uppercase tracking-widest mb-3">My account</p>

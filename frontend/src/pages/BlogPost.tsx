@@ -11,7 +11,7 @@ const BlogPost = () => {
   if (!post) {
     return (
       <Layout>
-        <section className="container pt-32 pb-24 max-w-2xl text-center">
+        <section className="container pt-10 pb-24 max-w-2xl text-center">
           <h1 className="font-display font-bold text-4xl tracking-tight">Article not found</h1>
           <p className="mt-4 text-muted-foreground">The blog you are looking for is unavailable.</p>
           <Link
@@ -47,7 +47,7 @@ const BlogPost = () => {
           "url": `https://luxtronics.in/blog/${post.slug}`
         }}
       />
-      <section className="container pt-32 pb-10">
+      <section className="container pt-10 pb-10">
         <Link to="/blog" className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground">
           <ArrowLeft className="h-4 w-4" />
           Back to blog

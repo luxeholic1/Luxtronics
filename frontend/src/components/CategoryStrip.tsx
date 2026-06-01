@@ -1,13 +1,14 @@
-import { useMemo, useEffect, useState } from "react";
+import { useMemo } from "react";
 import { Link } from "react-router-dom";
-import { ArrowRight } from "lucide-react";
+import { ArrowRight, BadgeCheck } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { Smartphone, Headphones, Watch, Laptop, Gamepad2, Camera, Package } from "lucide-react";
 import { motion } from "framer-motion";
 import { fetchStoreCategories } from "@/services/store-api";
+import type { StoreCategory } from "@/services/store-api";
 import { categories as staticCategories } from "@/data/products";
-import shopBgDesktop from "@/assets/shop.jpg";
-import shopBgMobile from "@/assets/mob2.jpg";
+
+type DisplayCategory = Pick<StoreCategory, "name" | "slug" | "count" | "productCount">;
 
 const icons = {
   smartphones: Smartphone,
@@ -19,101 +20,107 @@ const icons = {
 };
 
 const CategoryStrip = () => {
-  const [isMobile, setIsMobile] = useState(false);
-
-  useEffect(() => {
-    const checkMobile = () => {
-      setIsMobile(window.innerWidth < 768);
-    };
-    
-    checkMobile();
-    const resizeHandler = () => {
-      requestAnimationFrame(checkMobile);
-    };
-    window.addEventListener('resize', resizeHandler, { passive: true });
-    
-    return () => window.removeEventListener('resize', resizeHandler);
-  }, []);
-
   const { data: categoryResult, isLoading } = useQuery({
-    queryKey: ['categories', 'strip'],
+    queryKey: ["categories", "strip"],
     queryFn: () => fetchStoreCategories(1, 6),
-    staleTime: 1000 * 60 * 60, // 1 hour
+    staleTime: 1000 * 60 * 60,
   });
 
-  const displayCategories = useMemo(() => {
+  const displayCategories: DisplayCategory[] = useMemo(() => {
     if (categoryResult?.data && categoryResult.data.length > 0) return categoryResult.data;
     return staticCategories;
   }, [categoryResult]);
 
   return (
-      <section className="w-full py-16 sm:py-20 md:py-24 lg:py-32 px-4 sm:px-6 md:px-8 lg:px-12 xl:px-16 relative bg-cover bg-center section-bg-overlay overflow-hidden"
+    <section className="relative w-full overflow-hidden bg-[linear-gradient(180deg,hsl(var(--background))_0%,hsl(var(--muted)/0.8)_52%,hsl(var(--background))_100%)] px-4 py-16 sm:px-6 sm:py-20 md:px-8 lg:px-12 lg:py-28 xl:px-16 ">
+      <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-border to-transparent" />
+      <div className="absolute inset-x-0 bottom-0 h-px bg-gradient-to-r from-transparent via-border to-transparent" />
+      <div
+        className="absolute inset-0"
         style={{
-          backgroundImage: `url(${isMobile ? shopBgMobile : shopBgDesktop})`,
-          backgroundPosition: 'center',
-          backgroundSize: 'cover',
+          backgroundImage: `url("/a2.jpg")`,
+          backgroundRepeat: "no-repeat",
+          backgroundAttachment: "fixed",
+          backgroundSize: "cover",
+          backgroundPosition: "center",
         }}
-      >
-        {/* Enhanced background effects */}
-        <div className="absolute inset-0 bg-gradient-to-b from-transparent via-primary/10 to-transparent opacity-40" />
-        <div className="absolute inset-0 bg-black/30 dark:bg-black/40 pointer-events-none" />
-        <div className="absolute inset-0 opacity-20 dark:opacity-10 pointer-events-none"
-          style={{
-            backgroundImage: `
-              linear-gradient(90deg, rgba(255,107,53,0.1) 1px, transparent 1px),
-              linear-gradient(0deg, rgba(255,107,53,0.1) 1px, transparent 1px)
-            `,
-            backgroundSize: '60px 60px',
-          }}
-        />
-        
-        <div className="flex items-end justify-between mb-8 sm:mb-12 md:mb-16 gap-3 sm:gap-4 flex-wrap relative z-10 max-w-[1920px] mx-auto">
-          <div className="p-6 sm:p-8 md:p-10 rounded-2xl sm:rounded-3xl dark:bg-black/50 light:bg-white/95 backdrop-blur-2xl border dark:border-white/15 light:border-black/15 shadow-2xl">
-            <p className="text-xs sm:text-sm text-primary font-bold uppercase tracking-widest mb-3 sm:mb-4">
-              Shop by Category
-            </p>
-            <h2 className="font-display font-bold text-3xl sm:text-4xl md:text-5xl lg:text-6xl xl:text-7xl tracking-tight max-w-xl leading-tight dark:text-white light:text-black">
-              Find what <span className="text-gradient bg-gradient-to-r from-primary via-accent to-primary bg-[length:200%_auto] animate-gradient">moves you</span>
+      />
+
+      <div className="relative z-10 mx-auto max-w-[1400px]">
+        <div className="mb-10 flex flex-col gap-5 sm:mb-12 lg:mb-14 lg:flex-row lg:items-end lg:justify-between">
+          <div className="max-w-3xl">
+            <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-border bg-background/60 px-4 py-2 text-xs font-bold uppercase tracking-[0.18em] text-muted-foreground shadow-sm backdrop-blur-xl">
+              <BadgeCheck className="h-4 w-4 text-primary" />
+              Premium categories
+            </div>
+            <h2 className="font-display text-3xl font-extrabold leading-tight tracking-tight text-foreground sm:text-4xl md:text-5xl lg:text-6xl">
+              Refined tech categories for every setup.
             </h2>
+            <p className="mt-4 max-w-2xl text-sm leading-6 text-muted-foreground sm:text-base">
+              Premium accessories, devices and essentials ko clean sections mein browse karo. No clutter, bas quick discovery.
+            </p>
           </div>
-          <Link to="/categories" className="group inline-flex items-center gap-2 text-xs sm:text-sm dark:text-white light:text-black hover:text-primary transition-colors font-semibold rounded-full px-5 py-3 hover:bg-primary/10 transition-all backdrop-blur-xl border dark:border-white/10 light:border-black/10">
-            View all <ArrowRight className="h-3 w-3 transition-transform group-hover:translate-x-1" />
+
+          <Link
+            to="/categories"
+            className="group inline-flex w-fit items-center gap-2 rounded-full border border-border bg-background/80 px-5 py-3 text-sm font-bold text-foreground shadow-sm backdrop-blur transition duration-300 hover:-translate-y-0.5 hover:border-primary/40 hover:text-primary hover:shadow-lg"
+          >
+            View all categories
+            <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
           </Link>
         </div>
 
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 sm:gap-4 md:gap-5 lg:gap-6 relative z-10 max-w-[1920px] mx-auto">
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4 lg:grid-cols-6 lg:gap-5">
         {isLoading && displayCategories.length === 0 ? (
           [...Array(6)].map((_, i) => (
-            <div key={i} className="aspect-square rounded-2xl sm:rounded-3xl bg-gradient-card border border-border animate-pulse" />
+            <div key={i} className="min-h-[190px] rounded-2xl border border-white/20 bg-background/45 backdrop-blur-xl animate-pulse" />
           ))
         ) : (
           displayCategories.slice(0, 6).map((cat, index) => {
             const Icon = icons[cat.slug as keyof typeof icons] || Package;
-            const count = (cat as any).productCount ?? cat.count ?? 0;
+            const count = cat.productCount ?? cat.count ?? 0;
+
             return (
               <motion.div
                 key={cat.slug}
-                initial={{ opacity: 0, y: 20 }}
+                initial={{ opacity: 0, y: 18 }}
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true }}
-                transition={{ delay: index * 0.1 }}
+                transition={{ delay: index * 0.06, duration: 0.45 }}
+                className="h-full"
               >
                 <Link
                   to={`/shop?cat=${cat.slug}`}
-                  className="group relative rounded-xl sm:rounded-2xl md:rounded-3xl bg-gradient-card border border-border dark:border-border light:border-black/8 p-4 sm:p-5 md:p-6 text-center hover:border-primary/50 transition-all duration-500 hover:-translate-y-2 sm:hover:-translate-y-1 hover:shadow-elegant-hover overflow-hidden"
+                  className="group relative flex h-full min-h-[190px] flex-col overflow-hidden rounded-2xl border border-white/20 bg-background/54 p-4 shadow-[0_18px_60px_rgba(0,0,0,0.08)] backdrop-blur-xl transition duration-300 hover:-translate-y-1 hover:border-primary/35 hover:bg-background/72 hover:shadow-[0_24px_80px_rgba(0,0,0,0.14)] dark:border-white/10 dark:bg-white/[0.055] dark:hover:bg-white/[0.08] sm:p-5"
                 >
-                  <div className="relative z-10">
-                    <div className="h-12 w-12 sm:h-14 sm:w-14 md:h-16 md:w-16 mx-auto rounded-xl sm:rounded-2xl md:rounded-3xl bg-secondary group-hover:bg-gradient-brand flex items-center justify-center mb-3 sm:mb-4 md:mb-5 transition-all duration-500 group-hover:shadow-glow group-hover:scale-110">
-                      <Icon className="h-6 w-6 sm:h-7 sm:w-7" />
+                  <div className="absolute inset-x-4 top-0 h-px bg-gradient-to-r from-transparent via-primary/45 to-transparent opacity-0 transition duration-300 group-hover:opacity-100" />
+                  <div className="absolute inset-0 bg-[linear-gradient(135deg,rgba(255,255,255,0.16)_0%,transparent_42%,rgba(255,255,255,0.08)_100%)] opacity-60 dark:opacity-20" />
+
+                  <div className="relative z-10 flex h-full flex-col">
+                    <div className="mb-6 flex h-14 w-14 items-center justify-center rounded-2xl border border-border bg-background/70 text-foreground shadow-sm backdrop-blur transition duration-300 group-hover:border-primary/35 group-hover:text-primary">
+                      <Icon className="h-6 w-6" />
                     </div>
-                    <h3 className="font-semibold text-sm sm:text-base md:text-lg truncate">{cat.name}</h3>
-                    <p className="text-xs sm:text-sm text-muted-foreground mt-1">{count} items</p>
+
+                    <div className="mt-auto">
+                      <h3 className="line-clamp-2 font-display text-lg font-bold leading-tight text-foreground">
+                        {cat.name}
+                      </h3>
+                      <div className="mt-4 flex items-center justify-between gap-2">
+                        <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground/80">
+                          {count} items
+                        </p>
+                        <span className="flex h-9 w-9 items-center justify-center rounded-full border border-border bg-background/70 text-foreground transition duration-300 group-hover:border-primary/40 group-hover:bg-primary group-hover:text-primary-foreground">
+                          <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
+                        </span>
+                      </div>
+                    </div>
                   </div>
                 </Link>
               </motion.div>
             );
           })
         )}
+        </div>
       </div>
     </section>
   );

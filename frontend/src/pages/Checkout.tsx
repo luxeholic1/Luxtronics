@@ -168,7 +168,7 @@ const Checkout = () => {
 
   return (
     <Layout>
-      <section className="container pt-32 pb-16">
+      <section className="container pt-10 pb-16">
         <Link
           to="/cart"
           className="inline-flex items-center text-sm text-muted-foreground hover:text-foreground mb-8 transition-colors"

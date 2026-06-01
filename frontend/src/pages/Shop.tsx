@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
-import { SlidersHorizontal, ChevronLeft, ChevronRight, X, Search, Sparkles, ChevronDown } from "lucide-react";
+import { ChevronLeft, ChevronRight, X, Search, Sparkles } from "lucide-react";
 import Layout from "@/components/Layout";
 import ProductCard from "@/components/ProductCard";
 import ImageCursorCard from "@/components/ImageCursorCard";
@@ -8,9 +8,18 @@ import SEO from "@/components/SEO";
 import { fetchStoreCategories, fetchStoreProducts, mapStoreProductToLocalProduct } from "@/services/store-api";
 import type { Product } from "@/data/products";
 
-const PAGE_SIZE = 28; // products per page
+const PAGE_SIZE = 30; // products per page
 
 type CategoryFilter = { id: number; name: string; slug: string; count: number };
+type PriceRange = "all" | "under-100" | "100-500" | "500-1000" | "1000-plus";
+
+const PRICE_RANGES: Array<{ value: PriceRange; label: string; test: (price: number) => boolean }> = [
+  { value: "all", label: "All prices", test: () => true },
+  { value: "under-100", label: "Under 100", test: (price) => price < 100 },
+  { value: "100-500", label: "100 to 500", test: (price) => price >= 100 && price <= 500 },
+  { value: "500-1000", label: "500 to 1,000", test: (price) => price > 500 && price <= 1000 },
+  { value: "1000-plus", label: "1,000+", test: (price) => price > 1000 },
+];
 
 // ─── Smart search engine ──────────────────────────────────────────────────────
 function tokenise(text: string): string[] {
@@ -21,6 +30,14 @@ function wordMatchesToken(qw: string, pt: string): boolean {
 }
 function allWordsInTokens(words: string[], tokens: string[]): boolean {
   return words.every(w => tokens.some(t => wordMatchesToken(w, t)));
+}
+function slugify(value: string): string {
+  return value
+    .toLowerCase()
+    .trim()
+    .replace(/&/g, "and")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
 }
 
 // ─── Levenshtein distance ─────────────────────────────────────────────────────
@@ -92,210 +109,6 @@ function useDebounce<T>(value: T, delay: number): T {
   return d;
 }
 
-// ─── Category icon map ────────────────────────────────────────────────────────
-const CAT_EMOJI: Record<string, string> = {
-  audio: "🎧", camera: "📷", "smart phone": "📱", smartphone: "📱",
-  wearables: "⌚", iphone: "🍎", uncategorized: "📦",
-};
-function catEmoji(name: string) {
-  return CAT_EMOJI[name.toLowerCase()] ?? "🛍️";
-}
-
-// ─── Category Pills with Megamenu ────────────────────────────────────────────
-const VISIBLE_CATS = 6;
-
-function CategoryPills({
-  categories,
-  totalCount,
-  activeCat,
-  onSelect,
-}: {
-  categories: CategoryFilter[];
-  totalCount: number;
-  activeCat: string;
-  onSelect: (slug: string) => void;
-}) {
-  const [open, setOpen] = useState(false);
-  const [search, setSearch] = useState("");
-  const dropdownRef = useRef<HTMLDivElement>(null);
-
-  // Sort by count descending, pick top 6 (excluding "All")
-  const sorted = useMemo(
-    () => [...categories].sort((a, b) => b.count - a.count),
-    [categories]
-  );
-  const topCats = sorted.slice(0, VISIBLE_CATS);
-  const moreCats = sorted.slice(VISIBLE_CATS);
-
-  // Is active cat in the "more" list?
-  const activeInMore = moreCats.some(c => c.slug === activeCat);
-
-  // Filtered more cats based on search
-  const filteredMore = useMemo(() => {
-    if (!search.trim()) return moreCats;
-    const q = search.toLowerCase();
-    return moreCats.filter(c => c.name.toLowerCase().includes(q));
-  }, [moreCats, search]);
-
-  // Group filtered more cats alphabetically
-  const grouped = useMemo(() => {
-    const map: Record<string, CategoryFilter[]> = {};
-    filteredMore.forEach(c => {
-      const letter = c.name[0]?.toUpperCase() || "#";
-      if (!map[letter]) map[letter] = [];
-      map[letter].push(c);
-    });
-    return Object.entries(map).sort(([a], [b]) => a.localeCompare(b));
-  }, [filteredMore]);
-
-  // Close on outside click
-  useEffect(() => {
-    const handler = (e: MouseEvent) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
-        setOpen(false);
-        setSearch("");
-      }
-    };
-    if (open) document.addEventListener("mousedown", handler);
-    return () => document.removeEventListener("mousedown", handler);
-  }, [open]);
-
-  const handleSelect = (slug: string) => {
-    onSelect(slug);
-    setOpen(false);
-    setSearch("");
-  };
-
-  const allCats = [{ id: 0, name: "All", slug: "all", count: totalCount }, ...topCats];
-
-  return (
-    <div className="mb-8 flex flex-wrap items-center gap-2">
-      {/* All + top 6 pills */}
-      {allCats.map(cat => {
-        const active = cat.slug === activeCat;
-        return (
-          <button
-            key={cat.slug}
-            onClick={() => handleSelect(cat.slug)}
-            className={`inline-flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium border transition-all duration-200 ${
-              active
-                ? "bg-gradient-brand text-primary-foreground border-transparent shadow-glow scale-105"
-                : "border-border hover:border-primary/50 hover:bg-secondary/50 text-muted-foreground hover:text-foreground"
-            }`}
-          >
-            <span>{catEmoji(cat.name)}</span>
-            <span>{cat.name}</span>
-            <span className={`text-xs px-1.5 py-0.5 rounded-full ${active ? "bg-white/20" : "bg-secondary"}`}>
-              {cat.count.toLocaleString()}
-            </span>
-          </button>
-        );
-      })}
-
-      {/* More button + megamenu */}
-      {moreCats.length > 0 && (
-        <div className="relative" ref={dropdownRef}>
-          <button
-            onClick={() => setOpen(v => !v)}
-            className={`inline-flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium border transition-all duration-200 ${
-              open || activeInMore
-                ? "bg-gradient-brand text-primary-foreground border-transparent shadow-glow scale-105"
-                : "border-border hover:border-primary/50 hover:bg-secondary/50 text-muted-foreground hover:text-foreground"
-            }`}
-          >
-            <span>🗂️</span>
-            <span>More</span>
-            <span className={`text-xs px-1.5 py-0.5 rounded-full ${open || activeInMore ? "bg-white/20" : "bg-secondary"}`}>
-              {moreCats.length}
-            </span>
-            <ChevronDown className={`h-3.5 w-3.5 transition-transform duration-200 ${open ? "rotate-180" : ""}`} />
-          </button>
-
-          {/* Megamenu dropdown */}
-          {open && (
-            <div className="absolute left-0 top-full mt-2 z-50 w-[min(92vw,680px)] rounded-2xl border border-border bg-background shadow-2xl overflow-hidden">
-              {/* Search bar */}
-              <div className="p-3 border-b border-border">
-                <div className="relative">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
-                  <input
-                    autoFocus
-                    type="text"
-                    placeholder="Search categories…"
-                    value={search}
-                    onChange={e => setSearch(e.target.value)}
-                    className="w-full h-9 pl-9 pr-3 rounded-full border border-border bg-secondary/50 text-sm focus:outline-none focus:border-primary placeholder:text-muted-foreground"
-                  />
-                  {search && (
-                    <button
-                      onClick={() => setSearch("")}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-                    >
-                      <X className="h-3.5 w-3.5" />
-                    </button>
-                  )}
-                </div>
-              </div>
-
-              {/* Category grid grouped by letter */}
-              <div className="max-h-[60vh] overflow-y-auto p-4">
-                {grouped.length === 0 ? (
-                  <p className="text-center text-sm text-muted-foreground py-8">No categories found</p>
-                ) : (
-                  <div className="space-y-4">
-                    {grouped.map(([letter, cats]) => (
-                      <div key={letter}>
-                        <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground mb-2 px-1">
-                          {letter}
-                        </p>
-                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5">
-                          {cats.map(cat => {
-                            const active = cat.slug === activeCat;
-                            return (
-                              <button
-                                key={cat.slug}
-                                onClick={() => handleSelect(cat.slug)}
-                                className={`flex items-center gap-2 px-3 py-2 rounded-xl text-sm text-left transition-all duration-150 ${
-                                  active
-                                    ? "bg-gradient-brand text-primary-foreground shadow-glow"
-                                    : "hover:bg-secondary/70 text-muted-foreground hover:text-foreground"
-                                }`}
-                              >
-                                <span className="text-base leading-none">{catEmoji(cat.name)}</span>
-                                <span className="flex-1 truncate font-medium">{cat.name}</span>
-                                <span className={`text-xs shrink-0 ${active ? "text-white/70" : "text-muted-foreground"}`}>
-                                  {cat.count > 0 ? cat.count : ""}
-                                </span>
-                              </button>
-                            );
-                          })}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-
-              {/* Footer */}
-              <div className="p-3 border-t border-border flex items-center justify-between">
-                <span className="text-xs text-muted-foreground">
-                  {moreCats.length} more categories
-                </span>
-                <button
-                  onClick={() => { handleSelect("all"); }}
-                  className="text-xs text-primary hover:underline font-medium"
-                >
-                  View all products
-                </button>
-              </div>
-            </div>
-          )}
-        </div>
-      )}
-    </div>
-  );
-}
-
 // ─── Pagination component ─────────────────────────────────────────────────────
 function Pagination({ page, total, pageSize, onChange }: {
   page: number; total: number; pageSize: number; onChange: (p: number) => void;
@@ -353,6 +166,128 @@ function Pagination({ page, total, pageSize, onChange }: {
   );
 }
 
+function ShopSidebar({
+  categories,
+  totalCount,
+  activeCat,
+  sort,
+  priceRange,
+  minRating,
+  onCategoryChange,
+  onSortChange,
+  onPriceChange,
+  onRatingChange,
+  onClear,
+}: {
+  categories: CategoryFilter[];
+  totalCount: number;
+  activeCat: string;
+  sort: string;
+  priceRange: PriceRange;
+  minRating: number;
+  onCategoryChange: (slug: string) => void;
+  onSortChange: (value: string) => void;
+  onPriceChange: (value: PriceRange) => void;
+  onRatingChange: (value: number) => void;
+  onClear: () => void;
+}) {
+  const topCategories = useMemo(
+    () => [...categories].sort((a, b) => b.count - a.count).slice(0, 14),
+    [categories]
+  );
+
+  return (
+    <aside className="rounded-2xl border border-border bg-card shadow-sm">
+      <div className="flex items-center justify-between border-b border-border px-4 py-4">
+        <div>
+          <p className="text-xs font-bold uppercase tracking-[0.18em] text-muted-foreground">Filters</p>
+          <h2 className="mt-1 font-display text-lg font-bold">Browse Store</h2>
+        </div>
+        <button onClick={onClear} className="text-xs font-semibold text-muted-foreground transition-colors hover:text-foreground">
+          Reset
+        </button>
+      </div>
+
+      <div className="space-y-6 p-4">
+        <div>
+          <h3 className="mb-3 text-xs font-bold uppercase tracking-[0.16em] text-muted-foreground">Department</h3>
+          <div className="space-y-1">
+            <button
+              onClick={() => onCategoryChange("all")}
+              className={`flex w-full items-center justify-between rounded-xl px-3 py-2 text-left text-sm transition-colors ${
+                activeCat === "all" ? "bg-primary text-primary-foreground" : "text-foreground hover:bg-muted"
+              }`}
+            >
+              <span className="font-medium">All Products</span>
+              <span className="text-xs opacity-70">{totalCount.toLocaleString()}</span>
+            </button>
+            {topCategories.map((cat) => (
+              <button
+                key={cat.slug}
+                onClick={() => onCategoryChange(cat.slug)}
+                className={`flex w-full items-center justify-between rounded-xl px-3 py-2 text-left text-sm transition-colors ${
+                  activeCat === cat.slug ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted hover:text-foreground"
+                }`}
+              >
+                <span className="truncate font-medium">{cat.name}</span>
+                <span className="ml-2 text-xs opacity-70">{cat.count.toLocaleString()}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className="border-t border-border pt-5">
+          <h3 className="mb-3 text-xs font-bold uppercase tracking-[0.16em] text-muted-foreground">Sort By</h3>
+          <select
+            value={sort}
+            onChange={(e) => onSortChange(e.target.value)}
+            className="h-10 w-full rounded-xl border border-border bg-background px-3 text-sm font-medium outline-none transition-colors focus:border-primary"
+          >
+            <option value="featured">Featured</option>
+            <option value="low">Price: Low to High</option>
+            <option value="high">Price: High to Low</option>
+            <option value="rating">Top Rated</option>
+          </select>
+        </div>
+
+        <div className="border-t border-border pt-5">
+          <h3 className="mb-3 text-xs font-bold uppercase tracking-[0.16em] text-muted-foreground">Price</h3>
+          <div className="space-y-1">
+            {PRICE_RANGES.map((range) => (
+              <button
+                key={range.value}
+                onClick={() => onPriceChange(range.value)}
+                className={`flex w-full rounded-xl px-3 py-2 text-left text-sm font-medium transition-colors ${
+                  priceRange === range.value ? "bg-accent text-accent-foreground" : "text-muted-foreground hover:bg-muted hover:text-foreground"
+                }`}
+              >
+                {range.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className="border-t border-border pt-5">
+          <h3 className="mb-3 text-xs font-bold uppercase tracking-[0.16em] text-muted-foreground">Rating</h3>
+          <div className="space-y-1">
+            {[0, 4, 4.5].map((rating) => (
+              <button
+                key={rating}
+                onClick={() => onRatingChange(rating)}
+                className={`flex w-full rounded-xl px-3 py-2 text-left text-sm font-medium transition-colors ${
+                  minRating === rating ? "bg-accent text-accent-foreground" : "text-muted-foreground hover:bg-muted hover:text-foreground"
+                }`}
+              >
+                {rating === 0 ? "All ratings" : `${rating}+ stars`}
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+    </aside>
+  );
+}
+
 // ─── Main component ───────────────────────────────────────────────────────────
 const Shop = () => {
   const [params, setParams] = useSearchParams();
@@ -361,6 +296,8 @@ const Shop = () => {
   const currentPage = parseInt(params.get("page") || "1", 10);
 
   const [sort,       setSort]       = useState("featured");
+  const [priceRange, setPriceRange] = useState<PriceRange>("all");
+  const [minRating,  setMinRating]  = useState(0);
   const [categories, setCategories] = useState<CategoryFilter[]>([]);
   const [products,   setProducts]   = useState<Product[]>([]);
   const [totalCount, setTotalCount] = useState(0); // real total from source
@@ -415,16 +352,22 @@ const Shop = () => {
         if (sel) {
           p = p.filter(x => {
             // Check all possible category fields — Firebase stores raw WooCommerce data
-            const cats: any[] = Array.isArray((x as any).categories) ? (x as any).categories : [];
+            const cats: Array<{ id?: number; name?: string; slug?: string }> = Array.isArray(x.categories) ? x.categories : [];
+            const productCategoryName = String(x.category || '').toLowerCase().trim();
+            const productCategorySlug = slugify(x.category || '');
 
-            return cats.some((c: any) => {
+            return cats.some((c) => {
               const cId   = Number(c.id);
-              const cSlug = String(c.slug  || '').toLowerCase().trim();
+              const cSlug = slugify(String(c.slug || c.name || ''));
               const cName = String(c.name  || '').toLowerCase().trim();
               return (
                 cId   === sel.id   ||
-                cSlug === sel.slug.toLowerCase().trim() ||
-                cName === sel.name.toLowerCase().trim()
+                cSlug === slugify(sel.slug) ||
+                cSlug === slugify(sel.name) ||
+                cName === sel.name.toLowerCase().trim() ||
+                productCategorySlug === slugify(sel.slug) ||
+                productCategorySlug === slugify(sel.name) ||
+                productCategoryName === sel.name.toLowerCase().trim()
               );
             });
           });
@@ -434,8 +377,11 @@ const Shop = () => {
       if (sort === "high")   p = [...p].sort((a, b) => b.price - a.price);
       if (sort === "rating") p = [...p].sort((a, b) => b.rating - a.rating);
     }
+    const priceRule = PRICE_RANGES.find((range) => range.value === priceRange) ?? PRICE_RANGES[0];
+    p = p.filter((x) => priceRule.test(x.price));
+    if (minRating > 0) p = p.filter((x) => x.rating >= minRating);
     return p;
-  }, [activeCat, searchQuery, sort, products, categories]);
+  }, [activeCat, searchQuery, sort, products, categories, priceRange, minRating]);
 
   // ── Paginated slice ──
   const paginated = useMemo(
@@ -458,6 +404,13 @@ const Shop = () => {
 
   const clearSearch = () => setParams({});
 
+  const resetFilters = () => {
+    setSort("featured");
+    setPriceRange("all");
+    setMinRating(0);
+    setCat("all");
+  };
+
   const pageTitle = searchQuery
     ? `Search: "${searchQuery}" | Luxtronics`
     : activeCat !== "all"
@@ -466,13 +419,15 @@ const Shop = () => {
 
   // ── Loading skeleton ──
   const Skeleton = () => (
-    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
-      {Array.from({ length: 8 }).map((_, i) => (
-        <div key={i} className="rounded-3xl bg-gradient-card border border-border p-5 animate-pulse">
-          <div className="aspect-square rounded-2xl bg-secondary/40 mb-4" />
+    <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-6">
+      {Array.from({ length: 12 }).map((_, i) => (
+        <div key={i} className="rounded-2xl bg-card border border-border animate-pulse">
+          <div className="aspect-square bg-secondary/40 mb-4" />
+          <div className="px-4 pb-4">
           <div className="h-3 w-1/3 bg-secondary/40 rounded mb-2" />
           <div className="h-4 w-3/4 bg-secondary/40 rounded mb-3" />
           <div className="h-6 w-1/2 bg-secondary/40 rounded" />
+          </div>
         </div>
       ))}
     </div>
@@ -493,181 +448,159 @@ const Shop = () => {
         }}
       />
 
-      {/* ── Hero banner ── */}
-      <section className="relative overflow-hidden bg-gradient-to-br from-background via-background to-primary/5 border-b border-border">
-        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,hsl(var(--primary)/0.12),transparent_60%)]" />
-        <div className="container relative pt-28 sm:pt-32 lg:pt-36 pb-10 sm:pb-14">
-          {searchQuery ? (
-            <div className="flex flex-col sm:flex-row sm:items-end gap-4">
-              <div>
-                <div className="inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-widest text-primary mb-3 bg-primary/10 px-3 py-1.5 rounded-full">
-                  <Search className="h-3 w-3" /> Search Results
-                </div>
-                <h1 className="font-display font-bold text-4xl sm:text-5xl lg:text-6xl tracking-tight">
-                  Results for{" "}
-                  <span className="text-gradient">"{searchQuery}"</span>
-                </h1>
-                <p className="mt-3 text-muted-foreground">
-                  {loading ? "Searching…" : `${list.length} product${list.length !== 1 ? "s" : ""} found`}
-                </p>
-              </div>
-              <button
-                onClick={clearSearch}
-                className="sm:ml-auto flex items-center gap-2 px-4 py-2 rounded-full border border-border hover:border-primary/40 text-sm font-medium transition-all"
-              >
-                <X className="h-3.5 w-3.5" /> Clear search
-              </button>
-            </div>
-          ) : (
-            <div className="max-w-2xl">
-              <div className="inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-widest text-primary mb-3 bg-primary/10 px-3 py-1.5 rounded-full">
-                <Sparkles className="h-3 w-3" /> Premium Collection
-              </div>
-              <h1 className="font-display font-bold text-5xl sm:text-6xl lg:text-7xl tracking-tight leading-none">
-                {activeCat !== "all"
-                  ? <>{categories.find(c => c.slug === activeCat)?.name || "Category"} <span className="text-gradient">Products</span></>
-                  : <>All <span className="text-gradient">Products</span></>
-                }
-              </h1>
-              <p className="mt-4 text-muted-foreground text-lg max-w-lg">
-                {loading
-                  ? "Loading products…"
-                  : `${totalCount.toLocaleString()} premium electronics — free shipping, 2-year warranty.`
-                }
-              </p>
-            </div>
-          )}
-        </div>
-      </section>
-
       <section className="container py-8 sm:py-10 lg:py-12">
+        <div className="grid gap-6 lg:grid-cols-[280px_minmax(0,1fr)] xl:grid-cols-[300px_minmax(0,1fr)]">
+          <div className="hidden lg:block">
+            <div className="sticky top-24">
+              <ShopSidebar
+                categories={categories}
+                totalCount={totalCount}
+                activeCat={activeCat}
+                sort={sort}
+                priceRange={priceRange}
+                minRating={minRating}
+                onCategoryChange={setCat}
+                onSortChange={(value) => { setSort(value); setPage(1); }}
+                onPriceChange={(value) => { setPriceRange(value); setPage(1); }}
+                onRatingChange={(value) => { setMinRating(value); setPage(1); }}
+                onClear={resetFilters}
+              />
+            </div>
+          </div>
 
-        {/* ── Category pills with megamenu ── */}
-        {!searchQuery && (
-          <CategoryPills
-            categories={categories}
-            totalCount={totalCount}
-            activeCat={activeCat}
-            onSelect={setCat}
-          />
-        )}
-
-        {/* ── Toolbar ── */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-6 p-3 sm:p-4 rounded-2xl bg-gradient-card border border-border">
-          {/* Left: sort + active filter badge */}
-          <div className="flex items-center gap-3 flex-wrap">
-            <div className="flex items-center gap-2">
-              <SlidersHorizontal className="h-4 w-4 text-muted-foreground" />
-              {!searchQuery ? (
-                <div className="flex items-center gap-2">
-                  <select
-                    value={activeCat}
-                    onChange={e => { setCat(e.target.value); setPage(1); }}
-                    aria-label="Select category"
-                    className="h-9 rounded-full border border-border bg-background px-3 text-sm focus:outline-none focus:border-primary appearance-none cursor-pointer"
-                  >
-                    <option value="all">All ({totalCount.toLocaleString()})</option>
-                    {categories.map(c => (
-                      <option key={c.slug} value={c.slug}>{`${c.name} (${c.count.toLocaleString()})`}</option>
-                    ))}
-                  </select>
-
-                  <select
-                    value={sort}
-                    onChange={e => { setSort(e.target.value); setPage(1); }}
-                    className="h-9 rounded-full border border-border bg-background px-3 pr-8 text-sm focus:outline-none focus:border-primary appearance-none cursor-pointer"
-                  >
-                    <option value="featured">Featured</option>
-                    <option value="low">Price: Low → High</option>
-                    <option value="high">Price: High → Low</option>
-                    <option value="rating">Top Rated</option>
-                  </select>
+          <div className="min-w-0">
+            <div className="mb-5 rounded-2xl border border-border bg-card p-4 shadow-sm sm:p-5">
+              <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
+                <div>
+                  <div className="inline-flex items-center gap-2 rounded-full bg-primary/10 px-3 py-1.5 text-xs font-bold uppercase tracking-[0.16em] text-primary">
+                    {searchQuery ? <Search className="h-3.5 w-3.5" /> : <Sparkles className="h-3.5 w-3.5" />}
+                    {searchQuery ? "Search Results" : "Marketplace"}
+                  </div>
+                  <h1 className="mt-3 font-display text-2xl font-extrabold tracking-tight text-foreground sm:text-3xl">
+                    {searchQuery
+                      ? `Results for "${searchQuery}"`
+                      : activeCat !== "all"
+                        ? categories.find(c => c.slug === activeCat)?.name || "Products"
+                        : "All Products"}
+                  </h1>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    {loading ? "Loading products..." : `${list.length.toLocaleString()} products matched`}
+                  </p>
                 </div>
-              ) : (
-                <span className="text-sm text-muted-foreground italic">Sorted by relevance</span>
+
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+                  <div className="flex gap-2 lg:hidden">
+                    <select
+                      value={activeCat}
+                      onChange={(e) => setCat(e.target.value)}
+                      aria-label="Select category"
+                      className="h-10 min-w-0 flex-1 rounded-xl border border-border bg-background px-3 text-sm font-medium outline-none focus:border-primary"
+                    >
+                      <option value="all">All Departments</option>
+                      {categories.map(c => (
+                        <option key={c.slug} value={c.slug}>{c.name}</option>
+                      ))}
+                    </select>
+                    <select
+                      value={sort}
+                      onChange={(e) => { setSort(e.target.value); setPage(1); }}
+                      className="h-10 min-w-0 flex-1 rounded-xl border border-border bg-background px-3 text-sm font-medium outline-none focus:border-primary"
+                    >
+                      <option value="featured">Featured</option>
+                      <option value="low">Low to High</option>
+                      <option value="high">High to Low</option>
+                      <option value="rating">Top Rated</option>
+                    </select>
+                  </div>
+
+                  {searchQuery && (
+                    <button
+                      onClick={clearSearch}
+                      className="inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-border px-4 text-sm font-semibold transition-colors hover:border-primary/40 hover:text-primary"
+                    >
+                      <X className="h-4 w-4" />
+                      Clear search
+                    </button>
+                  )}
+
+                  {!loading && list.length > PAGE_SIZE && (
+                    <span className="inline-flex h-10 items-center justify-center rounded-xl bg-muted px-3 text-xs font-semibold text-muted-foreground">
+                      {(currentPage - 1) * PAGE_SIZE + 1}-{Math.min(currentPage * PAGE_SIZE, list.length)} of {list.length.toLocaleString()}
+                    </span>
+                  )}
+                </div>
+              </div>
+
+              {(activeCat !== "all" || priceRange !== "all" || minRating > 0) && (
+                <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-border pt-4">
+                  <span className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">Active</span>
+                  {activeCat !== "all" && (
+                    <button onClick={() => setCat("all")} className="inline-flex items-center gap-1.5 rounded-full bg-muted px-3 py-1.5 text-xs font-semibold">
+                      {categories.find(c => c.slug === activeCat)?.name}
+                      <X className="h-3 w-3" />
+                    </button>
+                  )}
+                  {priceRange !== "all" && (
+                    <button onClick={() => { setPriceRange("all"); setPage(1); }} className="inline-flex items-center gap-1.5 rounded-full bg-muted px-3 py-1.5 text-xs font-semibold">
+                      {PRICE_RANGES.find((range) => range.value === priceRange)?.label}
+                      <X className="h-3 w-3" />
+                    </button>
+                  )}
+                  {minRating > 0 && (
+                    <button onClick={() => { setMinRating(0); setPage(1); }} className="inline-flex items-center gap-1.5 rounded-full bg-muted px-3 py-1.5 text-xs font-semibold">
+                      {minRating}+ stars
+                      <X className="h-3 w-3" />
+                    </button>
+                  )}
+                </div>
               )}
             </div>
 
-            {activeCat !== "all" && !searchQuery && (
-              <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-primary/10 border border-primary/20 text-xs font-medium text-primary">
-                {catEmoji(categories.find(c => c.slug === activeCat)?.name || "")}
-                {categories.find(c => c.slug === activeCat)?.name}
-                <button onClick={() => setCat("all")} className="ml-1 hover:text-foreground transition-colors">
-                  <X className="h-3 w-3" />
-                </button>
+            {/* ── Error ── */}
+            {error && (
+              <div className="rounded-2xl border border-red-500/20 bg-red-500/10 p-4 mb-6">
+                <p className="text-sm text-red-400 font-medium">Failed to load products</p>
+                <p className="text-xs text-red-400/70 mt-1">{error}</p>
               </div>
             )}
-          </div>
 
-          {/* Right: count + page info */}
-          <div className="flex items-center gap-3 text-sm text-muted-foreground">
-            {!loading && (
+            {/* ── Product grid ── */}
+            {loading ? (
+              <Skeleton />
+            ) : list.length === 0 ? (
+              <div className="flex flex-col items-center justify-center rounded-2xl border border-border bg-card py-28 text-center">
+                <Search className="mb-5 h-10 w-10 text-muted-foreground" />
+                <h3 className="font-display font-bold text-2xl mb-2">No products found</h3>
+                <p className="text-muted-foreground mb-6 max-w-sm">
+                  Try changing department, price, rating, or search keyword.
+                </p>
+                <button
+                  onClick={resetFilters}
+                  className="px-6 py-3 rounded-full bg-foreground text-background text-sm font-semibold shadow-sm"
+                >
+                  Reset filters
+                </button>
+              </div>
+            ) : (
               <>
-                <span>
-                  {list.length > PAGE_SIZE
-                    ? `${(currentPage - 1) * PAGE_SIZE + 1}–${Math.min(currentPage * PAGE_SIZE, list.length)} of ${list.length.toLocaleString()}`
-                    : `${list.length.toLocaleString()} product${list.length !== 1 ? "s" : ""}`
-                  }
-                </span>
-                {list.length > PAGE_SIZE && (
-                  <span className="text-xs px-2 py-1 rounded-full bg-secondary border border-border">
-                    Page {currentPage} / {Math.ceil(list.length / PAGE_SIZE)}
-                  </span>
-                )}
+                <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-6">
+                  {paginated.map(p => (
+                    <ImageCursorCard key={p.id} imageUrl={p.image} category={p.category}>
+                      <ProductCard product={p} />
+                    </ImageCursorCard>
+                  ))}
+                </div>
+
+                <Pagination
+                  page={currentPage}
+                  total={list.length}
+                  pageSize={PAGE_SIZE}
+                  onChange={setPage}
+                />
               </>
             )}
           </div>
         </div>
-
-        {/* ── Error ── */}
-        {error && (
-          <div className="rounded-2xl border border-red-500/20 bg-red-500/10 p-4 mb-6">
-            <p className="text-sm text-red-400 font-medium">Failed to load products</p>
-            <p className="text-xs text-red-400/70 mt-1">{error}</p>
-          </div>
-        )}
-
-        {/* ── Product grid ── */}
-        {loading ? (
-          <Skeleton />
-        ) : list.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-32 text-center">
-            <div className="h-20 w-20 rounded-full bg-secondary/50 flex items-center justify-center text-4xl mb-6">
-              {searchQuery ? "🔍" : "📦"}
-            </div>
-            <h3 className="font-display font-bold text-2xl mb-2">
-              {searchQuery ? "No results found" : "No products here"}
-            </h3>
-            <p className="text-muted-foreground mb-6 max-w-sm">
-              {searchQuery
-                ? `We couldn't find anything for "${searchQuery}". Try a different keyword.`
-                : "This category is empty right now. Check back soon!"}
-            </p>
-            <button
-              onClick={clearSearch}
-              className="px-6 py-3 rounded-full bg-gradient-brand text-primary-foreground text-sm font-semibold shadow-glow"
-            >
-              {searchQuery ? "Clear search" : "Browse all products"}
-            </button>
-          </div>
-        ) : (
-          <>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
-              {paginated.map(p => (
-                <ImageCursorCard key={p.id} imageUrl={p.image} category={p.category}>
-                  <ProductCard product={p} />
-                </ImageCursorCard>
-              ))}
-            </div>
-
-            <Pagination
-              page={currentPage}
-              total={list.length}
-              pageSize={PAGE_SIZE}
-              onChange={setPage}
-            />
-          </>
-        )}
       </section>
     </Layout>
   );

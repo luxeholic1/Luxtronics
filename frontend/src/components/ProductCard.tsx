@@ -59,7 +59,7 @@ const ProductCard = ({ product }: { product: Product }) => {
       
       <Link
         to={`/product/${product.slug}`}
-        className="group relative block rounded-2xl sm:rounded-3xl bg-gradient-card border border-border dark:border-border light:border-black/8 p-4 sm:p-5 md:p-6 transition-all duration-300 hover:border-primary/50 hover:shadow-elegant-hover hover:-translate-y-1 overflow-hidden"
+        className="group relative block overflow-hidden rounded-2xl border border-border bg-card transition-all duration-300 hover:-translate-y-1 hover:border-primary/50 hover:shadow-elegant-hover sm:rounded-3xl"
         aria-label={`View ${product.name} - ${product.category}`}
         itemScope
         itemType="https://schema.org/Product"
@@ -84,7 +84,7 @@ const ProductCard = ({ product }: { product: Product }) => {
             </motion.span>
           )}
 
-          <div className="relative aspect-square rounded-lg sm:rounded-xl bg-gradient-to-br from-secondary/30 to-secondary/10 overflow-hidden mb-3 sm:mb-4 flex items-center justify-center shadow-[inset_0_1px_0_rgba(255,255,255,0.3)] border border-white/5">
+          <div className="relative aspect-square overflow-hidden bg-secondary/40">
             {/* Image loading skeleton */}
             <div className="absolute inset-0 skeleton opacity-0 group-hover:opacity-0 transition-opacity" />
             
@@ -97,7 +97,7 @@ const ProductCard = ({ product }: { product: Product }) => {
               loading="lazy"
               width={400}
               height={400}
-              className="relative h-3/4 w-3/4 object-contain transition-transform duration-500 group-hover:scale-110 will-change-transform"
+              className="relative h-full w-full object-cover transition-transform duration-500 group-hover:scale-105 will-change-transform"
               onError={(e) => {
                 (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1581091226825-a6a2a5aee158?q=80&w=400&auto=format&fit=crop';
               }}
@@ -112,11 +112,11 @@ const ProductCard = ({ product }: { product: Product }) => {
             </div>
           </div>
 
-          <div className="space-y-1.5 sm:space-y-2">
+          <div className="space-y-1.5 p-3 sm:space-y-2 sm:p-4">
             <p className="text-[10px] sm:text-xs uppercase tracking-wider text-muted-foreground font-medium">
               <span itemProp="category">{product.category}</span>
             </p>
-            <h3 className="font-display font-semibold text-sm sm:text-base leading-tight line-clamp-2 min-h-[2.5em] group-hover:text-gradient transition-all" itemProp="name">
+            <h3 className="font-display font-semibold text-sm leading-tight line-clamp-2 min-h-[2.5em] group-hover:text-gradient transition-all" itemProp="name">
               {product.name}
             </h3>
 
@@ -142,13 +142,13 @@ const ProductCard = ({ product }: { product: Product }) => {
 
             <div className="flex items-end justify-between pt-1.5 sm:pt-2">
               <div className="flex items-baseline gap-1.5 sm:gap-2" itemProp="offers" itemScope itemType="https://schema.org/Offer">
-                <span className="font-display font-bold text-lg sm:text-xl text-foreground" itemProp="price">
+                <span className="font-display font-bold text-base sm:text-lg text-foreground" itemProp="price">
                   {formatPrice(product.price)}
                 </span>
                 <meta itemProp="priceCurrency" content="USD" />
                 <meta itemProp="availability" content="https://schema.org/InStock" />
                 {product.oldPrice && (
-                  <span className="text-xs sm:text-sm text-muted-foreground line-through">
+                  <span className="text-xs text-muted-foreground line-through">
                     {formatPrice(product.oldPrice)}
                   </span>
                 )}
@@ -157,7 +157,7 @@ const ProductCard = ({ product }: { product: Product }) => {
                 onClick={handleAddToCart}
                 whileHover={{ scale: 1.1 }}
                 whileTap={{ scale: 0.95 }}
-                className="h-8 w-8 sm:h-9 sm:w-9 rounded-full bg-secondary group-hover:bg-gradient-brand flex items-center justify-center transition-all duration-300 group-hover:shadow-glow cursor-pointer"
+                className="h-8 w-8 rounded-full bg-secondary group-hover:bg-gradient-brand flex items-center justify-center transition-all duration-300 group-hover:shadow-glow cursor-pointer"
                 aria-label={`Add ${product.name} to cart`}
               >
                 <ShoppingBag className="h-3 w-3 sm:h-4 sm:w-4" />

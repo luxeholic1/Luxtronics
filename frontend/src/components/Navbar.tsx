@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, NavLink as RouterNavLink, useLocation, useNavigate } from "react-router-dom";
 import { Search, ShoppingBag, User, Menu, X, Zap, ChevronDown, LogOut, Smartphone, Tv, Headphones, Camera, Laptop, Watch, Gamepad2, Home as HomeIcon, Cpu, Battery, Globe, Package } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -9,6 +9,7 @@ import ThemeToggle from "@/components/ThemeToggle";
 import { useQuery } from "@tanstack/react-query";
 import { fetchSearchSuggestions, fetchStoreCategories } from "@/services/store-api";
 import type { StoreCategory } from "@/services/store-api";
+import type { Product } from "@/data/products";
 import { motion, AnimatePresence } from "framer-motion";
 
 // ─── Store domains ─────────────────────────────────────────────────────────────
@@ -20,10 +21,10 @@ const STORES = [
     currency: "INR",
     symbol: "₹",
     domain: "luxtronics.in",
-    color: "from-orange-500 to-amber-500",
-    bg: "bg-orange-50 dark:bg-orange-950/30",
-    border: "border-orange-400",
-    text: "text-orange-600 dark:text-orange-400",
+    color: "from-primary to-accent",
+    bg: "bg-primary/10",
+    border: "border-primary/50",
+    text: "text-primary",
   },
   {
     code: "AU",
@@ -96,6 +97,60 @@ const simpleLinks = [
 
 const megaLinks = ["Shop", "Categories"] as const;
 type MegaKey = typeof megaLinks[number];
+
+const KNOWN_BRANDS = ["apple", "samsung", "sony", "bose", "jbl", "canon", "dji", "logitech", "dyson", "gopro"];
+const SEARCH_REWRITES: Record<string, string> = {
+  airpod: "airpods",
+  airpods: "apple airpods",
+  buds: "earbuds",
+  earbud: "earbuds",
+  earpods: "earbuds",
+  magsafe: "magsafe accessories",
+  magsefe: "magsafe accessories",
+  iph: "iphone",
+  iphon: "iphone",
+  iphone: "iphone accessories",
+  samsng: "samsung",
+  samung: "samsung",
+  charger: "fast charger",
+  charging: "fast charger",
+  cover: "phone case",
+  case: "phone case",
+  watch: "smart watch",
+  smartwatch: "smart watch",
+  headphone: "headphones",
+  speaker: "bluetooth speaker",
+};
+
+function normalizeSmartQuery(value: string) {
+  const cleaned = value.toLowerCase().trim().replace(/\s+/g, " ");
+  if (!cleaned) return "";
+  return SEARCH_REWRITES[cleaned] ?? cleaned;
+}
+
+function tokeniseSearch(value: string) {
+  return value.toLowerCase().match(/[a-z0-9]+/g) ?? [];
+}
+
+function scoreSuggestion(product: Product, query: string) {
+  const q = query.toLowerCase().trim();
+  const words = tokeniseSearch(q);
+  const name = product.name.toLowerCase();
+  const category = product.category.toLowerCase();
+  const haystack = `${name} ${category} ${product.description ?? ""}`.toLowerCase();
+  let score = 0;
+
+  if (name === q) score += 1000;
+  if (name.startsWith(q)) score += 700;
+  if (category.includes(q)) score += 240;
+  if (KNOWN_BRANDS.some((brand) => q.includes(brand) && name.includes(brand))) score += 260;
+  score += words.filter((word) => name.includes(word)).length * 120;
+  score += words.filter((word) => category.includes(word)).length * 70;
+  score += words.filter((word) => haystack.includes(word)).length * 20;
+  score += (product.rating ?? 0) * 4;
+
+  return score;
+}
 
 const Navbar = () => {
   const [scrolled, setScrolled] = useState(false);
@@ -191,7 +246,7 @@ const Navbar = () => {
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
-    const q = searchQuery.trim();
+    const q = normalizeSmartQuery(searchQuery.trim());
     if (!q) return;
     navigate(`/shop?q=${encodeURIComponent(q)}`);
     setSearchOpen(false);
@@ -214,34 +269,33 @@ const Navbar = () => {
         className={cn(
           "sticky top-0 left-0 right-0 z-50 w-full transition-all duration-300",
           scrolled
-            ? "bg-white/95 dark:bg-gray-950/95 backdrop-blur-xl shadow-md border-b border-gray-200 dark:border-gray-800"
-            : "bg-white dark:bg-gray-950 border-b border-gray-100 dark:border-gray-900"
+            ? "border-b border-border/70 bg-background/88 shadow-[0_10px_30px_rgba(0,0,0,0.08)] backdrop-blur-2xl"
+            : "border-b border-border/60 bg-background/82 backdrop-blur-xl"
         )}
       >
-        <div className="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8 h-14 sm:h-16 flex items-center justify-between gap-2">
+        <div className="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8 h-14 sm:h-[68px] flex items-center justify-between gap-3">
 
           {/* ── Logo ── */}
-          <Link to="/" className="flex items-center gap-1.5 shrink-0 group">
-            <div className="h-8 w-8 rounded-lg bg-gradient-to-br from-orange-500 to-pink-600 flex items-center justify-center shadow-sm group-hover:scale-110 transition-transform duration-300">
-              <Zap className="h-4 w-4 text-white" strokeWidth={2.5} />
-            </div>
-            <span className="font-display font-bold text-lg sm:text-xl tracking-tight text-gray-900 dark:text-white">
-              Lux<span className="bg-gradient-to-r from-orange-500 to-pink-600 bg-clip-text text-transparent">tronics</span>
-            </span>
+          <Link to="/" className="flex items-center shrink-0 group" aria-label="Luxtronics home">
+            <img
+              src="/logo.jpeg"
+              alt="Luxtronics"
+              className="h-9 w-auto sm:h-11 max-w-[145px] sm:max-w-[180px] object-contain transition-transform duration-300 group-hover:scale-[1.02]"
+            />
           </Link>
 
           {/* ── Desktop nav with Megamenu ── */}
-          <nav className="hidden lg:flex items-center gap-0.5" aria-label="Main navigation">
+          <nav className="hidden lg:flex items-center gap-1 rounded-full border border-border/70 bg-muted/45 p-1 shadow-sm" aria-label="Main navigation">
             {/* Simple links */}
             <RouterNavLink
               to="/"
               end
               className={({ isActive }) =>
                 cn(
-                  "relative px-3 py-2 text-sm font-medium rounded-lg transition-colors",
+                  "relative px-3.5 py-2 text-sm font-semibold rounded-full transition-colors",
                   isActive
-                    ? "text-orange-600 dark:text-orange-400 bg-orange-50 dark:bg-orange-950/30"
-                    : "text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-800"
+                    ? "bg-background text-foreground shadow-sm"
+                    : "text-muted-foreground hover:bg-background/70 hover:text-foreground"
                 )
               }
             >
@@ -260,21 +314,21 @@ const Navbar = () => {
                 >
                   {/* Clickable link + chevron */}
                   <div className={cn(
-                    "flex items-center rounded-lg transition-colors",
+                    "flex items-center rounded-full transition-colors",
                     activeMega === key
-                      ? "text-orange-600 dark:text-orange-400 bg-orange-50 dark:bg-orange-950/30"
-                      : "text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-800"
+                      ? "bg-background text-foreground shadow-sm"
+                      : "text-muted-foreground hover:bg-background/70 hover:text-foreground"
                   )}>
                     <Link
                       to={linkTo}
                       onClick={() => setActiveMega(null)}
-                      className="px-3 py-2 text-sm font-medium"
+                      className="px-3.5 py-2 text-sm font-semibold"
                     >
                       {key}
                     </Link>
                     <button
                       onClick={() => setActiveMega(activeMega === key ? null : key)}
-                      className="pr-2 py-2"
+                      className="pr-2.5 py-2"
                       aria-label={`${key} submenu`}
                     >
                       <ChevronDown className={cn("h-3.5 w-3.5 transition-transform duration-200", activeMega === key && "rotate-180")} />
@@ -316,9 +370,9 @@ const Navbar = () => {
                                         key={cat.slug}
                                         to={`/shop?cat=${cat.slug}`}
                                         onClick={() => setActiveMega(null)}
-                                        className="flex items-center gap-2.5 px-2 py-2 rounded-lg text-sm text-gray-700 dark:text-gray-200 hover:bg-orange-50 dark:hover:bg-orange-950/20 hover:text-orange-600 dark:hover:text-orange-400 transition-colors group"
+                                        className="flex items-center gap-2.5 px-2 py-2 rounded-lg text-sm text-gray-700 dark:text-gray-200 hover:bg-primary/10 hover:text-primary transition-colors group"
                                       >
-                                        <Icon className="h-4 w-4 text-gray-400 group-hover:text-orange-500 transition-colors shrink-0" />
+                                        <Icon className="h-4 w-4 text-gray-400 group-hover:text-primary transition-colors shrink-0" />
                                         <span className="truncate">{cat.name}</span>
                                         {cat.count > 0 && (
                                           <span className="ml-auto text-[10px] text-gray-400 shrink-0">{cat.count}</span>
@@ -339,9 +393,9 @@ const Navbar = () => {
                                         key={cat.slug}
                                         to={`/shop?cat=${cat.slug}`}
                                         onClick={() => setActiveMega(null)}
-                                        className="flex items-center gap-2.5 px-2 py-2 rounded-lg text-sm text-gray-700 dark:text-gray-200 hover:bg-orange-50 dark:hover:bg-orange-950/20 hover:text-orange-600 dark:hover:text-orange-400 transition-colors group"
+                                        className="flex items-center gap-2.5 px-2 py-2 rounded-lg text-sm text-gray-700 dark:text-gray-200 hover:bg-primary/10 hover:text-primary transition-colors group"
                                       >
-                                        <Icon className="h-4 w-4 text-gray-400 group-hover:text-orange-500 transition-colors shrink-0" />
+                                        <Icon className="h-4 w-4 text-gray-400 group-hover:text-primary transition-colors shrink-0" />
                                         <span className="truncate">{cat.name}</span>
                                         {cat.count > 0 && (
                                           <span className="ml-auto text-[10px] text-gray-400 shrink-0">{cat.count}</span>
@@ -358,7 +412,7 @@ const Navbar = () => {
                               <Link
                                 to={linkTo}
                                 onClick={() => setActiveMega(null)}
-                                className="flex items-center gap-1.5 text-xs font-semibold text-orange-600 hover:text-orange-700 transition-colors"
+                                className="flex items-center gap-1.5 text-xs font-semibold text-primary hover:text-primary/80 transition-colors"
                               >
                                 <Zap className="h-3.5 w-3.5" />
                                 View all {key === "Shop" ? "products" : "categories"} →
@@ -367,7 +421,7 @@ const Navbar = () => {
                           </div>
 
                           {/* Featured panel */}
-                          <div className="w-44 bg-gradient-to-br from-orange-500 to-pink-600 p-5 flex flex-col justify-between shrink-0">
+                          <div className="w-44 bg-gradient-to-br from-primary to-accent p-5 flex flex-col justify-between shrink-0">
                             <div>
                               <span className="inline-block text-[10px] font-bold uppercase tracking-widest bg-white/20 text-white rounded-full px-2 py-0.5 mb-3">
                                 {key === "Shop" ? "New" : "Sale"}
@@ -404,10 +458,10 @@ const Navbar = () => {
                 to={l.to}
                 className={({ isActive }) =>
                   cn(
-                    "relative px-3 py-2 text-sm font-medium rounded-lg transition-colors",
+                    "relative px-3.5 py-2 text-sm font-semibold rounded-full transition-colors",
                     isActive
-                      ? "text-orange-600 dark:text-orange-400 bg-orange-50 dark:bg-orange-950/30"
-                      : "text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-800"
+                      ? "bg-background text-foreground shadow-sm"
+                      : "text-muted-foreground hover:bg-background/70 hover:text-foreground"
                   )
                 }
               >
@@ -417,7 +471,7 @@ const Navbar = () => {
           </nav>
 
           {/* ── Right actions ── */}
-          <div className="flex items-center gap-1">
+          <div className="flex items-center gap-1.5">
             <ThemeToggle />
 
             {/* Search */}
@@ -428,10 +482,10 @@ const Navbar = () => {
                 if (searchOpen) { setSearchQuery(""); setDebouncedQuery(""); }
               }}
               className={cn(
-                "h-9 w-9 rounded-full flex items-center justify-center transition-colors",
+                "h-9 w-9 rounded-full border border-transparent flex items-center justify-center transition-colors",
                 searchOpen
-                  ? "bg-orange-100 dark:bg-orange-950/40 text-orange-600"
-                  : "text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800"
+                  ? "border-primary/20 bg-primary/10 text-primary"
+                  : "text-muted-foreground hover:border-border hover:bg-muted hover:text-foreground"
               )}
             >
               {searchOpen ? <X className="h-[18px] w-[18px]" /> : <Search className="h-[18px] w-[18px]" />}
@@ -442,10 +496,10 @@ const Navbar = () => {
               <button
                 onClick={() => setStoreOpen((v) => !v)}
                 className={cn(
-                  "h-9 flex items-center gap-1.5 rounded-full px-3 text-sm font-medium transition-colors",
+                  "h-9 flex items-center gap-1.5 rounded-full border border-transparent px-3 text-sm font-semibold transition-colors",
                   storeOpen
                     ? `${currentStore.bg} ${currentStore.text} border border-current/20`
-                    : "text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800"
+                    : "text-muted-foreground hover:border-border hover:bg-muted hover:text-foreground"
                 )}
                 aria-label="Switch store region"
               >
@@ -516,11 +570,11 @@ const Navbar = () => {
             <Link
               to="/cart"
               aria-label={`Cart (${totalItems} items)`}
-              className="h-9 w-9 rounded-full flex items-center justify-center text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors relative"
+              className="h-9 w-9 rounded-full border border-transparent flex items-center justify-center text-muted-foreground hover:border-border hover:bg-muted hover:text-foreground transition-colors relative"
             >
               <ShoppingBag className="h-[18px] w-[18px]" />
               {totalItems > 0 && (
-                <span className="absolute -top-0.5 -right-0.5 h-5 w-5 rounded-full bg-gradient-to-br from-orange-500 to-pink-600 text-[10px] font-bold flex items-center justify-center text-white shadow border-2 border-white dark:border-gray-950">
+                <span className="absolute -top-0.5 -right-0.5 h-5 w-5 rounded-full bg-gradient-to-br from-primary to-accent text-[10px] font-bold flex items-center justify-center text-white shadow border-2 border-white dark:border-gray-950">
                   {totalItems > 99 ? "99+" : totalItems}
                 </span>
               )}
@@ -531,7 +585,7 @@ const Navbar = () => {
               <div className="hidden sm:flex items-center gap-1">
                 <Link
                   to="/account"
-                  className="h-8 w-8 rounded-full bg-gradient-to-br from-orange-500 to-pink-600 flex items-center justify-center text-white text-sm font-bold shadow"
+                  className="h-8 w-8 rounded-full bg-gradient-to-br from-primary to-accent flex items-center justify-center text-white text-sm font-bold shadow"
                   aria-label="My account"
                 >
                   {avatarLabel}
@@ -548,20 +602,20 @@ const Navbar = () => {
               <div className="hidden sm:flex items-center gap-2">
                 <Link
                   to="/account/login"
-                  className="h-9 w-9 rounded-full flex items-center justify-center text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+                  className="h-9 w-9 rounded-full border border-transparent flex items-center justify-center text-muted-foreground hover:border-border hover:bg-muted hover:text-foreground transition-colors"
                   aria-label="Sign in"
                 >
                   <User className="h-[18px] w-[18px]" />
                 </Link>
                 <Link
                   to="/account/login"
-                  className="hidden md:inline-flex h-9 items-center rounded-full border border-gray-300 dark:border-gray-600 px-4 text-sm font-medium text-gray-700 dark:text-gray-200 hover:border-orange-400 hover:text-orange-600 transition-colors"
+                  className="hidden md:inline-flex h-9 items-center rounded-full border border-border px-4 text-sm font-semibold text-foreground hover:border-primary/50 hover:text-primary transition-colors"
                 >
                   Sign in
                 </Link>
                 <Link
                   to="/account/register"
-                  className="hidden md:inline-flex h-9 items-center rounded-full bg-gradient-to-r from-orange-500 to-pink-600 px-4 text-sm font-semibold text-white shadow hover:shadow-md hover:scale-105 active:scale-95 transition-all"
+                  className="hidden md:inline-flex h-9 items-center rounded-full bg-foreground px-4 text-sm font-semibold text-background shadow-sm hover:scale-[1.03] active:scale-95 transition-all"
                 >
                   Sign up
                 </Link>
@@ -573,7 +627,7 @@ const Navbar = () => {
               aria-label={mobileOpen ? "Close menu" : "Open menu"}
               aria-expanded={mobileOpen}
               onClick={() => setMobileOpen((v) => !v)}
-              className="lg:hidden h-9 w-9 rounded-full flex items-center justify-center text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors ml-1"
+              className="lg:hidden h-9 w-9 rounded-full border border-transparent flex items-center justify-center text-foreground hover:border-border hover:bg-muted transition-colors ml-1"
             >
               {mobileOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
             </button>
@@ -608,7 +662,7 @@ const Navbar = () => {
                     {searchQuery && (
                       <button
                         type="submit"
-                        className="shrink-0 rounded-full bg-gradient-to-r from-orange-500 to-pink-600 px-4 py-1.5 text-xs font-semibold text-white shadow hover:shadow-md transition-all"
+                        className="shrink-0 rounded-full bg-gradient-to-r from-primary to-accent px-4 py-1.5 text-xs font-semibold text-white shadow hover:shadow-md transition-all"
                       >
                         Search
                       </button>
@@ -635,6 +689,7 @@ const Navbar = () => {
                         <SearchSuggestions
                           query={searchQuery}
                           debouncedQuery={debouncedQuery}
+                          categories={navCategories}
                           onSelect={() => { setSearchOpen(false); setSearchQuery(""); setDebouncedQuery(""); }}
                         />
                       </motion.div>
@@ -670,13 +725,17 @@ const Navbar = () => {
             >
               {/* Drawer header */}
               <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 dark:border-gray-800">
-                <Link to="/" onClick={() => setMobileOpen(false)} className="flex items-center gap-1.5">
-                  <div className="h-7 w-7 rounded-lg bg-gradient-to-br from-orange-500 to-pink-600 flex items-center justify-center">
-                    <Zap className="h-3.5 w-3.5 text-white" strokeWidth={2.5} />
-                  </div>
-                  <span className="font-display font-bold text-base text-gray-900 dark:text-white">
-                    Lux<span className="bg-gradient-to-r from-orange-500 to-pink-600 bg-clip-text text-transparent">tronics</span>
-                  </span>
+                <Link
+                  to="/"
+                  onClick={() => setMobileOpen(false)}
+                  className="flex items-center"
+                  aria-label="Luxtronics home"
+                >
+                  <img
+                    src="/logo.jpeg"
+                    alt="Luxtronics"
+                    className="h-10 w-auto max-w-[155px] object-contain"
+                  />
                 </Link>
                 <button
                   onClick={() => setMobileOpen(false)}
@@ -715,7 +774,7 @@ const Navbar = () => {
                     cn(
                       "flex items-center px-4 py-3.5 rounded-xl text-base font-medium transition-colors mb-1",
                       isActive
-                        ? "bg-orange-50 dark:bg-orange-950/30 text-orange-600 dark:text-orange-400"
+                        ? "bg-primary/10 text-primary"
                         : "text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800"
                     )
                   }
@@ -769,7 +828,7 @@ const Navbar = () => {
                                       key={cat.slug}
                                       to={`/shop?cat=${cat.slug}`}
                                       onClick={() => { setMobileOpen(false); setMobileExpanded(null); }}
-                                      className="flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-sm text-gray-600 dark:text-gray-300 hover:bg-orange-50 dark:hover:bg-orange-950/20 hover:text-orange-600 transition-colors"
+                                      className="flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-sm text-gray-600 dark:text-gray-300 hover:bg-primary/10 hover:text-primary transition-colors"
                                     >
                                       <Icon className="h-4 w-4 text-gray-400 shrink-0" />
                                       <span className="flex-1">{cat.name}</span>
@@ -783,7 +842,7 @@ const Navbar = () => {
                               <Link
                                 to={linkTo}
                                 onClick={() => { setMobileOpen(false); setMobileExpanded(null); }}
-                                className="flex items-center gap-2 px-3 py-2.5 rounded-lg text-sm font-semibold text-orange-600 hover:bg-orange-50 transition-colors"
+                                className="flex items-center gap-2 px-3 py-2.5 rounded-lg text-sm font-semibold text-primary hover:bg-primary/10 transition-colors"
                               >
                                 <Zap className="h-4 w-4" />
                                 View all {key === "Shop" ? "products" : "categories"}
@@ -806,7 +865,7 @@ const Navbar = () => {
                       cn(
                         "flex items-center px-4 py-3.5 rounded-xl text-base font-medium transition-colors mb-1",
                         isActive
-                          ? "bg-orange-50 dark:bg-orange-950/30 text-orange-600 dark:text-orange-400"
+                          ? "bg-primary/10 text-primary"
                           : "text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800"
                       )
                     }
@@ -862,14 +921,14 @@ const Navbar = () => {
                     <Link
                       to="/account/login"
                       onClick={() => setMobileOpen(false)}
-                      className="flex-1 rounded-xl border border-gray-300 dark:border-gray-600 px-4 py-3 text-sm font-medium text-center text-gray-700 dark:text-gray-200 hover:border-orange-400 transition-colors"
+                      className="flex-1 rounded-xl border border-gray-300 dark:border-gray-600 px-4 py-3 text-sm font-medium text-center text-gray-700 dark:text-gray-200 hover:border-primary/50 transition-colors"
                     >
                       Sign in
                     </Link>
                     <Link
                       to="/account/register"
                       onClick={() => setMobileOpen(false)}
-                      className="flex-1 rounded-xl bg-gradient-to-r from-orange-500 to-pink-600 px-4 py-3 text-sm font-semibold text-white text-center shadow hover:shadow-md transition-all"
+                      className="flex-1 rounded-xl bg-gradient-to-r from-primary to-accent px-4 py-3 text-sm font-semibold text-white text-center shadow hover:shadow-md transition-all"
                     >
                       Sign up
                     </Link>
@@ -889,22 +948,52 @@ const Navbar = () => {
 const SearchSuggestions = ({
   query,
   debouncedQuery,
+  categories,
   onSelect,
 }: {
   query: string;
   debouncedQuery: string;
+  categories: StoreCategory[];
   onSelect: () => void;
 }) => {
   const { formatPrice } = useCurrency();
   const isTyping = query.trim() !== debouncedQuery;
+  const smartQuery = normalizeSmartQuery(debouncedQuery);
 
   const { data: suggestions = [], isLoading, isError, error } = useQuery({
-    queryKey: ["search-suggestions", debouncedQuery],
-    queryFn: () => fetchSearchSuggestions(debouncedQuery),
+    queryKey: ["search-suggestions", smartQuery],
+    queryFn: () => fetchSearchSuggestions(smartQuery),
     enabled: debouncedQuery.length >= 2 && !isTyping,
     staleTime: 1000 * 60 * 5,
     retry: 1,
   });
+
+  const rankedSuggestions = useMemo(() => {
+    return [...suggestions]
+      .map((product) => ({ product, score: scoreSuggestion(product, smartQuery) }))
+      .sort((a, b) => b.score - a.score)
+      .map(({ product }) => product)
+      .slice(0, 6);
+  }, [suggestions, smartQuery]);
+
+  const categoryMatches = useMemo(() => {
+    const words = tokeniseSearch(smartQuery);
+    if (words.length === 0) return [];
+    return categories
+      .filter((cat) => {
+        const name = cat.name.toLowerCase();
+        const slug = cat.slug.toLowerCase();
+        return words.some((word) => name.includes(word) || slug.includes(word));
+      })
+      .slice(0, 3);
+  }, [categories, smartQuery]);
+
+  const brandMatches = useMemo(() => {
+    const q = smartQuery.toLowerCase();
+    return KNOWN_BRANDS.filter((brand) => brand.includes(q) || q.includes(brand)).slice(0, 3);
+  }, [smartQuery]);
+
+  const hasSmartRewrite = smartQuery !== debouncedQuery.toLowerCase().trim();
 
   if (isTyping || isLoading) {
     return (
@@ -932,22 +1021,71 @@ const SearchSuggestions = ({
     );
   }
 
-  if (suggestions.length === 0) {
+  if (rankedSuggestions.length === 0 && categoryMatches.length === 0 && brandMatches.length === 0) {
     return (
       <div className="p-6 text-center">
         <p className="text-sm text-gray-500">
           No products found for <span className="font-medium text-gray-900 dark:text-white">"{debouncedQuery}"</span>
         </p>
+        <Link
+          to="/categories"
+          onClick={onSelect}
+          className="mt-3 inline-flex rounded-full border border-gray-200 px-4 py-2 text-xs font-semibold text-gray-600 transition-colors hover:border-primary/50 hover:text-primary dark:border-gray-700 dark:text-gray-300"
+        >
+          Browse categories
+        </Link>
       </div>
     );
   }
 
   return (
     <div className="max-h-[400px] overflow-y-auto py-2 scrollbar-hidden">
+      {(hasSmartRewrite || categoryMatches.length > 0 || brandMatches.length > 0) && (
+        <div className="border-b border-gray-100 px-4 pb-3 dark:border-gray-800">
+          {hasSmartRewrite && (
+            <Link
+              to={`/shop?q=${encodeURIComponent(smartQuery)}`}
+              onClick={onSelect}
+              className="mb-2 flex items-center justify-between rounded-xl border border-primary/30 bg-primary/10 px-3 py-2 text-xs font-semibold text-primary transition-colors hover:bg-primary/15 dark:border-primary/30 dark:bg-primary/10 dark:text-primary"
+            >
+              <span>Smart search: "{smartQuery}"</span>
+              <Search className="h-3.5 w-3.5" />
+            </Link>
+          )}
+
+          <div className="flex flex-wrap gap-2">
+            {categoryMatches.map((cat) => {
+              const Icon = getCatIcon(cat.name);
+              return (
+                <Link
+                  key={cat.slug}
+                  to={`/shop?cat=${cat.slug}`}
+                  onClick={onSelect}
+                  className="inline-flex items-center gap-1.5 rounded-full border border-gray-200 bg-white px-3 py-1.5 text-xs font-semibold text-gray-700 transition-colors hover:border-primary/50 hover:text-primary dark:border-gray-700 dark:bg-gray-950 dark:text-gray-200"
+                >
+                  <Icon className="h-3.5 w-3.5" />
+                  {cat.name}
+                </Link>
+              );
+            })}
+            {brandMatches.map((brand) => (
+              <Link
+                key={brand}
+                to={`/shop?q=${encodeURIComponent(`${brand} accessories`)}`}
+                onClick={onSelect}
+                className="inline-flex items-center gap-1.5 rounded-full border border-gray-200 bg-white px-3 py-1.5 text-xs font-semibold capitalize text-gray-700 transition-colors hover:border-primary/50 hover:text-primary dark:border-gray-700 dark:bg-gray-950 dark:text-gray-200"
+              >
+                {brand} accessories
+              </Link>
+            ))}
+          </div>
+        </div>
+      )}
+
       <p className="px-4 pb-2 text-[10px] font-semibold uppercase tracking-widest text-gray-400">
-        Suggestions ({suggestions.length})
+        Best matches ({rankedSuggestions.length})
       </p>
-      {suggestions.map((product) => (
+      {rankedSuggestions.map((product) => (
         <Link
           key={product.id}
           to={`/product/${product.slug}`}
@@ -961,15 +1099,15 @@ const SearchSuggestions = ({
             <p className="text-sm font-medium text-gray-900 dark:text-white truncate">{product.name}</p>
             <p className="text-[10px] text-gray-500 uppercase tracking-wider">{product.category}</p>
           </div>
-          <div className="text-sm font-semibold text-orange-600 shrink-0">{formatPrice(product.price)}</div>
+          <div className="text-sm font-semibold text-primary shrink-0">{formatPrice(product.price)}</div>
         </Link>
       ))}
       <Link
-        to={`/shop?q=${encodeURIComponent(debouncedQuery)}`}
+        to={`/shop?q=${encodeURIComponent(smartQuery)}`}
         onClick={onSelect}
-        className="block w-full p-3 text-center text-xs font-medium text-gray-500 hover:text-orange-600 transition-colors border-t border-gray-100 dark:border-gray-800"
+        className="block w-full p-3 text-center text-xs font-medium text-gray-500 hover:text-primary transition-colors border-t border-gray-100 dark:border-gray-800"
       >
-        View all results for <span className="font-semibold">"{debouncedQuery}"</span>
+        View all results for <span className="font-semibold">"{smartQuery}"</span>
       </Link>
     </div>
   );
