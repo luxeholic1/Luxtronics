@@ -101,7 +101,7 @@ const LimitedEdition = () => {
       <motion.video
         style={{ y: videoY, scale: videoScale }}
         className="absolute -inset-y-16 inset-x-0 h-[calc(100%+8rem)] w-full object-cover will-change-transform"
-        src="/v7.mp4"
+        src="/v8.mp4"
         autoPlay
         muted
         loop
