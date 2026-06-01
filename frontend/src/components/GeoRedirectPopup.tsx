@@ -1,8 +1,9 @@
 /**
  * GeoRedirectPopup
  * Jeep-style country selector popup.
- * Shows immediately (no delay) when the user's detected country
- * doesn't match the current domain's country.
+ * Shows immediately on AU/NZ domains so visitors can continue there
+ * or switch back to the India store. On the India domain, it still
+ * suggests AU/NZ when IP detection says the user is there.
  *
  * Three stores:
  *   India   → luxtronics.in
@@ -37,7 +38,8 @@ const IP_TO_STORE: Record<string, string> = {
   PK: "IN", BD: "IN", LK: "IN", NP: "IN",
 };
 
-const STORAGE_KEY = "lux_geo_dismissed";
+const STORAGE_KEY_PREFIX = "lux_geo_prompt_v2";
+const DEFAULT_HOME_STORE = "IN";
 
 function getCurrentStoreCode(): string {
   const host = window.location.hostname.replace(/^www\./, "");
@@ -80,10 +82,25 @@ export default function GeoRedirectPopup() {
   const [show, setShow]           = useState(false);
   const [suggestedCode, setSuggested] = useState<string | null>(null);
   const currentCode = getCurrentStoreCode();
+  const currentStore  = STORES.find(s => s.code === currentCode)!;
+  const suggestedStore = STORES.find(s => s.code === suggestedCode);
+  const storageKey = suggestedCode
+    ? `${STORAGE_KEY_PREFIX}_${currentCode}_to_${suggestedCode}`
+    : `${STORAGE_KEY_PREFIX}_${currentCode}`;
 
   useEffect(() => {
-    // Don't show if user already dismissed this session
-    if (sessionStorage.getItem(STORAGE_KEY)) return;
+    // AU/NZ domains must always offer India as the home-store switch.
+    if (currentCode !== DEFAULT_HOME_STORE) {
+      const key = `${STORAGE_KEY_PREFIX}_${currentCode}_to_${DEFAULT_HOME_STORE}`;
+      if (sessionStorage.getItem(key)) return;
+      setSuggested(DEFAULT_HOME_STORE);
+      setShow(true);
+      return;
+    }
+
+    const dismissedPrefix = `${STORAGE_KEY_PREFIX}_${currentCode}_to_`;
+    const dismissedAny = Object.keys(sessionStorage).some((key) => key.startsWith(dismissedPrefix));
+    if (dismissedAny) return;
 
     detectIPCountry().then(ipCode => {
       if (!ipCode) return;
@@ -96,17 +113,14 @@ export default function GeoRedirectPopup() {
   }, [currentCode]);
 
   const dismiss = () => {
-    sessionStorage.setItem(STORAGE_KEY, "1");
+    sessionStorage.setItem(storageKey, "1");
     setShow(false);
   };
 
   const goToStore = (domain: string) => {
-    sessionStorage.setItem(STORAGE_KEY, "1");
+    sessionStorage.setItem(storageKey, "1");
     window.location.href = `https://${domain}`;
   };
-
-  const currentStore  = STORES.find(s => s.code === currentCode)!;
-  const suggestedStore = STORES.find(s => s.code === suggestedCode);
 
   return (
     <AnimatePresence>
@@ -148,9 +162,9 @@ export default function GeoRedirectPopup() {
               {/* Body */}
               <div className="px-6 py-5">
                 <p className="text-sm text-muted-foreground mb-6 text-center">
-                  You are currently on the <strong className="text-foreground">{currentStore.country}</strong> store,
-                  but we detected you are in <strong className="text-foreground">{suggestedStore.country}</strong>.
-                  Switch to your local store for the right currency and availability.
+                  You are currently in the <strong className="text-foreground">{currentStore.country}</strong> store.
+                  Continue here or switch to the <strong className="text-foreground">{suggestedStore.country}</strong> store
+                  for the right currency and availability.
                 </p>
 
                 <div className="grid grid-cols-2 gap-4">
