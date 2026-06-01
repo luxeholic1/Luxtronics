@@ -48,13 +48,32 @@ function getCurrentStoreCode(): string {
 }
 
 async function detectIPCountry(): Promise<string | null> {
-  try {
-    const res = await fetch("https://ipapi.co/json/?fields=country_code", { signal: AbortSignal.timeout(3000) });
-    const data = await res.json();
-    return data.country_code || null;
-  } catch {
-    return null;
+  const providers = [
+    {
+      url: "https://ipapi.co/json/?fields=country_code",
+      parse: (data: { country_code?: string }) => data.country_code,
+    },
+    {
+      url: "https://ipwho.is/",
+      parse: (data: { country_code?: string; success?: boolean }) => data.success === false ? null : data.country_code,
+    },
+  ];
+
+  for (const provider of providers) {
+    try {
+      const controller = new AbortController();
+      const timer = window.setTimeout(() => controller.abort(), 3000);
+      const res = await fetch(provider.url, { signal: controller.signal, cache: "no-store" });
+      window.clearTimeout(timer);
+      const data = await res.json();
+      const code = provider.parse(data);
+      if (code) return code.toUpperCase();
+    } catch {
+      // Try the next provider.
+    }
   }
+
+  return null;
 }
 
 export default function GeoRedirectPopup() {
@@ -74,7 +93,7 @@ export default function GeoRedirectPopup() {
       setSuggested(storeCode);
       setShow(true);
     });
-  }, []);
+  }, [currentCode]);
 
   const dismiss = () => {
     sessionStorage.setItem(STORAGE_KEY, "1");
@@ -129,8 +148,9 @@ export default function GeoRedirectPopup() {
               {/* Body */}
               <div className="px-6 py-5">
                 <p className="text-sm text-muted-foreground mb-6 text-center">
-                  We detected you're in <strong className="text-foreground">{suggestedStore.country}</strong>.
-                  Would you like to visit your local store?
+                  You are currently on the <strong className="text-foreground">{currentStore.country}</strong> store,
+                  but we detected you are in <strong className="text-foreground">{suggestedStore.country}</strong>.
+                  Switch to your local store for the right currency and availability.
                 </p>
 
                 <div className="grid grid-cols-2 gap-4">

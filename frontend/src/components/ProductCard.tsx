@@ -5,7 +5,6 @@ import type { Product } from "@/data/products";
 import { cn } from "@/lib/utils";
 import { useCurrency } from "@/context/CurrencyContext";
 import { useCart } from "@/context/CartContext";
-import { toast } from "sonner";
 
 const badgeStyles: Record<string, string> = {
   New: "bg-foreground text-background",
@@ -21,9 +20,6 @@ const ProductCard = ({ product }: { product: Product }) => {
     e.preventDefault(); // Prevent navigation to product page
     e.stopPropagation();
     addItem(product, 1);
-    toast.success(`${product.name} added to cart!`, {
-      duration: 2000,
-    });
   };
   
   // Generate structured data for SEO

@@ -10,7 +10,6 @@ import { useCart } from "@/context/CartContext";
 import { fetchStoreProduct, fetchStoreProducts, mapStoreProductToLocalProduct } from "@/services/store-api";
 import { sanitizeHtml } from "@/lib/sanitize";
 import { redirectToWooCheckout } from "@/lib/woo-checkout";
-import { toast } from "sonner";
 import SEO from "@/components/SEO";
 import type { Product } from "@/data/products";
 
@@ -133,10 +132,6 @@ const ProductDetail = () => {
     setAddedToCart(true);
     setTimeout(() => setAddedToCart(false), 2000);
     
-    // Show toast notification
-    toast.success(`${product.name} added to cart!`, {
-      duration: 2000,
-    });
   };
 
   const related = useMemo(() => relatedProducts, [relatedProducts]);
