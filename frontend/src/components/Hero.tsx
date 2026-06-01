@@ -1,6 +1,5 @@
 import { motion } from "framer-motion";
 import { ArrowRight, BadgeCheck, ShieldCheck, Truck, Zap } from "lucide-react";
-import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 
 const trustItems = [
@@ -16,39 +15,20 @@ const stats = [
 ];
 
 const Hero = () => {
-  const [loadVideo, setLoadVideo] = useState(false);
-  const [videoReady, setVideoReady] = useState(false);
-
-  useEffect(() => {
-    const timer = window.setTimeout(() => setLoadVideo(true), 650);
-    return () => window.clearTimeout(timer);
-  }, []);
-
   return (
     <section className="relative isolate w-full overflow-hidden bg-black text-white" aria-label="Luxtronics hero">
       <div className="relative min-h-[680px] sm:min-h-[720px] lg:min-h-[760px]">
-        <img
-          src="/a6.jpg"
-          alt=""
-          loading="eager"
-          decoding="async"
-          className={`absolute inset-0 h-full w-full object-cover transition-opacity duration-700 ${videoReady ? "opacity-0" : "opacity-100"}`}
-          aria-hidden="true"
-        />
-        {loadVideo && (
-          <video
-            autoPlay
-            muted
-            loop
-            playsInline
-            preload="none"
-            poster="/a6.jpg"
-            onCanPlay={() => setVideoReady(true)}
-            className={`absolute inset-0 h-full w-full object-cover transition-opacity duration-700 ${videoReady ? "opacity-100" : "opacity-0"}`}
-          >
-            <source src="/v5.mp4" type="video/mp4" />
-          </video>
-        )}
+        <video
+          autoPlay
+          muted
+          loop
+          playsInline
+          preload="auto"
+          poster="/a6.jpg"
+          className="absolute inset-0 h-full w-full object-cover"
+        >
+          <source src="/v5.mp4" type="video/mp4" />
+        </video>
 
 
         <div className="relative z-10 mx-auto flex min-h-[680px] max-w-[1400px] items-center px-5 py-24 sm:min-h-[720px] sm:px-8 lg:min-h-[760px] lg:px-16">
