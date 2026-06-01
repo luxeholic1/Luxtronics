@@ -15,7 +15,7 @@ const BrandMarquee = () => {
       <div className="mx-auto mb-6 flex max-w-[1400px] flex-col gap-2 px-5 text-center sm:mb-8 sm:px-8">
         <p className="text-xs font-bold uppercase tracking-[0.24em] text-primary">Brand accessories</p>
         <h2 className="font-display text-2xl font-bold tracking-tight text-foreground sm:text-3xl md:text-4xl">
-          We sell accessories from top brands, trusted for quality and performance.
+          We sell accessories for top brands, trusted for quality and performance.
         </h2>
       </div>
 
