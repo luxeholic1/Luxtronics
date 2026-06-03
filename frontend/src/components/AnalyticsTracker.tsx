@@ -12,6 +12,19 @@ const getElementLabel = (element: HTMLElement) => {
   return element.tagName.toLowerCase();
 };
 
+const getProductMeta = (element: HTMLElement) => {
+  const productElement = element.closest("[data-product-id],[data-product-slug],[data-product-name]") as HTMLElement | null;
+  if (!productElement) return {};
+  const price = productElement.getAttribute("data-product-price");
+  return {
+    productId: productElement.getAttribute("data-product-id") || undefined,
+    productName: productElement.getAttribute("data-product-name") || undefined,
+    productSlug: productElement.getAttribute("data-product-slug") || undefined,
+    productCategory: productElement.getAttribute("data-product-category") || undefined,
+    productPrice: price ? Number(price) : undefined,
+  };
+};
+
 const AnalyticsTracker = () => {
   const location = useLocation();
 
@@ -123,8 +136,9 @@ const AnalyticsTracker = () => {
       const label = getElementLabel(clickable);
       const href = clickable instanceof HTMLAnchorElement ? clickable.href : clickable.getAttribute("data-href") || undefined;
       const lower = label.toLowerCase();
+      const productMeta = getProductMeta(clickable);
       const type =
-        lower.includes("buy") || lower.includes("cart") || lower.includes("checkout")
+        lower.includes("buy") || lower.includes("cart") || lower.includes("checkout") || Boolean(productMeta.productSlug)
           ? "product_intent"
           : "click";
 
@@ -133,10 +147,15 @@ const AnalyticsTracker = () => {
         label,
         href,
         path: `${window.location.pathname}${window.location.search}`,
+        ...productMeta,
       });
       updateLiveVisitor({
         lastAction: label,
         path: `${window.location.pathname}${window.location.search}`,
+        currentProductId: productMeta.productId,
+        currentProductName: productMeta.productName,
+        currentProductSlug: productMeta.productSlug,
+        currentProductCategory: productMeta.productCategory,
       });
     };
 

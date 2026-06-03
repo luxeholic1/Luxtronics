@@ -1,4 +1,13 @@
-export type AnalyticsEventType = "page_view" | "section_view" | "click" | "search" | "product_intent";
+export type AnalyticsEventType = "page_view" | "section_view" | "click" | "search" | "product_intent" | "product_view";
+
+export type AnalyticsLocation = {
+  timezone?: string;
+  locale?: string;
+  country?: string;
+  city?: string;
+  latitude?: number;
+  longitude?: number;
+};
 
 export type AnalyticsEvent = {
   id: string;
@@ -15,6 +24,17 @@ export type AnalyticsEvent = {
   device: "mobile" | "tablet" | "desktop";
   browser: string;
   countryStore?: string;
+  timezone?: string;
+  locale?: string;
+  country?: string;
+  city?: string;
+  latitude?: number;
+  longitude?: number;
+  productId?: string | number;
+  productName?: string;
+  productSlug?: string;
+  productCategory?: string;
+  productPrice?: number;
   sessionId: string;
   timestamp: number;
 };
@@ -32,6 +52,16 @@ export type LiveVisitor = {
   device: AnalyticsEvent["device"];
   browser: string;
   countryStore?: string;
+  timezone?: string;
+  locale?: string;
+  country?: string;
+  city?: string;
+  latitude?: number;
+  longitude?: number;
+  currentProductId?: string | number;
+  currentProductName?: string;
+  currentProductSlug?: string;
+  currentProductCategory?: string;
   referrer: string;
   startedAt: number;
   lastSeenAt: number;
@@ -79,6 +109,20 @@ export function getBrowserName() {
   if (/Safari/i.test(agent)) return "Safari";
   if (/Firefox/i.test(agent)) return "Firefox";
   return "Browser";
+}
+
+export function getApproxLocation(): AnalyticsLocation {
+  const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+  const locale = navigator.language || "unknown";
+  const store = localStorage.getItem("lux_store_code") || "";
+  const countryFromLocale = locale.includes("-") ? locale.split("-").pop()?.toUpperCase() : undefined;
+  const country =
+    store === "IN" ? "India" :
+    store === "AU" ? "Australia" :
+    store === "NZ" ? "New Zealand" :
+    countryFromLocale;
+
+  return { timezone, locale, country };
 }
 
 export function getTrafficSource() {
@@ -148,6 +192,7 @@ export function updateLiveVisitor(input: Partial<LiveVisitor> = {}) {
   if (typeof window === "undefined") return;
 
   const traffic = getTrafficSource();
+  const location = getApproxLocation();
   const sessionId = getSessionId();
   const existing = readLiveVisitors().find((visitor) => visitor.sessionId === sessionId);
   const visitor: LiveVisitor = {
@@ -163,6 +208,16 @@ export function updateLiveVisitor(input: Partial<LiveVisitor> = {}) {
     device: getDeviceType(),
     browser: getBrowserName(),
     countryStore: localStorage.getItem("lux_store_code") || existing?.countryStore,
+    timezone: input.timezone || existing?.timezone || location.timezone,
+    locale: input.locale || existing?.locale || location.locale,
+    country: input.country || existing?.country || location.country,
+    city: input.city || existing?.city || location.city,
+    latitude: input.latitude ?? existing?.latitude ?? location.latitude,
+    longitude: input.longitude ?? existing?.longitude ?? location.longitude,
+    currentProductId: input.currentProductId ?? existing?.currentProductId,
+    currentProductName: input.currentProductName ?? existing?.currentProductName,
+    currentProductSlug: input.currentProductSlug ?? existing?.currentProductSlug,
+    currentProductCategory: input.currentProductCategory ?? existing?.currentProductCategory,
     referrer: document.referrer || existing?.referrer || "direct",
     startedAt: existing?.startedAt || getSessionStartedAt(),
     lastSeenAt: Date.now(),
@@ -211,6 +266,7 @@ export function trackAnalyticsEvent(input: Partial<AnalyticsEvent> & { type: Ana
   if (typeof window === "undefined") return;
 
   const traffic = getTrafficSource();
+  const location = getApproxLocation();
   const event: AnalyticsEvent = {
     id: nowId(),
     type: input.type,
@@ -226,6 +282,17 @@ export function trackAnalyticsEvent(input: Partial<AnalyticsEvent> & { type: Ana
     device: getDeviceType(),
     browser: getBrowserName(),
     countryStore: localStorage.getItem("lux_store_code") || undefined,
+    timezone: input.timezone || location.timezone,
+    locale: input.locale || location.locale,
+    country: input.country || location.country,
+    city: input.city || location.city,
+    latitude: input.latitude ?? location.latitude,
+    longitude: input.longitude ?? location.longitude,
+    productId: input.productId,
+    productName: input.productName,
+    productSlug: input.productSlug,
+    productCategory: input.productCategory,
+    productPrice: input.productPrice,
     sessionId: getSessionId(),
     timestamp: Date.now(),
   };
@@ -237,6 +304,10 @@ export function trackAnalyticsEvent(input: Partial<AnalyticsEvent> & { type: Ana
     title: event.title,
     section: event.section,
     lastAction: event.label || event.section || event.type.replace("_", " "),
+    currentProductId: event.productId,
+    currentProductName: event.productName,
+    currentProductSlug: event.productSlug,
+    currentProductCategory: event.productCategory,
   });
 
   window.dispatchEvent(new CustomEvent("lux-analytics-event", { detail: event }));

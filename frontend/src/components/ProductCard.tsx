@@ -57,6 +57,12 @@ const ProductCard = ({ product }: { product: Product }) => {
         to={`/product/${product.slug}`}
         className="group relative block overflow-hidden rounded-xl border border-border bg-card transition-all duration-300 hover:-translate-y-0.5 hover:border-primary/50 hover:shadow-elegant-hover sm:rounded-2xl"
         aria-label={`View ${product.name} - ${product.category}`}
+        data-analytics-label={`Viewed ${product.name}`}
+        data-product-id={product.id}
+        data-product-name={product.name}
+        data-product-slug={product.slug}
+        data-product-category={product.category}
+        data-product-price={product.price}
         itemScope
         itemType="https://schema.org/Product"
       >
@@ -155,6 +161,12 @@ const ProductCard = ({ product }: { product: Product }) => {
                 whileTap={{ scale: 0.95 }}
                 className="h-7 w-7 shrink-0 rounded-full bg-secondary group-hover:bg-gradient-brand flex items-center justify-center transition-all duration-300 group-hover:shadow-glow cursor-pointer"
                 aria-label={`Add ${product.name} to cart`}
+                data-analytics-label={`Add ${product.name} to cart`}
+                data-product-id={product.id}
+                data-product-name={product.name}
+                data-product-slug={product.slug}
+                data-product-category={product.category}
+                data-product-price={product.price}
               >
                 <ShoppingBag className="h-3 w-3" />
               </motion.button>

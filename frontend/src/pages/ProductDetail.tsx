@@ -10,6 +10,7 @@ import { useCart } from "@/context/CartContext";
 import { fetchStoreProduct, fetchStoreProducts, mapStoreProductToLocalProduct } from "@/services/store-api";
 import { sanitizeHtml } from "@/lib/sanitize";
 import { redirectToWooCheckout } from "@/lib/woo-checkout";
+import { trackAnalyticsEvent, updateLiveVisitor } from "@/lib/analytics";
 import SEO from "@/components/SEO";
 import type { Product } from "@/data/products";
 
@@ -136,6 +137,31 @@ const ProductDetail = () => {
   };
 
   const related = useMemo(() => relatedProducts, [relatedProducts]);
+
+  useEffect(() => {
+    if (!product) return;
+    trackAnalyticsEvent({
+      type: "product_view",
+      path: `/product/${product.slug}`,
+      title: product.name,
+      label: product.name,
+      productId: product.id,
+      productName: product.name,
+      productSlug: product.slug,
+      productCategory: product.category,
+      productPrice: product.price,
+    });
+    updateLiveVisitor({
+      path: `/product/${product.slug}`,
+      title: product.name,
+      section: "Product detail",
+      lastAction: `Viewing ${product.name}`,
+      currentProductId: product.id,
+      currentProductName: product.name,
+      currentProductSlug: product.slug,
+      currentProductCategory: product.category,
+    });
+  }, [product]);
 
   // ─── Unique attribute names ──────────────────────────────────────────────
   const attributeNames: string[] = useMemo(() => {
@@ -485,6 +511,16 @@ const ProductDetail = () => {
             <div className="mt-5 flex flex-col sm:flex-row gap-3">
               <button
                 onClick={() => {
+                  trackAnalyticsEvent({
+                    type: "product_intent",
+                    label: `Buy now ${product.name}`,
+                    path: `/product/${product.slug}`,
+                    productId: product.id,
+                    productName: product.name,
+                    productSlug: product.slug,
+                    productCategory: product.category,
+                    productPrice: currentPrice,
+                  });
                   // Buy Now - Direct to WooCommerce checkout
                   redirectToWooCheckout(
                     [{
@@ -498,6 +534,12 @@ const ProductDetail = () => {
                 }}
                 disabled={!inStock || (attributeNames.length > 0 && !selectedVariation)}
                 className="flex-1 inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-brand px-6 py-3.5 text-sm font-bold text-primary-foreground shadow-glow hover:shadow-glow-pink transition-all hover:scale-[1.01] disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
+                data-analytics-label={`Buy now ${product.name}`}
+                data-product-id={product.id}
+                data-product-name={product.name}
+                data-product-slug={product.slug}
+                data-product-category={product.category}
+                data-product-price={currentPrice}
               >
                 <ShoppingBag className="h-4 w-4" />
                 Buy Now
@@ -511,6 +553,12 @@ const ProductDetail = () => {
                     ? "border-emerald-500 text-emerald-400 bg-emerald-500/10"
                     : "border-border bg-transparent text-foreground hover:bg-secondary"
                 }`}
+                data-analytics-label={`Add ${product.name} to cart`}
+                data-product-id={product.id}
+                data-product-name={product.name}
+                data-product-slug={product.slug}
+                data-product-category={product.category}
+                data-product-price={currentPrice}
               >
                 {addedToCart ? (
                   <>
