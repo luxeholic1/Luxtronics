@@ -14,6 +14,18 @@ const Testimonials = lazy(() => import("@/components/Testimonials"));
 const TrustBadges = lazy(() => import("@/components/TrustBadges"));
 const Newsletter = lazy(() => import("@/components/Newsletter"));
 
+const mobileBrandTrail = [
+  { name: "OPPO", logo: "/brands/oppo-mobile-logo-icon.svg" },
+  { name: "Vivo", logo: "/brands/vivo-mobile-logo-icon.svg" },
+  { name: "Huawei", logo: "/brands/huawei-icon.svg" },
+  { name: "Realme", logo: "/brands/realme-mobile-logo-icon.svg" },
+  { name: "OnePlus", logo: "/brands/plus-one-icon.svg" },
+  { name: "Tecno", logo: "/brands/tecno-mobile-logo-icon.svg" },
+  { name: "Google", logo: "/brands/google-color-icon.svg" },
+  { name: "Motorola", logo: "/brands/motorola-logo-icon.svg" },
+  { name: "Nokia", logo: "/brands/nokia-logo-icon.svg" },
+];
+
 const Index = () => {
   return (
     <Layout>
@@ -44,6 +56,12 @@ const Index = () => {
       <BrandMarquee />
       <Suspense fallback={<div className="h-40" />}>
         <CategoryStrip />
+        <BrandMarquee
+          brands={mobileBrandTrail}
+          eyebrow="Mobile brand support"
+          title="Compatible picks for OPPO, Vivo, Huawei, Realme, OnePlus, Tecno, Google, Motorola and Nokia devices."
+          compact
+        />
         <FeaturedProducts />
         <DealsBanner />
         <PromoBanner />

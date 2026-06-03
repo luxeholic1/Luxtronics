@@ -37,6 +37,16 @@ const footerColumns = [
   },
 ];
 
+const PAYMENT_LOGOS = [
+  { label: "PayPal", src: "/brands/paypal-color-icon.svg" },
+  { label: "Google Pay", src: "/brands/google-pay-acceptance-mark-icon.svg" },
+  { label: "Mastercard", src: "/brands/master-card-icon.svg" },
+  { label: "Visa", src: "/brands/visa-icon.svg" },
+  { label: "Apple Pay", src: "/brands/apple-pay-icon.svg" },
+  { label: "PayU", src: "/brands/payu-icon.svg" },
+  { label: "UPI", src: "/brands/upi-icon.svg" },
+];
+
 const Footer = () => {
   const currentYear = new Date().getFullYear();
   
@@ -65,7 +75,7 @@ const Footer = () => {
   };
 
   return (
-    <footer className="relative mt-24 overflow-hidden border-t border-white/10 bg-black text-black sm:mt-32 lg:mt-40">
+    <footer className="relative mt-24 overflow-hidden border-t border-white/10 bg-black text-white sm:mt-32 lg:mt-40">
       {/* Organization schema */}
       
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(organizationSchema) }} />
@@ -74,21 +84,21 @@ const Footer = () => {
         className="absolute inset-0 bg-cover bg-center"
         style={{ backgroundImage: `url("/footer.jpg")` }}
       />
-      <div className="absolute inset-0 bg-black/42" />
+      <div className="absolute inset-0 bg-black/68" />
       <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/30 to-transparent" />
 
       <div className="relative z-10 w-full py-12 sm:py-16 md:py-20 lg:py-24 px-4 sm:px-6 md:px-8 lg:px-12 xl:px-16 max-w-[1920px] mx-auto">
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8 sm:gap-10 md:gap-12 rounded-3xl border border-white/14 bg-white/[0.075] p-6 shadow-[0_28px_90px_rgba(0,0,0,0.32)] backdrop-blur-xl sm:p-8 lg:p-10">
+        <div className="grid grid-cols-1 gap-8 rounded-2xl border border-white/14 bg-black/35 p-6 shadow-[0_28px_90px_rgba(0,0,0,0.36)] backdrop-blur-xl sm:grid-cols-2 sm:gap-10 sm:p-8 lg:grid-cols-4 lg:gap-12 lg:p-10">
         <div className="sm:col-span-2 lg:col-span-1">
           <Link to="/" className="flex items-center gap-2 mb-4 sm:mb-6 group">
             <div className="h-8 w-8 sm:h-9 sm:w-9 rounded-lg bg-gradient-brand flex items-center justify-center shadow-glow group-hover:scale-110 transition-transform">
               <Zap className="h-4 w-4 sm:h-5 sm:w-5 text-primary-foreground" strokeWidth={2.5} />
             </div>
-            <span className="font-display font-bold text-lg sm:text-xl lg:text-2xl">
+            <span className="font-display text-lg font-black tracking-tight text-white sm:text-xl lg:text-2xl">
               Lux<span className="text-gradient">tronics</span>
             </span>
           </Link>
-          <p className="text-xs sm:text-sm text-white/68 leading-relaxed mb-6">
+          <p className="mb-6 max-w-sm text-sm leading-6 text-white/72">
             Premium electronics curated for the next generation of creators and tech enthusiasts.
           </p>
           <div className="flex gap-3 flex-wrap">
@@ -109,13 +119,13 @@ const Footer = () => {
 
         {footerColumns.map((col) => (
           <div key={col.title}>
-            <h4 className="font-display font-semibold mb-3 sm:mb-4 md:mb-5 text-xs sm:text-sm uppercase tracking-wider">
+            <h4 className="mb-3 font-display text-xs font-black uppercase tracking-[0.18em] text-white sm:mb-4 md:mb-5">
               {col.title}
             </h4>
             <ul className="space-y-2 sm:space-y-2.5 md:space-y-3">
               {col.links.map((l) => (
                 <li key={l.label}>
-                  <Link to={l.to} className="text-xs sm:text-sm text-white/64 hover:text-white transition-colors duration-200">
+                  <Link to={l.to} className="text-sm font-medium text-white/68 transition-colors duration-200 hover:text-white">
                     {l.label}
                   </Link>
                 </li>
@@ -124,10 +134,36 @@ const Footer = () => {
           </div>
         ))}
         </div>
+
+        <div className="mt-5 rounded-2xl border border-white/14 bg-black/35 p-4 shadow-[0_18px_60px_rgba(0,0,0,0.28)] backdrop-blur-xl sm:p-5">
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+            <div>
+              <p className="text-[10px] font-black uppercase tracking-[0.22em] text-white/50">Secure payments</p>
+              <p className="mt-1 text-sm font-medium text-white/74">Trusted checkout options accepted at Luxtronics.</p>
+            </div>
+            <div className="grid grid-cols-4 gap-2 sm:flex sm:flex-wrap sm:justify-end">
+              {PAYMENT_LOGOS.map((logo) => (
+                <div
+                  key={logo.label}
+                  className="flex h-10 min-w-0 items-center justify-center rounded-lg border border-white/12 bg-white px-2 shadow-sm sm:h-11 sm:w-[74px]"
+                  title={logo.label}
+                  aria-label={logo.label}
+                >
+                  <img
+                    src={logo.src}
+                    alt={logo.label}
+                    loading="lazy"
+                    className="max-h-6 max-w-full object-contain"
+                  />
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
       </div>
 
       <div className="relative z-10 border-t border-white/12 bg-black/14 backdrop-blur-md">
-        <div className="w-full py-6 sm:py-8 px-4 sm:px-6 md:px-8 lg:px-12 xl:px-16 flex flex-col sm:flex-row items-center justify-between gap-4 sm:gap-6 text-xs text-white/58 max-w-[1920px] mx-auto">
+        <div className="mx-auto flex w-full max-w-[1920px] flex-col items-center justify-between gap-4 px-4 py-6 text-center text-xs font-medium text-white/62 sm:flex-row sm:gap-6 sm:px-6 sm:py-8 sm:text-left md:px-8 lg:px-12 xl:px-16">
           <p>© {currentYear} Luxtronics. All rights reserved. Premium electronics for creators.</p>
           <div className="flex gap-4 sm:gap-6">
             <Link to="/privacy" className="hover:text-white transition-colors">Privacy</Link>
