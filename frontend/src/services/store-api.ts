@@ -7,7 +7,6 @@ import {
   fetchProductFromFirebase,
   fetchCategoriesFromFirebase,
   searchProductsInFirebase,
-  checkFirebaseAvailability 
 } from './firebase-products';
 
 // Backend API URL - empty in production means same-origin Hostinger Express server.
@@ -180,6 +179,13 @@ interface ApiResponse<T> {
   success: boolean;
   data: T;
   error?: string;
+  total?: number;
+  pagination?: {
+    page: number;
+    perPage: number;
+    total: number;
+    totalPages: number;
+  };
 }
 
 async function fetchJson<T>(url: string): Promise<T> {
@@ -192,29 +198,64 @@ async function fetchJson<T>(url: string): Promise<T> {
   return response.json() as Promise<T>;
 }
 
+async function fetchProductsFromStoreCache(
+  page: number,
+  perPage: number,
+  search?: string
+): Promise<{ products: StoreProduct[]; total: number; totalPages: number }> {
+  let url = apiUrl(`/api/products?per_page=${perPage}&page=${page}`);
+  if (search) url += `&search=${encodeURIComponent(search)}`;
+
+  const response = await fetchJson<ApiResponse<StoreProduct[]>>(url);
+  const products = Array.isArray(response.data) ? response.data : [];
+  const total = Number(response.pagination?.total ?? response.total ?? products.length);
+  const totalPages = Number(response.pagination?.totalPages ?? Math.ceil(total / perPage)) || 1;
+
+  return { products, total, totalPages };
+}
+
 export async function fetchStoreProducts(page = 1, perPage = 100, search?: string): Promise<StoreProduct[]> {
-  // Try Firebase first (10-30x faster)
+  // Try Firestore first (fastest path). If the collection has products, use it
+  // even when sync_status is stale or missing.
   try {
-    const isFirebaseAvailable = await checkFirebaseAvailability();
-    
-    if (isFirebaseAvailable) {
-      console.log('[Store API] Fetching from Firebase (fast)');
-      const products = await fetchProductsFromFirebase(page, perPage, search);
-      
-      if (products.length > 0) {
-        console.log(`[Store API] Firebase returned ${products.length} products`);
-        return products;
-      }
+    console.log('[Store API] Fetching from Firestore (fast)');
+    const products = await fetchProductsFromFirebase(page, perPage, search);
+
+    if (products.length > 0) {
+      console.log(`[Store API] Firestore returned ${products.length} products`);
+      return products;
     }
   } catch (error) {
-    console.warn('[Store API] Firebase fetch failed, falling back to WooCommerce:', error);
+    console.warn('[Store API] Firestore fetch failed, falling back:', error);
   }
 
   // Fallback to same-origin server proxy. This avoids browser CORS and keeps Woo keys server-side.
-  console.log('[Store API] Fetching from WooCommerce proxy (fallback)');
+  console.log('[Store API] Fetching from store cache API (fallback)');
 
   // perPage=0 means "fetch ALL" — paginate through WooCommerce 100 at a time
   if (perPage === 0 || perPage > 100) {
+    try {
+      const allProducts: StoreProduct[] = [];
+      const maxPerPage = 500;
+      let currentPage = 1;
+
+      while (true) {
+        const { products, totalPages } = await fetchProductsFromStoreCache(currentPage, maxPerPage, search);
+        if (products.length === 0) break;
+
+        allProducts.push(...products);
+
+        if (currentPage >= totalPages) break;
+        if (perPage > 0 && allProducts.length >= perPage) break;
+
+        currentPage++;
+      }
+
+      return perPage > 0 ? allProducts.slice(0, perPage) : allProducts;
+    } catch (error) {
+      console.warn('[Store API] Store cache failed, falling back to WooCommerce proxy:', error);
+    }
+
     const allProducts: StoreProduct[] = [];
     const maxPerPage = 100;
     let currentPage = 1;
@@ -232,26 +273,28 @@ export async function fetchStoreProducts(page = 1, perPage = 100, search?: strin
 
       allProducts.push(...products);
 
-      // If we got fewer than maxPerPage, we've reached the last page
       if (products.length < maxPerPage) break;
-
-      // If perPage is a specific number (not 0), stop when we have enough
       if (perPage > 0 && allProducts.length >= perPage) break;
 
       currentPage++;
     }
 
-    return allProducts;
+    return perPage > 0 ? allProducts.slice(0, perPage) : allProducts;
   }
 
   // Single page fetch (perPage ≤ 100)
+  try {
+    const { products } = await fetchProductsFromStoreCache(page, perPage, search);
+    if (products.length > 0) return products;
+  } catch (error) {
+    console.warn('[Store API] Store cache failed, falling back to WooCommerce proxy:', error);
+  }
+
   let url = apiUrl(`/api/woo/products?per_page=${perPage}&page=${page}&status=publish`);
   if (search) url += `&search=${encodeURIComponent(search)}`;
 
   const response = await fetch(url, { headers: { 'Accept': 'application/json' } });
-
   if (!response.ok) throw new Error(`Failed to fetch products: ${response.statusText}`);
-
   const products = await response.json();
   return Array.isArray(products) ? products : [];
 }
@@ -285,39 +328,35 @@ function getStoreCredentials() {
 }
 
 export async function fetchStoreProduct(slug: string): Promise<StoreProduct | null> {
-  // Try Firebase first (10-30x faster)
+  // Try Firestore first (fastest path)
   try {
-    const isFirebaseAvailable = await checkFirebaseAvailability();
-    
-    if (isFirebaseAvailable) {
-      console.log('[Store API] Fetching product from Firebase (fast)');
-      const product = await fetchProductFromFirebase(slug);
-      
-      if (product) {
-        console.log(`[Store API] Firebase returned product: ${product.name}`);
-        
-        // If it's a variable product, fetch variations through the same-origin proxy
-        if (product.type === 'variable' && product.id) {
-          try {
-            const variationsResponse = await fetch(
-              apiUrl(`/api/woo/products/${product.id}/variations?per_page=100`),
-              { headers: { 'Accept': 'application/json' } },
-            );
-            
-            if (variationsResponse.ok) {
-              const variations = await variationsResponse.json();
-              product.variations = Array.isArray(variations) ? variations : [];
-            }
-          } catch (error) {
-            console.error('Failed to fetch variations:', error);
+    console.log('[Store API] Fetching product from Firestore (fast)');
+    const product = await fetchProductFromFirebase(slug);
+
+    if (product) {
+      console.log(`[Store API] Firestore returned product: ${product.name}`);
+
+      // If it's a variable product, fetch variations through the same-origin proxy
+      if (product.type === 'variable' && product.id) {
+        try {
+          const variationsResponse = await fetch(
+            apiUrl(`/api/woo/products/${product.id}/variations?per_page=100`),
+            { headers: { 'Accept': 'application/json' } },
+          );
+
+          if (variationsResponse.ok) {
+            const variations = await variationsResponse.json();
+            product.variations = Array.isArray(variations) ? variations : [];
           }
+        } catch (error) {
+          console.error('Failed to fetch variations:', error);
         }
-        
-        return product;
       }
+
+      return product;
     }
   } catch (error) {
-    console.warn('[Store API] Firebase fetch failed, falling back to WooCommerce:', error);
+    console.warn('[Store API] Firestore fetch failed, falling back to WooCommerce:', error);
   }
 
   // Fallback to same-origin WooCommerce proxy
@@ -364,33 +403,29 @@ export async function fetchStoreCategories(page = 1, perPage = 20): Promise<{
   data: StoreCategory[];
   pagination: { page: number; perPage: number; total: number; totalPages: number };
 }> {
-  // Try Firebase first (10-30x faster)
+  // Try Firestore first (fastest path)
   try {
-    const isFirebaseAvailable = await checkFirebaseAvailability();
-    
-    if (isFirebaseAvailable) {
-      console.log('[Store API] Fetching categories from Firebase (fast)');
+    console.log('[Store API] Fetching categories from Firestore (fast)');
 
-      // Warm product cache in the background; don't block first render on the full catalog.
-      void fetchProductsFromFirebase().catch(() => {});
+    // Warm product cache in the background; don't block first render on the full catalog.
+    void fetchProductsFromFirebase().catch(() => {});
 
-      const categories = await fetchCategoriesFromFirebase();
-      
-      if (categories.length > 0) {
-        console.log(`[Store API] Firebase returned ${categories.length} categories`);
-        return {
-          data: categories,
-          pagination: { 
-            page: 1, 
-            perPage: categories.length, 
-            total: categories.length, 
-            totalPages: 1 
-          },
-        };
-      }
+    const categories = await fetchCategoriesFromFirebase();
+
+    if (categories.length > 0) {
+      console.log(`[Store API] Firestore returned ${categories.length} categories`);
+      return {
+        data: categories,
+        pagination: {
+          page: 1,
+          perPage: categories.length,
+          total: categories.length,
+          totalPages: 1
+        },
+      };
     }
   } catch (error) {
-    console.warn('[Store API] Firebase fetch failed, falling back to WooCommerce:', error);
+    console.warn('[Store API] Firestore fetch failed, falling back to WooCommerce:', error);
   }
 
   // Fallback to same-origin WooCommerce proxy
@@ -420,22 +455,18 @@ export async function fetchStoreCategories(page = 1, perPage = 20): Promise<{
  */
 export async function fetchSearchSuggestions(query: string): Promise<Product[]> {
   if (!query || query.length < 2) return [];
-  
-  // Try Firebase first (10-30x faster)
+
+  // Try Firestore first (fastest path)
   try {
-    const isFirebaseAvailable = await checkFirebaseAvailability();
-    
-    if (isFirebaseAvailable) {
-      console.log('[Store API] Searching in Firebase (fast)');
-      const products = await searchProductsInFirebase(query);
-      
-      if (products.length > 0) {
-        console.log(`[Store API] Firebase search returned ${products.length} results`);
-        return products.slice(0, 8).map(mapStoreProductToLocalProduct).filter((product): product is Product => product !== null);
-      }
+    console.log('[Store API] Searching in Firestore (fast)');
+    const products = await searchProductsInFirebase(query);
+
+    if (products.length > 0) {
+      console.log(`[Store API] Firestore search returned ${products.length} results`);
+      return products.slice(0, 8).map(mapStoreProductToLocalProduct).filter((product): product is Product => product !== null);
     }
   } catch (error) {
-    console.warn('[Store API] Firebase search failed, falling back to WooCommerce:', error);
+    console.warn('[Store API] Firestore search failed, falling back to WooCommerce:', error);
   }
 
   // Fallback to same-origin WooCommerce proxy
