@@ -47,6 +47,7 @@ type InvoiceForm = {
   sellerName: string;
   sellerAddress: string;
   sellerTaxId: string;
+  customerCompanyName: string;
   customerName: string;
   customerAddress: string;
   customerTaxId: string;
@@ -72,6 +73,8 @@ const makeLine = (): InvoiceLine => ({
   taxRate: 18,
 });
 
+const PRODUCTS_PER_PAGE = 100;
+
 const formatMoney = (amount: number, currency: string) =>
   new Intl.NumberFormat("en-IN", {
     style: "currency",
@@ -88,13 +91,18 @@ const escapeHtml = (value: string) =>
     "'": "&#39;",
   }[char] || char));
 
-const getLineSubtotal = (line: InvoiceLine) => line.quantity * line.unitPrice;
-const getLineTax = (line: InvoiceLine, invoiceType: InvoiceType) =>
-  invoiceType === "tax" ? getLineSubtotal(line) * (line.taxRate / 100) : 0;
+const getLineGross = (line: InvoiceLine) => line.quantity * line.unitPrice;
+const getLineTaxable = (line: InvoiceLine, invoiceType: InvoiceType) =>
+  invoiceType === "tax" && line.taxRate > 0
+    ? getLineGross(line) / (1 + line.taxRate / 100)
+    : getLineGross(line);
+const getLineIncludedTax = (line: InvoiceLine, invoiceType: InvoiceType) =>
+  invoiceType === "tax" ? getLineGross(line) - getLineTaxable(line, invoiceType) : 0;
 
 export default function AdminInvoices() {
   const [invoiceType, setInvoiceType] = useState<InvoiceType>("proforma");
   const [products, setProducts] = useState<WooProduct[]>([]);
+  const [productSearch, setProductSearch] = useState("");
   const [loadingProducts, setLoadingProducts] = useState(false);
   const [lines, setLines] = useState<InvoiceLine[]>([makeLine()]);
   const [form, setForm] = useState<InvoiceForm>({
@@ -104,6 +112,7 @@ export default function AdminInvoices() {
     sellerName: "Luxtronics",
     sellerAddress: "Luxtronics Online Store",
     sellerTaxId: "",
+    customerCompanyName: "",
     customerName: "",
     customerAddress: "",
     customerTaxId: "",
@@ -115,10 +124,30 @@ export default function AdminInvoices() {
   const fetchProducts = useCallback(async () => {
     setLoadingProducts(true);
     try {
-      const response = await fetch("/api/woo/products?per_page=100&status=publish&orderby=title&order=asc");
-      const data = await response.json();
-      if (!response.ok || data.success === false) throw new Error(data.error || "Product fetch failed");
-      setProducts(Array.isArray(data) ? data : []);
+      const allProducts: WooProduct[] = [];
+      let page = 1;
+      let totalPages = 1;
+
+      do {
+        const params = new URLSearchParams({
+          per_page: String(PRODUCTS_PER_PAGE),
+          page: String(page),
+          status: "publish",
+          orderby: "title",
+          order: "asc",
+        });
+        const response = await fetch(`/api/woo/products?${params.toString()}`);
+        const data = await response.json();
+        if (!response.ok || data.success === false) throw new Error(data.error || "Product fetch failed");
+
+        const pageProducts = Array.isArray(data) ? data : [];
+        allProducts.push(...pageProducts);
+        totalPages = Math.max(1, Number(response.headers.get("X-WP-TotalPages") || (pageProducts.length === PRODUCTS_PER_PAGE ? page + 1 : page)));
+        page += 1;
+      } while (page <= totalPages);
+
+      const uniqueProducts = [...new Map(allProducts.map((product) => [product.id, product])).values()];
+      setProducts(uniqueProducts);
     } catch (error) {
       setProducts([]);
       toast({
@@ -136,10 +165,21 @@ export default function AdminInvoices() {
   }, [fetchProducts]);
 
   const totals = useMemo(() => {
-    const subtotal = lines.reduce((sum, line) => sum + getLineSubtotal(line), 0);
-    const tax = lines.reduce((sum, line) => sum + getLineTax(line, invoiceType), 0);
-    return { subtotal, tax, grandTotal: subtotal + tax };
+    const taxable = lines.reduce((sum, line) => sum + getLineTaxable(line, invoiceType), 0);
+    const tax = lines.reduce((sum, line) => sum + getLineIncludedTax(line, invoiceType), 0);
+    const grandTotal = lines.reduce((sum, line) => sum + getLineGross(line), 0);
+    return { taxable, tax, grandTotal };
   }, [invoiceType, lines]);
+
+  const filteredProducts = useMemo(() => {
+    const query = productSearch.trim().toLowerCase();
+    if (!query) return products;
+    return products.filter((product) =>
+      [product.name, product.sku, product.price]
+        .filter(Boolean)
+        .some((value) => String(value).toLowerCase().includes(query)),
+    );
+  }, [productSearch, products]);
 
   const updateLine = (lineId: string, patch: Partial<InvoiceLine>) => {
     setLines((current) => current.map((line) => line.id === lineId ? { ...line, ...patch } : line));
@@ -164,8 +204,9 @@ export default function AdminInvoices() {
   const buildInvoiceHtml = () => {
     const title = invoiceType === "tax" ? "Tax Invoice" : "Proforma Invoice";
     const rows = lines.map((line, index) => {
-      const subtotal = getLineSubtotal(line);
-      const tax = getLineTax(line, invoiceType);
+      const gross = getLineGross(line);
+      const taxable = getLineTaxable(line, invoiceType);
+      const tax = getLineIncludedTax(line, invoiceType);
       return `
         <tr>
           <td>${index + 1}</td>
@@ -175,8 +216,8 @@ export default function AdminInvoices() {
           </td>
           <td>${line.quantity}</td>
           <td>${formatMoney(line.unitPrice, form.currency)}</td>
-          ${invoiceType === "tax" ? `<td>${line.taxRate}%</td><td>${formatMoney(tax, form.currency)}</td>` : ""}
-          <td>${formatMoney(subtotal + tax, form.currency)}</td>
+          ${invoiceType === "tax" ? `<td>${formatMoney(taxable, form.currency)}</td><td>${line.taxRate}%</td><td>${formatMoney(tax, form.currency)}</td>` : ""}
+          <td>${formatMoney(gross, form.currency)}</td>
         </tr>
       `;
     }).join("");
@@ -188,11 +229,17 @@ export default function AdminInvoices() {
           <title>${escapeHtml(title)} ${escapeHtml(form.invoiceNumber)}</title>
           <style>
             body { color: #111827; font-family: Arial, sans-serif; margin: 32px; }
-            .top { align-items: flex-start; display: flex; justify-content: space-between; gap: 32px; }
+            .letterhead { align-items: center; border-bottom: 2px solid #111827; display: flex; justify-content: space-between; gap: 24px; padding-bottom: 16px; }
+            .brand { align-items: center; display: flex; gap: 14px; }
+            .brand img { border-radius: 12px; height: 64px; object-fit: cover; width: 64px; }
+            .brand-name { font-size: 26px; font-weight: 800; letter-spacing: 0.06em; margin: 0; text-transform: uppercase; }
+            .letterhead-details { max-width: 320px; text-align: right; }
+            .top { align-items: flex-start; display: flex; justify-content: space-between; gap: 32px; margin-top: 22px; }
             h1 { font-size: 30px; margin: 0 0 8px; text-transform: uppercase; }
             h2 { font-size: 15px; margin: 0 0 8px; text-transform: uppercase; }
             p { line-height: 1.45; margin: 4px 0; white-space: pre-line; }
             .muted { color: #6b7280; font-size: 12px; }
+            .notice { background: #ecfdf5; border: 1px solid #a7f3d0; border-radius: 8px; color: #065f46; font-size: 12px; margin-top: 16px; padding: 10px 12px; }
             .panel { border: 1px solid #d1d5db; border-radius: 8px; margin-top: 24px; padding: 16px; }
             .grid { display: grid; gap: 16px; grid-template-columns: 1fr 1fr; }
             table { border-collapse: collapse; margin-top: 24px; width: 100%; }
@@ -205,43 +252,58 @@ export default function AdminInvoices() {
           </style>
         </head>
         <body>
+          <div class="letterhead">
+            <div class="brand">
+              <img src="/logo.jpeg" alt="Luxtronics logo">
+              <div>
+                <p class="brand-name">${escapeHtml(form.sellerName || "Luxtronics")}</p>
+                <p class="muted">Premium Electronics & Gadgets</p>
+              </div>
+            </div>
+            <div class="letterhead-details">
+              <p>${escapeHtml(form.sellerAddress || "Luxtronics Online Store")}</p>
+              ${form.sellerTaxId ? `<p class="muted">Tax ID: ${escapeHtml(form.sellerTaxId)}</p>` : ""}
+            </div>
+          </div>
           <div class="top">
             <div>
               <h1>${escapeHtml(title)}</h1>
               <p class="muted">Invoice No. ${escapeHtml(form.invoiceNumber)}</p>
               <p class="muted">Date: ${escapeHtml(form.invoiceDate)} · Due: ${escapeHtml(form.dueDate)}</p>
             </div>
-            <div>
-              <h2>${escapeHtml(form.sellerName)}</h2>
+            <div class="letterhead-details">
+              <h2>From</h2>
+              <p><strong>${escapeHtml(form.sellerName || "Luxtronics")}</strong></p>
               <p>${escapeHtml(form.sellerAddress)}</p>
-              ${form.sellerTaxId ? `<p class="muted">Tax ID: ${escapeHtml(form.sellerTaxId)}</p>` : ""}
             </div>
           </div>
           <div class="grid panel">
             <div>
               <h2>Bill To</h2>
+              ${form.customerCompanyName ? `<p><strong>${escapeHtml(form.customerCompanyName)}</strong></p>` : ""}
               <p><strong>${escapeHtml(form.customerName || "Customer")}</strong></p>
               <p>${escapeHtml(form.customerAddress)}</p>
               ${form.customerTaxId ? `<p class="muted">Tax ID: ${escapeHtml(form.customerTaxId)}</p>` : ""}
             </div>
             <div>
               <h2>Summary</h2>
-              <p class="muted">${invoiceType === "tax" ? "This is a tax invoice with applicable tax shown separately." : "This is a proforma invoice and is not a tax demand until confirmed."}</p>
+              <p class="muted">${invoiceType === "tax" ? "Product prices are GST inclusive. Taxable value and GST are reverse-calculated from the displayed price." : "This is a proforma invoice and is not a tax demand until confirmed."}</p>
             </div>
           </div>
+          ${invoiceType === "tax" ? `<div class="notice">Prices include GST. Formula shown: taxable value = GST-inclusive amount / (1 + GST rate), GST = GST-inclusive amount - taxable value.</div>` : ""}
           <table>
             <thead>
               <tr>
-                <th>#</th><th>Item</th><th>Qty</th><th>Unit Price</th>
-                ${invoiceType === "tax" ? "<th>Tax</th><th>Tax Amount</th>" : ""}
+                <th>#</th><th>Item</th><th>Qty</th><th>Unit Price Incl. GST</th>
+                ${invoiceType === "tax" ? "<th>Taxable Value</th><th>GST</th><th>GST Amount</th>" : ""}
                 <th>Total</th>
               </tr>
             </thead>
             <tbody>${rows}</tbody>
           </table>
           <div class="totals">
-            <div><span>Subtotal</span><strong>${formatMoney(totals.subtotal, form.currency)}</strong></div>
-            ${invoiceType === "tax" ? `<div><span>Tax</span><strong>${formatMoney(totals.tax, form.currency)}</strong></div>` : ""}
+            <div><span>${invoiceType === "tax" ? "Taxable value" : "Subtotal"}</span><strong>${formatMoney(totals.taxable, form.currency)}</strong></div>
+            ${invoiceType === "tax" ? `<div><span>GST included in price</span><strong>${formatMoney(totals.tax, form.currency)}</strong></div>` : ""}
             <div class="grand"><span>Total</span><span>${formatMoney(totals.grandTotal, form.currency)}</span></div>
           </div>
           ${form.notes ? `<div class="panel"><h2>Notes</h2><p>${escapeHtml(form.notes)}</p></div>` : ""}
@@ -252,10 +314,10 @@ export default function AdminInvoices() {
 
   const saveAsPdf = () => {
     const validLines = lines.filter((line) => line.description.trim() && line.quantity > 0);
-    if (!form.customerName.trim() || validLines.length === 0) {
+    if ((!form.customerName.trim() && !form.customerCompanyName.trim()) || validLines.length === 0) {
       toast({
         title: "Invoice needs details",
-        description: "Add a customer name and at least one product line before saving.",
+        description: "Add a company or customer name and at least one product line before saving.",
         variant: "destructive",
       });
       return;
@@ -318,7 +380,7 @@ export default function AdminInvoices() {
           <div className="flex flex-wrap gap-2">
             <Button variant="outline" className="gap-2" onClick={fetchProducts} disabled={loadingProducts}>
               {loadingProducts ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
-              Products
+              {loadingProducts ? "Loading products" : `Products ${products.length ? `(${products.length})` : ""}`}
             </Button>
             <Button className="gap-2" onClick={saveAsPdf}>
               <FileDown className="h-4 w-4" />
@@ -376,6 +438,10 @@ export default function AdminInvoices() {
 
                 <div className="grid gap-4 md:grid-cols-2">
                   <div>
+                    <Label htmlFor="customerCompanyName">Company name</Label>
+                    <Input id="customerCompanyName" value={form.customerCompanyName} onChange={(event) => setForm({ ...form, customerCompanyName: event.target.value })} />
+                  </div>
+                  <div>
                     <Label htmlFor="customerName">Customer name</Label>
                     <Input id="customerName" value={form.customerName} onChange={(event) => setForm({ ...form, customerName: event.target.value })} />
                   </div>
@@ -393,21 +459,43 @@ export default function AdminInvoices() {
 
             <Card className="border-border/80 bg-card/90">
               <CardHeader className="flex flex-row items-center justify-between gap-3">
-                <CardTitle className="text-lg">Products</CardTitle>
+                <div>
+                  <CardTitle className="text-lg">Products</CardTitle>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Product prices are GST inclusive. The invoice shows taxable value and GST calculation separately.
+                  </p>
+                </div>
                 <Button size="sm" className="gap-2" onClick={() => setLines((current) => [...current, makeLine()])}>
                   <Plus className="h-4 w-4" />
                   Add line
                 </Button>
               </CardHeader>
               <CardContent>
+                <div className="mb-4 grid gap-3 md:grid-cols-[minmax(0,1fr)_auto] md:items-end">
+                  <div>
+                    <Label htmlFor="productSearch">Search products</Label>
+                    <Input
+                      id="productSearch"
+                      value={productSearch}
+                      onChange={(event) => setProductSearch(event.target.value)}
+                      placeholder="Search all fetched products by name, SKU, or price"
+                    />
+                  </div>
+                  <Button variant="outline" className="gap-2" onClick={fetchProducts} disabled={loadingProducts}>
+                    {loadingProducts ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+                    Fetch all
+                  </Button>
+                </div>
                 <Table>
                   <TableHeader>
                     <TableRow>
                       <TableHead className="min-w-[220px]">Product</TableHead>
                       <TableHead className="min-w-[180px]">Description</TableHead>
                       <TableHead>Qty</TableHead>
-                      <TableHead>Unit</TableHead>
-                      {invoiceType === "tax" && <TableHead>Tax %</TableHead>}
+                      <TableHead>Unit incl. GST</TableHead>
+                      {invoiceType === "tax" && <TableHead>Taxable</TableHead>}
+                      {invoiceType === "tax" && <TableHead>GST %</TableHead>}
+                      {invoiceType === "tax" && <TableHead>GST</TableHead>}
                       <TableHead className="text-right">Total</TableHead>
                       <TableHead />
                     </TableRow>
@@ -422,7 +510,12 @@ export default function AdminInvoices() {
                             className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm outline-none focus:border-primary"
                           >
                             <option value="">Custom item</option>
-                            {products.map((product) => (
+                            {line.productId && !filteredProducts.some((product) => String(product.id) === line.productId) && (
+                              <option value={line.productId}>
+                                {products.find((product) => String(product.id) === line.productId)?.name || "Selected product"}
+                              </option>
+                            )}
+                            {filteredProducts.map((product) => (
                               <option key={product.id} value={product.id}>{product.name}</option>
                             ))}
                           </select>
@@ -437,12 +530,22 @@ export default function AdminInvoices() {
                           <Input className="w-28" inputMode="decimal" value={line.unitPrice} onChange={(event) => updateLine(line.id, { unitPrice: Number(event.target.value) || 0 })} />
                         </TableCell>
                         {invoiceType === "tax" && (
+                          <TableCell className="font-semibold">
+                            {formatMoney(getLineTaxable(line, invoiceType), form.currency)}
+                          </TableCell>
+                        )}
+                        {invoiceType === "tax" && (
                           <TableCell>
                             <Input className="w-24" inputMode="decimal" value={line.taxRate} onChange={(event) => updateLine(line.id, { taxRate: Number(event.target.value) || 0 })} />
                           </TableCell>
                         )}
+                        {invoiceType === "tax" && (
+                          <TableCell className="font-semibold">
+                            {formatMoney(getLineIncludedTax(line, invoiceType), form.currency)}
+                          </TableCell>
+                        )}
                         <TableCell className="text-right font-semibold">
-                          {formatMoney(getLineSubtotal(line) + getLineTax(line, invoiceType), form.currency)}
+                          {formatMoney(getLineGross(line), form.currency)}
                         </TableCell>
                         <TableCell className="text-right">
                           <Button
@@ -459,19 +562,19 @@ export default function AdminInvoices() {
                   </TableBody>
                   <TableFooter>
                     <TableRow>
-                      <TableCell colSpan={invoiceType === "tax" ? 5 : 4}>Subtotal</TableCell>
-                      <TableCell className="text-right">{formatMoney(totals.subtotal, form.currency)}</TableCell>
+                      <TableCell colSpan={invoiceType === "tax" ? 7 : 4}>{invoiceType === "tax" ? "Taxable value" : "Subtotal"}</TableCell>
+                      <TableCell className="text-right">{formatMoney(totals.taxable, form.currency)}</TableCell>
                       <TableCell />
                     </TableRow>
                     {invoiceType === "tax" && (
                       <TableRow>
-                        <TableCell colSpan={5}>Tax</TableCell>
+                        <TableCell colSpan={7}>GST included in price</TableCell>
                         <TableCell className="text-right">{formatMoney(totals.tax, form.currency)}</TableCell>
                         <TableCell />
                       </TableRow>
                     )}
                     <TableRow>
-                      <TableCell colSpan={invoiceType === "tax" ? 5 : 4}>Grand total</TableCell>
+                      <TableCell colSpan={invoiceType === "tax" ? 7 : 4}>Grand total</TableCell>
                       <TableCell className="text-right text-base font-black">{formatMoney(totals.grandTotal, form.currency)}</TableCell>
                       <TableCell />
                     </TableRow>
@@ -512,9 +615,17 @@ export default function AdminInvoices() {
                   {invoiceType === "tax" ? "Tax Invoice" : "Proforma Invoice"}
                 </p>
                 <h2 className="mt-1 break-words font-display text-2xl font-black">{form.invoiceNumber}</h2>
+                {invoiceType === "tax" && (
+                  <p className="mt-3 rounded-md bg-emerald-500/10 p-3 text-xs font-semibold text-emerald-700 dark:text-emerald-300">
+                    Prices include GST. Taxable value = total / (1 + GST rate); GST = total - taxable value.
+                  </p>
+                )}
                 <div className="mt-4 space-y-2 text-sm">
-                  <div className="flex justify-between gap-4"><span>Subtotal</span><strong>{formatMoney(totals.subtotal, form.currency)}</strong></div>
-                  {invoiceType === "tax" && <div className="flex justify-between gap-4"><span>Tax</span><strong>{formatMoney(totals.tax, form.currency)}</strong></div>}
+                  <div className="flex justify-between gap-4">
+                    <span>{invoiceType === "tax" ? "Taxable value" : "Subtotal"}</span>
+                    <strong>{formatMoney(totals.taxable, form.currency)}</strong>
+                  </div>
+                  {invoiceType === "tax" && <div className="flex justify-between gap-4"><span>GST included</span><strong>{formatMoney(totals.tax, form.currency)}</strong></div>}
                   <div className="flex justify-between gap-4 border-t border-border pt-3 text-base"><span>Total</span><strong>{formatMoney(totals.grandTotal, form.currency)}</strong></div>
                 </div>
               </div>
