@@ -38,6 +38,7 @@ const AccountProfile = lazy(() => import("./pages/AccountProfile.tsx"));
 const NotFound = lazy(() => import("./pages/NotFound.tsx"));
 const AdminDashboard = lazy(() => import("./pages/AdminDashboard.tsx"));
 const AdminProducts = lazy(() => import("./pages/AdminProducts.tsx"));
+const AdminInvoices = lazy(() => import("./pages/AdminInvoices.tsx"));
 const AdminGuard = lazy(() => import("./components/AdminGuard.tsx"));
 
 // Loading fallback component
@@ -96,6 +97,8 @@ const App = () => {
                         <Route path="/account/profile" element={<AccountProfile />} />
                         <Route path="/admin" element={<AdminGuard><AdminDashboard /></AdminGuard>} />
                         <Route path="/admin/products" element={<AdminGuard><AdminProducts /></AdminGuard>} />
+                        <Route path="/admin/invoices" element={<AdminGuard><AdminInvoices /></AdminGuard>} />
+                        <Route path="/invoices" element={<AdminGuard><AdminInvoices /></AdminGuard>} />
                         {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
                         <Route path="*" element={<NotFound />} />
                       </Routes>

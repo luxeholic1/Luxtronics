@@ -14,6 +14,7 @@ import {
   MousePointerClick,
   Package,
   Radio,
+  ReceiptText,
   Search,
   SlidersHorizontal,
   Trash2,
@@ -301,6 +302,12 @@ export default function AdminDashboard() {
               <Button variant="outline" className="gap-2">
                 <Package className="h-4 w-4" />
                 Products
+              </Button>
+            </Link>
+            <Link to="/admin/invoices">
+              <Button variant="outline" className="gap-2">
+                <ReceiptText className="h-4 w-4" />
+                Invoices
               </Button>
             </Link>
             <Button variant="destructive" className="gap-2" onClick={handleClear} disabled={events.length === 0}>
