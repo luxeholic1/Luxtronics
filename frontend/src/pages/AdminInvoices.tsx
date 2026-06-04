@@ -287,10 +287,9 @@ export default function AdminInvoices() {
             .totals { margin-left: auto; margin-top: 8px; width: 300px; break-inside: avoid; }
             .totals div { display: flex; justify-content: space-between; padding: 5px 0; }
             .grand { border-top: 2px solid #111827; font-size: 15px; font-weight: 700; }
-            .footer-row { align-items: flex-end; display: flex; justify-content: space-between; gap: 24px; margin-top: 12px; break-inside: avoid; }
+            .footer-row { align-items: flex-end; display: flex; justify-content: flex-end; gap: 24px; margin-top: 12px; break-inside: avoid; }
             .status-block { align-items: center; display: flex; flex-direction: column; gap: 4px; }
             .status-label { color: #6b7280; font-size: 10px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; }
-            .signature-line { border-top: 1px solid #9ca3af; color: #6b7280; font-size: 10px; min-width: 170px; padding-top: 6px; text-align: center; }
             @media print { button { display: none; } }
           </style>
         </head>
@@ -372,7 +371,6 @@ export default function AdminInvoices() {
           ` : ""}
           ${form.notes ? `<div class="panel"><h2>Notes</h2><p>${escapeHtml(form.notes)}</p></div>` : ""}
           <div class="footer-row">
-            <div class="signature-line">Authorized Signatory</div>
             <div class="status-block">
               <div class="status-label">Payment Status</div>
               <div class="invoice-stamp ${invoiceType === "tax" ? "paid" : "unpaid"}">
