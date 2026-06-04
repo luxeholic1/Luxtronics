@@ -47,6 +47,8 @@ type InvoiceForm = {
   sellerName: string;
   sellerAddress: string;
   sellerTaxId: string;
+  bankAccountNumber: string;
+  bankIfsc: string;
   customerCompanyName: string;
   customerName: string;
   customerAddress: string;
@@ -118,6 +120,8 @@ export default function AdminInvoices() {
     sellerName: "Luxtronics",
     sellerAddress: "Luxtronics Online Store",
     sellerTaxId: "",
+    bankAccountNumber: "",
+    bankIfsc: "",
     customerCompanyName: "",
     customerName: "",
     customerAddress: "",
@@ -221,6 +225,10 @@ export default function AdminInvoices() {
 
   const buildInvoiceHtml = () => {
     const title = invoiceType === "tax" ? "Tax Invoice" : "Proforma Invoice";
+    const stampSrc = invoiceType === "tax"
+      ? "/paid-letter-rubber-stamp-template_29794-1263.avif"
+      : "/unpaid-rubber-stamp-260nw-1203367513.webp";
+    const stampAlt = invoiceType === "tax" ? "Paid stamp" : "Unpaid stamp";
     const rows = lines.map((line, index) => {
       const gross = getLineGross(line);
       const taxable = getLineTaxable(line, invoiceType);
@@ -253,9 +261,13 @@ export default function AdminInvoices() {
             .brand img { display: block; height: 100%; object-fit: contain; width: 100%; }
             .brand-name { font-size: 26px; font-weight: 800; letter-spacing: 0.06em; margin: 0; text-transform: uppercase; }
             .letterhead-details { max-width: 320px; text-align: right; }
-            .invoice-banner { align-items: center; background: #111827; border-radius: 12px; color: #ffffff; display: flex; justify-content: space-between; gap: 18px; margin-top: 18px; padding: 18px 22px; }
+            .invoice-banner { align-items: center; background: #111827; border-radius: 12px; color: #ffffff; display: flex; justify-content: space-between; gap: 18px; margin-top: 18px; overflow: hidden; padding: 18px 22px; position: relative; }
             .invoice-banner h1 { color: #ffffff; font-size: 28px; letter-spacing: 0.06em; margin: 0; text-transform: uppercase; }
             .invoice-banner p { color: #d1d5db; margin: 4px 0 0; }
+            .invoice-stamp { align-items: center; background: rgba(255,255,255,0.96); border: 1px solid rgba(255,255,255,0.75); border-radius: 10px; display: flex; height: 78px; justify-content: center; overflow: hidden; padding: 0; position: absolute; right: 250px; top: 50%; transform: translateY(-50%) rotate(-8deg); width: 142px; }
+            .invoice-stamp img { display: block; height: 108px; object-fit: cover; object-position: center 38%; width: 154px; }
+            .invoice-stamp.unpaid img { height: 118px; object-position: center 22%; transform: translateY(-8px); }
+            .invoice-stamp.paid img { height: 96px; object-fit: contain; width: 132px; }
             .invoice-meta { min-width: 220px; text-align: right; }
             .invoice-meta strong { color: #ffffff; display: block; font-size: 15px; }
             .top { align-items: flex-start; display: flex; justify-content: space-between; gap: 32px; margin-top: 22px; }
@@ -295,6 +307,9 @@ export default function AdminInvoices() {
             <div>
               <h1>${escapeHtml(title)}</h1>
               <p>${invoiceType === "tax" ? "GST-inclusive pricing with tax calculation" : "Formal quotation for requested products"}</p>
+            </div>
+            <div class="invoice-stamp ${invoiceType === "tax" ? "paid" : "unpaid"}">
+              <img src="${stampSrc}" alt="${stampAlt}">
             </div>
             <div class="invoice-meta">
               <strong>${escapeHtml(form.invoiceNumber)}</strong>
@@ -343,6 +358,13 @@ export default function AdminInvoices() {
             ${invoiceType === "tax" ? `<div><span>GST included in price</span><strong>${formatMoney(totals.tax, form.currency)}</strong></div>` : ""}
             <div class="grand"><span>Total</span><span>${formatMoney(totals.grandTotal, form.currency)}</span></div>
           </div>
+          ${invoiceType === "proforma" && (form.bankAccountNumber || form.bankIfsc) ? `
+            <div class="panel">
+              <h2>Payment Details</h2>
+              ${form.bankAccountNumber ? `<p><strong>Account No:</strong> ${escapeHtml(form.bankAccountNumber)}</p>` : ""}
+              ${form.bankIfsc ? `<p><strong>IFSC:</strong> ${escapeHtml(form.bankIfsc)}</p>` : ""}
+            </div>
+          ` : ""}
           ${form.notes ? `<div class="panel"><h2>Notes</h2><p>${escapeHtml(form.notes)}</p></div>` : ""}
         </body>
       </html>
@@ -475,6 +497,14 @@ export default function AdminInvoices() {
                   <div className="md:col-span-2">
                     <Label htmlFor="sellerAddress">Seller address</Label>
                     <Textarea id="sellerAddress" rows={3} value={form.sellerAddress} onChange={(event) => setForm({ ...form, sellerAddress: event.target.value })} />
+                  </div>
+                  <div>
+                    <Label htmlFor="bankAccountNumber">Account number</Label>
+                    <Input id="bankAccountNumber" value={form.bankAccountNumber} onChange={(event) => setForm({ ...form, bankAccountNumber: event.target.value })} placeholder="Shown on proforma only" />
+                  </div>
+                  <div>
+                    <Label htmlFor="bankIfsc">IFSC</Label>
+                    <Input id="bankIfsc" value={form.bankIfsc} onChange={(event) => setForm({ ...form, bankIfsc: event.target.value })} placeholder="Shown on proforma only" />
                   </div>
                 </div>
 
