@@ -16,6 +16,7 @@ import {
   cleanText,
   offerReturnPolicyReference,
   offerShippingDetailsSchema,
+  toSchemaInteger,
   toSchemaPrice,
 } from "@/lib/seo";
 import SEO from "@/components/SEO";
@@ -281,7 +282,7 @@ const ProductDetail = () => {
             "aggregateRating": product.reviews > 0 ? {
               "@type": "AggregateRating",
               "ratingValue": product.rating,
-              "reviewCount": product.reviews,
+              "reviewCount": toSchemaInteger(product.reviews),
               "bestRating": 5,
               "worstRating": 1
             } : undefined,

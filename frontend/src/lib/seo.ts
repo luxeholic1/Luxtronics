@@ -52,10 +52,24 @@ const shippingDeliveryTime = () => ({
   },
 });
 
-export const toSchemaPrice = (value: number) => {
-  const safeValue = Number.isFinite(value) ? value : 0;
+const toPlainNumber = (value: unknown) => {
+  if (typeof value === "number") return Number.isFinite(value) ? value : 0;
+  if (typeof value !== "string") return 0;
+
+  const normalized = value
+    .replace(/,/g, "")
+    .replace(/[^\d.-]/g, "")
+    .trim();
+  const parsed = Number(normalized);
+  return Number.isFinite(parsed) ? parsed : 0;
+};
+
+export const toSchemaPrice = (value: unknown) => {
+  const safeValue = toPlainNumber(value);
   return safeValue.toFixed(2);
 };
+
+export const toSchemaInteger = (value: unknown) => Math.max(0, Math.round(toPlainNumber(value)));
 
 export const merchantReturnPolicySchema = (countryCode: string) => ({
   "@type": "MerchantReturnPolicy",
