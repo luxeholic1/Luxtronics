@@ -90,6 +90,122 @@ function getWooAuth(req) {
   return 'Basic ' + Buffer.from(`${key}:${secret}`).toString('base64');
 }
 
+const PUBLIC_HOSTS = ['luxtronics.in', 'luxtronics.com.au', 'luxtronics.co.nz'];
+const HREFLANG_BY_HOST = {
+  'luxtronics.in': 'en-in',
+  'luxtronics.com.au': 'en-au',
+  'luxtronics.co.nz': 'en-nz',
+};
+const STATIC_PUBLIC_PATHS = [
+  { path: '/', changefreq: 'daily', priority: '1.0' },
+  { path: '/shop', changefreq: 'daily', priority: '0.95' },
+  { path: '/latest-arrivals', changefreq: 'daily', priority: '0.9' },
+  { path: '/categories', changefreq: 'weekly', priority: '0.85' },
+  { path: '/blog', changefreq: 'weekly', priority: '0.75' },
+  { path: '/about', changefreq: 'monthly', priority: '0.55' },
+  { path: '/contact', changefreq: 'monthly', priority: '0.55' },
+  { path: '/faq', changefreq: 'monthly', priority: '0.5' },
+  { path: '/shipping-returns', changefreq: 'monthly', priority: '0.45' },
+  { path: '/privacy', changefreq: 'yearly', priority: '0.3' },
+  { path: '/terms', changefreq: 'yearly', priority: '0.3' },
+];
+const BLOG_SLUGS = [
+  'gan-wall-charger-fast-compact-powerful',
+  'top-10-laptops-for-creators-2025',
+  'how-to-choose-your-next-mirrorless-camera',
+  'anc-vs-passive-what-actually-works',
+];
+const sitemapCache = new Map();
+const SITEMAP_CACHE_MS = 6 * 60 * 60 * 1000;
+
+function getPublicHost(req) {
+  const host = String(req.headers.host || '').split(':')[0].replace(/^www\./, '');
+  return PUBLIC_HOSTS.includes(host) ? host : 'luxtronics.in';
+}
+
+function absoluteForHost(host, pathname = '/') {
+  const cleanPath = pathname.startsWith('/') ? pathname : `/${pathname}`;
+  return `https://${host}${cleanPath}`;
+}
+
+function xmlEscape(value = '') {
+  return String(value)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&apos;');
+}
+
+function validIsoDate(value) {
+  if (!value) return null;
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? null : date.toISOString().slice(0, 10);
+}
+
+function alternateLinks(pathname) {
+  return [
+    ...PUBLIC_HOSTS.map((host) =>
+      `    <xhtml:link rel="alternate" hreflang="${HREFLANG_BY_HOST[host]}" href="${xmlEscape(absoluteForHost(host, pathname))}"/>`
+    ),
+    `    <xhtml:link rel="alternate" hreflang="x-default" href="${xmlEscape(absoluteForHost('luxtronics.in', pathname))}"/>`,
+  ].join('\n');
+}
+
+function sitemapUrlEntry(host, pathname, { changefreq = 'weekly', priority = '0.5', lastmod = null, alternates = true } = {}) {
+  return [
+    '  <url>',
+    `    <loc>${xmlEscape(absoluteForHost(host, pathname))}</loc>`,
+    alternates ? alternateLinks(pathname) : '',
+    lastmod ? `    <lastmod>${xmlEscape(lastmod)}</lastmod>` : '',
+    changefreq ? `    <changefreq>${changefreq}</changefreq>` : '',
+    priority ? `    <priority>${priority}</priority>` : '',
+    '  </url>',
+  ].filter(Boolean).join('\n');
+}
+
+async function fetchSitemapProducts(req) {
+  if (mongoReady && productsCol) {
+    try {
+      const products = await productsCol
+        .find({ slug: { $exists: true, $ne: '' } })
+        .project({ slug: 1, date_modified: 1, modified: 1, updatedAt: 1 })
+        .limit(45000)
+        .toArray();
+      if (products.length > 0) {
+        return products.map((product) => ({
+          slug: product.slug,
+          lastmod: validIsoDate(product.date_modified || product.modified || product.updatedAt),
+        }));
+      }
+    } catch (err) {
+      console.warn('Sitemap MongoDB product fetch failed:', err.message);
+    }
+  }
+
+  try {
+    const wooUrl = getWooUrl(req);
+    const auth = getWooAuth(req);
+    const products = [];
+    for (let page = 1; page <= 500; page++) {
+      const url = `${wooUrl}/wp-json/wc/v3/products?per_page=100&page=${page}&status=publish`;
+      const response = await fetch(url, { headers: { Authorization: auth, Accept: 'application/json' } });
+      if (!response.ok) break;
+      const batch = await response.json();
+      if (!Array.isArray(batch) || batch.length === 0) break;
+      products.push(...batch.map((product) => ({
+        slug: product.slug,
+        lastmod: validIsoDate(product.date_modified_gmt || product.date_modified || product.modified),
+      })));
+      if (batch.length < 100 || products.length >= 45000) break;
+    }
+    return products.filter((product) => product.slug);
+  } catch (err) {
+    console.warn('Sitemap WooCommerce product fetch failed:', err.message);
+    return [];
+  }
+}
+
 app.use(cors());
 app.use(express.json());
 
@@ -434,6 +550,90 @@ app.get('/api/test-woo', async (req, res) => {
   } catch (err) {
     res.json({ error: err.message, url });
   }
+});
+
+// ── SEO: DYNAMIC ROBOTS + SITEMAP FOR SEARCH CONSOLE ─────────────────────────
+app.get('/robots.txt', (req, res) => {
+  const host = getPublicHost(req);
+  res.type('text/plain; charset=utf-8');
+  res.set('Cache-Control', 'public, max-age=3600');
+  res.send([
+    'User-agent: *',
+    'Allow: /',
+    '',
+    'Disallow: /admin',
+    'Disallow: /admin/',
+    'Disallow: /account',
+    'Disallow: /account/',
+    'Disallow: /cart',
+    'Disallow: /checkout',
+    'Disallow: /invoices',
+    '',
+    'Allow: /shop',
+    'Allow: /product/',
+    'Allow: /categories',
+    'Allow: /latest-arrivals',
+    'Allow: /blog',
+    '',
+    `Sitemap: ${absoluteForHost(host, '/sitemap.xml')}`,
+    '',
+  ].join('\n'));
+});
+
+app.get('/sitemap.xml', async (req, res) => {
+  const host = getPublicHost(req);
+  const cached = sitemapCache.get(host);
+  if (cached && Date.now() - cached.createdAt < SITEMAP_CACHE_MS) {
+    res.type('application/xml; charset=utf-8');
+    res.set('Cache-Control', 'public, max-age=3600');
+    return res.send(cached.xml);
+  }
+
+  const products = await fetchSitemapProducts(req);
+  const seen = new Set();
+  const entries = [];
+
+  for (const page of STATIC_PUBLIC_PATHS) {
+    entries.push(sitemapUrlEntry(host, page.path, page));
+    seen.add(page.path);
+  }
+
+  for (const slug of BLOG_SLUGS) {
+    const pathName = `/blog/${slug}`;
+    if (!seen.has(pathName)) {
+      entries.push(sitemapUrlEntry(host, pathName, { changefreq: 'monthly', priority: '0.6', alternates: true }));
+      seen.add(pathName);
+    }
+  }
+
+  for (const product of products) {
+    const slug = String(product.slug || '').trim();
+    if (!slug) continue;
+    const pathName = `/product/${encodeURIComponent(slug)}`;
+    if (seen.has(pathName)) continue;
+    entries.push(sitemapUrlEntry(host, pathName, {
+      changefreq: 'weekly',
+      priority: '0.8',
+      lastmod: product.lastmod,
+      alternates: true,
+    }));
+    seen.add(pathName);
+  }
+
+  const xml = [
+    '<?xml version="1.0" encoding="UTF-8"?>',
+    '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"',
+    '        xmlns:xhtml="http://www.w3.org/1999/xhtml">',
+    '',
+    ...entries,
+    '',
+    '</urlset>',
+  ].join('\n');
+
+  sitemapCache.set(host, { createdAt: Date.now(), xml });
+  res.type('application/xml; charset=utf-8');
+  res.set('Cache-Control', 'public, max-age=3600');
+  res.send(xml);
 });
 
 // ── UNIVERSAL ASSET RESOLVER ──────────────────────────────────────────────────
