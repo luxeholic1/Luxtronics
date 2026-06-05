@@ -484,8 +484,8 @@ const Shop = () => {
             "url": absoluteUrl("/shop"),
             "mainEntity": {
               "@type": "ItemList",
-              "numberOfItems": filtered.length,
-              "itemListElement": filtered.slice(0, 24).map((product, index) => ({
+              "numberOfItems": list.length,
+              "itemListElement": list.slice(0, 24).map((product, index) => ({
                 "@type": "ListItem",
                 "position": index + 1,
                 "url": absoluteUrl(`/product/${product.slug}`),
