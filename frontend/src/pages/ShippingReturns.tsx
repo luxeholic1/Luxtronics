@@ -25,7 +25,7 @@ const ShippingReturns = () => {
   };
 
   return (
-    <Layout>
+    <Layout hideBreadcrumb>
       <SEO
         title="Shipping & Returns Policy"
         description="Understand Luxtronics shipping timelines, international coverage to AU/NZ, return eligibility criteria, and secure refund workflows."

@@ -24,7 +24,7 @@ const Terms = () => {
   };
 
   return (
-    <Layout>
+    <Layout hideBreadcrumb>
       <SEO
         title="Terms of Service"
         description="Read the official Terms of Service for Luxtronics. Understand our regulations regarding order cancellations, secure checkouts, shipping policies, and intellectual property."

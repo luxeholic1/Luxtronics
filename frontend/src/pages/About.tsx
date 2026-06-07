@@ -30,7 +30,7 @@ const milestones = ["Premium Electronics", "Mobile Parts", "Tech Accessories", "
 
 const About = () => {
   return (
-    <Layout>
+    <Layout hideBreadcrumb>
       <SEO
         title="Our Story & Philosophy — Luxtronics"
         description="Discover the vision behind Luxtronics. We curate high-performance electronics, reliable replacement parts, and lifestyle tech accessories for tech enthusiasts."

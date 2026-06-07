@@ -31,7 +31,7 @@ const Privacy = () => {
   };
 
   return (
-    <Layout>
+    <Layout hideBreadcrumb>
 
       <SEO
         title="Privacy Policy"

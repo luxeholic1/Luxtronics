@@ -31,11 +31,16 @@ const WhatsAppButton = () => (
   </a>
 );
 
-const Layout = ({ children }: { children: ReactNode }) => (
+type LayoutProps = {
+  children: ReactNode;
+  hideBreadcrumb?: boolean;
+};
+
+const Layout = ({ children, hideBreadcrumb = false }: LayoutProps) => (
   <div className="min-h-screen flex flex-col bg-background overflow-x-hidden w-full">
     <AnnouncementBar />
     <Navbar />
-    <Breadcrumb />
+    {!hideBreadcrumb && <Breadcrumb />}
     <main className="flex-1 w-full overflow-x-hidden">{children}</main>
     <Footer />
     <WhatsAppButton />

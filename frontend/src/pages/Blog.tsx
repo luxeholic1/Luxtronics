@@ -52,7 +52,7 @@ const Blog = () => {
   const tags = Array.from(new Set(blogPosts.map((post) => post.tag)));
 
   return (
-    <Layout>
+    <Layout hideBreadcrumb>
       <SEO
         title="Blog — Electronics Guides & Reviews | Luxtronics"
         description="Expert guides, buying advice and reviews on smartphones, laptops, audio, cameras and wearables from the Luxtronics team."
