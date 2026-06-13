@@ -34,6 +34,7 @@ import Layout from "@/components/Layout";
 import SEO from "@/components/SEO";
 import { absoluteUrl, breadcrumbSchema } from "@/lib/seo";
 import { scoreTextMatch } from "@/lib/smart-search";
+import { filterVisibleCategories } from "@/lib/visible-categories";
 import { fetchStoreCategories } from "@/services/store-api";
 import type { StoreCategory } from "@/services/store-api";
 
@@ -45,22 +46,11 @@ type ParentGroup = {
 };
 
 const PARENT_GROUPS: ParentGroup[] = [
-  { name: "Apple Parts", icon: Apple, description: "Genuine and compatible parts for all Apple devices", slugKeywords: ["apple-parts", "iphone-13", "iphone-14", "iphone-15", "iphone-16", "iphone-17", "iphone-air", "ipad", "mac-parts", "apple-watch", "iphone"] },
-  { name: "Samsung Parts", icon: Smartphone, description: "Replacement parts for Samsung Galaxy series", slugKeywords: ["samsung-parts", "galaxy-s-series", "galaxy-note", "galaxy-s23", "galaxy-s24", "galaxy-s25", "galaxy-s26", "galaxy-z", "galaxy-tab", "galaxy-smarttag"] },
-  { name: "Mobile Parts", icon: Wrench, description: "Spare parts for all major mobile brands", slugKeywords: ["mobile-parts", "replacement-parts", "repair-tools", "huawei-spare", "oppo-spare", "oneplus-spare", "motorola-spare", "nokia-spare", "honor-spare"] },
-  { name: "Apple Accessories", icon: Apple, description: "Cases, cables and accessories for Apple devices", slugKeywords: ["apple-accessories", "mac-accessories", "airpods", "iphone-cases"] },
-  { name: "Xiaomi Accessories", icon: Smartphone, description: "Accessories for Xiaomi and Redmi devices", slugKeywords: ["xiaomi", "redmi", "more-xiaomi"] },
-  { name: "OnePlus & OPPO", icon: Smartphone, description: "Accessories for OnePlus and OPPO devices", slugKeywords: ["oneplus-oppo", "oneplus-15", "oppo-find", "oppo-reno"] },
-  { name: "Mobile Accessories", icon: Battery, description: "Universal mobile accessories and essentials", slugKeywords: ["mobile-accessories", "cable-charger", "tempered-glass", "cases", "bags-cases", "feature-phones"] },
+  { name: "Mobile Accessories", icon: Battery, description: "Universal mobile accessories and essentials", slugKeywords: ["mobile-accessories", "cable-charger", "tempered-glass", "cases", "case", "cover", "protector", "screen", "glass", "charger", "cable", "adapter", "bags-cases", "bag", "pouch", "holder", "stand", "mount", "dock", "magsafe", "airpods", "earbuds", "earphones", "headphones", "feature-phones"] },
   { name: "Smart Wear", icon: Watch, description: "Smartwatches, smart glasses and wearable technology", slugKeywords: ["wearables", "apple-watch", "huawei-watch", "garmin", "fitbit", "samsung-watch", "smart-glasses", "glasses", "eyewear"] },
-  { name: "Smart Phones", icon: Smartphone, description: "Latest smartphones from top brands", slugKeywords: ["smart-phone", "smartphone", "android-tablet", "google", "huawei", "motorola", "honor"] },
-  { name: "DJI & Insta360", icon: Camera, description: "Drones, action cameras and creator accessories", slugKeywords: ["dji", "insta360", "osmo", "gopro"] },
-  { name: "Camera Accessories", icon: Camera, description: "Lenses, filters, studio and photography gear", slugKeywords: ["camera", "photo-studio", "photographic", "camera-filters", "camera-lens", "camera-accessories", "live-equipment"] },
-  { name: "Game Accessories", icon: Gamepad2, description: "Gaming gear, consoles and accessories", slugKeywords: ["game-accessories", "gaming-accessories", "nintendo", "pocket-console"] },
-  { name: "Consumer Electronics", icon: Tv, description: "TVs, projectors, audio and smart home devices", slugKeywords: ["consumer-electronics", "audio", "bluetooth-speakers", "projector", "android-tv", "3d-printer"] },
-  { name: "In Car", icon: Car, description: "Car electronics, DVRs and parking sensors", slugKeywords: ["in-car", "car-dvr", "parking-sensor"] },
-  { name: "Security", icon: Shield, description: "CCTV, IP cameras and access control systems", slugKeywords: ["cctv", "ip-camera", "access-control", "gps-tracker"] },
   { name: "Outdoor & Sports", icon: TreePine, description: "Camping, cycling, fishing and outdoor gear", slugKeywords: ["outdoor", "camping", "bicycle", "fishing"] },
+  { name: "Consumer Electronics", icon: Tv, description: "TVs, projectors, audio and smart home devices", slugKeywords: ["consumer-electronics", "audio", "bluetooth-speakers", "projector", "android-tv", "3d-printer", "arduino", "vr", "ar", "live-equipment"] },
+  { name: "DJI & Insta360", icon: Camera, description: "Drones, action cameras and creator accessories", slugKeywords: ["dji", "insta360", "osmo", "gopro"] },
 ];
 
 function slugify(value: string) {
@@ -365,7 +355,9 @@ const Categories = () => {
   });
 
   const allCategories: StoreCategory[] = useMemo(() => {
-    return (categoryResult?.data ?? []).filter((category) => category.name.toLowerCase() !== "uncategorized");
+    return filterVisibleCategories(
+      (categoryResult?.data ?? []).filter((category) => category.name.toLowerCase() !== "uncategorized"),
+    );
   }, [categoryResult]);
 
   const grouped = useMemo(() => {
@@ -412,9 +404,7 @@ const Categories = () => {
   );
 
   const activeGroups = grouped.groups.filter((group) => group.children.length > 0);
-  const visibleGroups = grouped.unmatched.length
-    ? [...activeGroups, { group: { name: "Other", icon: Package, description: "More electronics categories", slugKeywords: [] }, children: grouped.unmatched }]
-    : activeGroups;
+  const visibleGroups = activeGroups;
   const displayGroups = useMemo(() => {
     const selected = departmentFilter === "all"
       ? visibleGroups

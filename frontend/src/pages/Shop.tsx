@@ -9,6 +9,7 @@ import { absoluteUrl, breadcrumbSchema } from "@/lib/seo";
 import { fetchStoreCategories, fetchStoreProducts, mapStoreProductToLocalProduct } from "@/services/store-api";
 import type { Product } from "@/data/products";
 import { scoreTextMatch } from "@/lib/smart-search";
+import { filterVisibleCategories } from "@/lib/visible-categories";
 
 const PAGE_SIZE = 72; // denser shop pages
 
@@ -324,7 +325,11 @@ const Shop = () => {
         if (!mounted) return;
         const categoryList = Array.isArray(catData?.data) ? catData.data : [];
         const productList = Array.isArray(prodData) ? prodData : [];
-        setCategories(categoryList.filter(c => String(c.name || "").toLowerCase() !== "uncategorized" || c.count > 0));
+        setCategories(
+          filterVisibleCategories(
+            categoryList.filter(c => String(c.name || "").toLowerCase() !== "uncategorized" || c.count > 0),
+          ),
+        );
         setProducts(productList.map(mapStoreProductToLocalProduct));
         setTotalCount(Math.max(productList.length, categoryList.reduce((sum, cat) => sum + Number(cat.count || 0), 0)));
         setError(null);

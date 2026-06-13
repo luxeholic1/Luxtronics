@@ -13,6 +13,7 @@ import type { Product } from "@/data/products";
 import { products as fallbackProducts } from "@/data/products";
 import { motion, AnimatePresence } from "framer-motion";
 import { normalizeSmartQuery as normalizeQuerySmart, scoreTextMatch } from "@/lib/smart-search";
+import { filterVisibleCategories } from "@/lib/visible-categories";
 
 // ─── Store domains ─────────────────────────────────────────────────────────────
 const STORES = [
@@ -108,25 +109,11 @@ type MegaDepartment = {
 };
 
 const COMPACT_DEPARTMENTS: MegaDepartment[] = [
-  { name: "Apple Parts", icon: Apple, patterns: [/apple.*part/i, /iphone.*part/i, /ipad/i, /mac.*part/i] },
-  { name: "Samsung Parts", icon: Smartphone, patterns: [/samsung.*part/i, /galaxy/i, /samsung/i] },
-  { name: "Mobile Parts", icon: Wrench, patterns: [/mobile.*part/i, /replacement/i, /repair/i, /spare/i] },
-  { name: "Apple Accessories", icon: Apple, patterns: [/apple.*access/i, /airpods/i, /iphone.*case/i, /magsafe/i] },
-  { name: "Samsung Accessories", icon: Smartphone, patterns: [/samsung.*access/i, /galaxy.*access/i] },
-  { name: "Xiaomi Accessories", icon: Smartphone, patterns: [/xiaomi/i, /redmi/i, /poco/i] },
-  { name: "OnePlus & OPPO", icon: Smartphone, patterns: [/oneplus/i, /oppo/i] },
-  { name: "Mobile Accessories", icon: Battery, patterns: [/mobile.*access/i, /charger/i, /cable/i, /case/i, /cover/i, /tempered/i, /power/i] },
+  { name: "Mobile Accessories", icon: Battery, patterns: [/mobile.*access/i, /charger/i, /cable/i, /case/i, /cover/i, /protector/i, /screen/i, /glass/i, /tempered/i, /adapter/i, /power/i, /bag/i, /pouch/i, /holder/i, /stand/i, /mount/i, /dock/i, /magsafe/i, /airpods/i, /earbuds/i, /earphones/i, /headphones/i] },
   { name: "Smart Wear", icon: Watch, patterns: [/wearable/i, /watch/i, /fitbit/i, /garmin/i, /band/i, /glasses/i, /eyewear/i] },
-  { name: "Smart Phones", icon: Smartphone, patterns: [/smart.?phone/i, /iphone/i, /android/i, /pixel/i, /huawei/i, /motorola/i] },
-  { name: "DJI & Insta360", icon: Camera, patterns: [/dji/i, /insta360/i, /gopro/i, /osmo/i] },
-  { name: "Camera Accessories", icon: Camera, patterns: [/camera/i, /photo/i, /lens/i, /filter/i, /studio/i] },
-  { name: "Game Accessories", icon: Gamepad2, patterns: [/game/i, /gaming/i, /nintendo/i, /playstation/i, /xbox/i, /controller/i] },
-  { name: "Consumer Electronics", icon: Tv, patterns: [/consumer/i, /electronics/i, /audio/i, /speaker/i, /projector/i, /tv/i] },
-  { name: "Computer & Networking", icon: Laptop, patterns: [/computer/i, /laptop/i, /network/i, /router/i, /keyboard/i, /mouse/i] },
-  { name: "In Car", icon: Car, patterns: [/car/i, /vehicle/i, /dvr/i, /parking/i] },
-  { name: "Security", icon: Shield, patterns: [/security/i, /cctv/i, /camera/i, /tracker/i, /access control/i] },
   { name: "Outdoor & Sports", icon: TreePine, patterns: [/outdoor/i, /sports/i, /camping/i, /bicycle/i, /fishing/i] },
-  { name: "Home & Garden", icon: Package, patterns: [/home/i, /garden/i, /smart home/i] },
+  { name: "Consumer Electronics", icon: Tv, patterns: [/consumer/i, /electronics/i, /audio/i, /speaker/i, /projector/i, /tv/i, /3d.*printer/i, /arduino/i, /vr/i, /ar/i, /live.*equipment/i] },
+  { name: "DJI & Insta360", icon: Camera, patterns: [/dji/i, /insta360/i, /gopro/i, /osmo/i] },
 ];
 
 const KNOWN_BRANDS = ["apple", "samsung", "sony", "bose", "jbl", "canon", "dji", "logitech", "dyson", "gopro"];
@@ -189,12 +176,12 @@ const CompactCategoriesMega = ({
   onClose: () => void;
 }) => {
   const groupedDepartments = useMemo(() => {
-    const sorted = [...categories].sort((a, b) => (b.count || 0) - (a.count || 0));
+    const sorted = filterVisibleCategories(categories).sort((a, b) => (b.count || 0) - (a.count || 0));
 
     return COMPACT_DEPARTMENTS.map((department) => {
       const items = sorted.filter((category) => categoryMatchesDepartment(category, department));
       return { ...department, items };
-    }).filter((department, index) => department.items.length > 0 || index < 10);
+    }).filter((department) => department.items.length > 0);
   }, [categories]);
 
   const [activeDepartment, setActiveDepartment] = useState(COMPACT_DEPARTMENTS[0].name);
@@ -204,7 +191,7 @@ const CompactCategoriesMega = ({
   const activeItems =
     active?.items.length
       ? active.items
-      : categories.slice(0, 24);
+      : filterVisibleCategories(categories).slice(0, 24);
   const columns = chunkCategories(activeItems.slice(0, 24), 8);
 
   return (
@@ -341,7 +328,7 @@ const Navbar = () => {
   useEffect(() => {
     const timer = setTimeout(() => {
       setDebouncedQuery(searchQuery.trim());
-    }, 80);
+    }, 300);
     return () => clearTimeout(timer);
   }, [searchQuery]);
 
@@ -421,6 +408,7 @@ const Navbar = () => {
   // Top 12 categories by count (exclude uncategorized)
   const navCategories: StoreCategory[] = (catResult?.data ?? [])
     .filter(c => c.name.toLowerCase() !== "uncategorized")
+    .filter((category) => filterVisibleCategories([category]).length > 0)
     .sort((a, b) => b.count - a.count)
     .slice(0, 12);
 
@@ -1168,14 +1156,16 @@ const SearchSuggestions = ({
 }) => {
   const { formatPrice } = useCurrency();
   const liveQuery = query.trim() || debouncedQuery.trim();
+  const requestQuery = debouncedQuery.trim();
   const smartQuery = normalizeSmartQuery(liveQuery);
+  const smartRequestQuery = normalizeSmartQuery(requestQuery);
 
   const { data: suggestions = [], isLoading, isError, error } = useQuery({
-    queryKey: ["search-suggestions", smartQuery],
-    queryFn: () => fetchSearchSuggestions(smartQuery),
-    enabled: liveQuery.length >= 2,
+    queryKey: ["search-suggestions", smartRequestQuery],
+    queryFn: () => fetchSearchSuggestions(smartRequestQuery),
+    enabled: requestQuery.length >= 2,
     staleTime: 1000 * 60 * 5,
-    retry: 1,
+    retry: 0,
   });
 
   const instantSuggestions = useMemo(() => {
@@ -1218,7 +1208,7 @@ const SearchSuggestions = ({
 
   const hasSmartRewrite = smartQuery !== liveQuery.toLowerCase().trim();
 
-  if (isLoading && rankedSuggestions.length === 0) {
+  if (isLoading && rankedSuggestions.length === 0 && requestQuery.length >= 2) {
     return (
       <div className="space-y-2 p-3">
         {[1, 2, 3].map((i) => (
@@ -1234,7 +1224,7 @@ const SearchSuggestions = ({
     );
   }
 
-  if (isError) {
+  if (isError && rankedSuggestions.length === 0) {
     return (
       <div className="p-5 text-center">
         <p className="text-sm text-red-500">

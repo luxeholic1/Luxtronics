@@ -7,6 +7,7 @@ import { motion } from "framer-motion";
 import { fetchStoreCategories } from "@/services/store-api";
 import type { StoreCategory } from "@/services/store-api";
 import { categories as staticCategories } from "@/data/products";
+import { filterVisibleCategories } from "@/lib/visible-categories";
 
 type DisplayCategory = Pick<StoreCategory, "name" | "slug" | "count" | "productCount">;
 
@@ -28,8 +29,8 @@ const CategoryStrip = () => {
 
   const displayCategories: DisplayCategory[] = useMemo(() => {
     const apiCategories = Array.isArray(categoryResult?.data) ? categoryResult.data : [];
-    if (apiCategories.length > 0) return apiCategories;
-    return Array.isArray(staticCategories) ? staticCategories : [];
+    if (apiCategories.length > 0) return filterVisibleCategories(apiCategories);
+    return Array.isArray(staticCategories) ? filterVisibleCategories(staticCategories) : [];
   }, [categoryResult]);
 
   return (

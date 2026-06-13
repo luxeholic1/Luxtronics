@@ -492,26 +492,7 @@ export async function fetchSearchSuggestions(query: string): Promise<Product[]> 
       return products.map(mapStoreProductToLocalProduct).filter((product): product is Product => product !== null);
     }
 
-    const fallbackResponse = await fetch(
-      apiUrl('/api/woo/products?per_page=100&status=publish'),
-      { headers: { 'Accept': 'application/json' } },
-    );
-
-    if (!fallbackResponse.ok) return [];
-    const fallbackProducts = await fallbackResponse.json();
-    if (!Array.isArray(fallbackProducts)) return [];
-
-    return fallbackProducts
-      .map(mapStoreProductToLocalProduct)
-      .filter((product): product is Product => product !== null)
-      .map((product) => ({
-        product,
-        score: scoreTextMatch(query, [product.name, product.category, product.description, product.brand], [5, 3, 1, 2]),
-      }))
-      .filter(({ score }) => score > 0)
-      .sort((a, b) => b.score - a.score)
-      .slice(0, 8)
-      .map(({ product }) => product);
+    return [];
   } catch {
     return [];
   }
