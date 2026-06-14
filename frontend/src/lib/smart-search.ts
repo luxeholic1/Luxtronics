@@ -40,15 +40,22 @@ export const SEARCH_SYNONYMS: Record<string, string[]> = {
   power: ["charger", "adapter", "power bank"],
 };
 
-export function tokeniseSmart(value: string): string[] {
-  return value.toLowerCase().match(/[a-z0-9]+/g) || [];
+function asSearchString(value: unknown): string {
+  if (value === null || value === undefined) return "";
+  if (typeof value === "string") return value;
+  if (typeof value === "number" || typeof value === "boolean") return String(value);
+  return "";
+}
+
+export function tokeniseSmart(value: unknown): string[] {
+  return asSearchString(value).toLowerCase().match(/[a-z0-9]+/g) || [];
 }
 
 const tokenCache = new Map<string, string[]>();
 const levenshteinCache = new Map<string, number>();
 
-function cachedTokens(value: string): string[] {
-  const key = value.toLowerCase();
+function cachedTokens(value: unknown): string[] {
+  const key = asSearchString(value).toLowerCase();
   const cached = tokenCache.get(key);
   if (cached) return cached;
   const tokens = tokeniseSmart(key);
@@ -57,8 +64,8 @@ function cachedTokens(value: string): string[] {
   return tokens;
 }
 
-export function expandSearchQuery(value: string): string {
-  const cleaned = value.toLowerCase().trim().replace(/\s+/g, " ");
+export function expandSearchQuery(value: unknown): string {
+  const cleaned = asSearchString(value).toLowerCase().trim().replace(/\s+/g, " ");
   const words = tokeniseSmart(cleaned);
   const expanded = new Set<string>(words);
 
@@ -71,8 +78,8 @@ export function expandSearchQuery(value: string): string {
   return Array.from(expanded).join(" ");
 }
 
-export function normalizeSmartQuery(value: string): string {
-  const cleaned = value.toLowerCase().trim().replace(/\s+/g, " ");
+export function normalizeSmartQuery(value: unknown): string {
+  const cleaned = asSearchString(value).toLowerCase().trim().replace(/\s+/g, " ");
   if (!cleaned) return "";
   const directRewrite = SEARCH_SYNONYMS[cleaned]?.[0];
   return directRewrite || cleaned;
@@ -103,6 +110,8 @@ export function levenshtein(a: string, b: string): number {
 }
 
 export function wordMatchesToken(queryWord: string, token: string): boolean {
+  queryWord = asSearchString(queryWord);
+  token = asSearchString(token);
   if (!queryWord || !token) return false;
   if (/^\d+$/.test(queryWord)) return token === queryWord;
   if (token.startsWith(queryWord) || queryWord.startsWith(token)) return true;
@@ -112,7 +121,7 @@ export function wordMatchesToken(queryWord: string, token: string): boolean {
   return levenshtein(queryWord, token) <= allowedDistance;
 }
 
-export function scoreTextMatch(query: string, fields: Array<string | undefined>, weights?: number[]): number {
+export function scoreTextMatch(query: unknown, fields: Array<unknown>, weights?: number[]): number {
   const normalized = normalizeSmartQuery(query);
   const expanded = expandSearchQuery(query);
   const queryWords = cachedTokens(`${normalized} ${expanded}`);
@@ -121,7 +130,7 @@ export function scoreTextMatch(query: string, fields: Array<string | undefined>,
 
   let score = 0;
   fields.forEach((field, index) => {
-    const text = (field || "").toLowerCase();
+    const text = asSearchString(field).toLowerCase();
     if (!text) return;
 
     const fieldWeight = weights?.[index] ?? 1;

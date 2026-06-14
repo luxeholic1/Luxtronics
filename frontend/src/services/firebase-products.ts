@@ -30,6 +30,7 @@ const AVAILABILITY_TTL = 5 * 60 * 1000;  // 5 minutes
 let _productsCache:    { data: StoreProduct[]; ts: number } | null = null;
 let _categoriesCache:  { data: StoreCategory[]; ts: number } | null = null;
 let _availabilityCache: { value: boolean; ts: number } | null = null;
+const _searchCache = new Map<string, { data: StoreProduct[]; ts: number }>();
 
 /**
  * Check if Firebase has fresh data — result cached for 5 minutes
@@ -220,56 +221,100 @@ export async function fetchCategoriesFromFirebase(): Promise<StoreCategory[]> {
  */
 export async function searchProductsInFirebase(searchQuery: string): Promise<StoreProduct[]> {
   try {
+    const normalized = normalizeSmartQuery(searchQuery);
+    if (normalized.length < 2) return [];
+
+    const cached = _searchCache.get(normalized);
+    if (cached && Date.now() - cached.ts < PRODUCTS_TTL) {
+      return cached.data;
+    }
+
+    const words = tokeniseSmart(normalized).filter((word) => word.length >= 2);
+    const indexedTerms = [...new Set([
+      ...words,
+      ...words.map((word) => word.slice(0, Math.min(word.length, 12))),
+    ])].slice(0, 10);
+
+    if (indexedTerms.length > 0) {
+      try {
+        const productsRef = collection(productsDb, COLLECTIONS.PRODUCTS);
+        const indexedQuery = query(
+          productsRef,
+          where('searchTerms', 'array-contains-any', indexedTerms),
+          firestoreLimit(80),
+        );
+        const snapshot = await getDocs(indexedQuery);
+        const indexedProducts = snapshot.docs.map(docSnap => ({
+          id: parseInt(docSnap.id),
+          ...docSnap.data(),
+        })) as StoreProduct[];
+
+        const ranked = rankSearchResults(indexedProducts, normalized).slice(0, 40);
+        if (ranked.length > 0) {
+          _searchCache.set(normalized, { data: ranked, ts: Date.now() });
+          return ranked;
+        }
+      } catch (error) {
+        console.warn('Firebase indexed search failed, falling back to cache:', error);
+      }
+    }
+
     // Ensure cache is populated (respects TTL)
     if (!_productsCache || Date.now() - _productsCache.ts > PRODUCTS_TTL) {
       await fetchProductsFromFirebase();
     }
     const products = _productsCache?.data || [];
 
-    const q = normalizeSmartQuery(searchQuery);
-    const words = tokeniseSmart(searchQuery);
-    const allIn = (ws: string[], tokens: string[]) =>
-      ws.every(w => tokens.some(t => wordMatchesToken(w, t)));
-
-    const score = (product: StoreProduct): number => {
-      const name = (product.name || '').toLowerCase();
-      const cats = product.categories?.map((c: any) => c.name).join(' ') || '';
-      const desc = (product.description || '').toLowerCase();
-      const slug = (product.slug || '').toLowerCase();
-      const nt = tokeniseSmart(name), ct = tokeniseSmart(cats), dt = tokeniseSmart(desc);
-
-      let s = scoreTextMatch(searchQuery, [name, cats, slug, desc], [5, 3, 2, 1]);
-      if (name === q)              s += 1000;
-      if (name.startsWith(q + ' ')) s += 800;
-
-      const inName = allIn(words, nt);
-      if (inName) {
-        s += 600;
-        if (words.length > 1) {
-          let last = -1, ok = true;
-          for (const w of words) {
-            const idx = nt.findIndex((t, i) => i > last && wordMatchesToken(w, t));
-            if (idx === -1) { ok = false; break; }
-            last = idx;
-          }
-          if (ok) s += 200;
-        }
-      }
-      if (!inName && allIn(words, [...nt, ...ct])) s += 120;
-      if (!inName && allIn(words, dt))             s += 40;
-      if (s > 0) s -= name.length * 0.1;
-      return s;
-    };
-
-    return products
-      .map(p => ({ p, s: score(p) }))
-      .filter(({ s }) => s > 0)
-      .sort((a, b) => b.s - a.s)
-      .map(({ p }) => p);
+    const ranked = rankSearchResults(products, normalized);
+    _searchCache.set(normalized, { data: ranked, ts: Date.now() });
+    return ranked;
   } catch (error) {
     console.error('Firebase search error:', error);
     return [];
   }
+}
+
+function rankSearchResults(products: StoreProduct[], searchQuery: string): StoreProduct[] {
+  const q = normalizeSmartQuery(searchQuery);
+  const words = tokeniseSmart(searchQuery);
+  const allIn = (ws: string[], tokens: string[]) =>
+    ws.every(w => tokens.some(t => wordMatchesToken(w, t)));
+
+  const score = (product: StoreProduct): number => {
+    const name = (product.name || '').toLowerCase();
+    const cats = product.categories?.map((c: any) => c.name).join(' ') || '';
+    const desc = (product.description || '').toLowerCase();
+    const slug = (product.slug || '').toLowerCase();
+    const nt = tokeniseSmart(name), ct = tokeniseSmart(cats), dt = tokeniseSmart(desc), st = tokeniseSmart(slug);
+
+    let s = scoreTextMatch(searchQuery, [name, cats, slug, desc], [5, 3, 2, 1]);
+    if (name === q) s += 1000;
+    if (name.startsWith(q + ' ')) s += 800;
+
+    const inName = allIn(words, nt);
+    if (inName) {
+      s += 600;
+      if (words.length > 1) {
+        let last = -1, ok = true;
+        for (const w of words) {
+          const idx = nt.findIndex((t, i) => i > last && wordMatchesToken(w, t));
+          if (idx === -1) { ok = false; break; }
+          last = idx;
+        }
+        if (ok) s += 200;
+      }
+    }
+    if (!inName && allIn(words, [...nt, ...ct, ...st])) s += 120;
+    if (!inName && allIn(words, dt)) s += 40;
+    if (s > 0) s -= name.length * 0.1;
+    return s;
+  };
+
+  return products
+    .map(p => ({ p, s: score(p) }))
+    .filter(({ s }) => s > 0)
+    .sort((a, b) => b.s - a.s)
+    .map(({ p }) => p);
 }
 
 /** Clear cache manually (e.g. after Firebase sync) */
@@ -277,4 +322,5 @@ export function clearFirebaseCache() {
   _productsCache    = null;
   _categoriesCache  = null;
   _availabilityCache = null;
+  _searchCache.clear();
 }

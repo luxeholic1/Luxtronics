@@ -371,15 +371,14 @@ const Shop = () => {
   // ── Filtered + sorted list ──
   const list = useMemo(() => {
     let p = [...products];
-    if (searchQuery) {
-      const q = searchQuery.toLowerCase().trim();
+    if (debouncedQuery) {
+      const q = debouncedQuery.toLowerCase().trim();
       const words = tokenise(q);
-      p = p.filter(x => scoreProduct(x, q, words) > 0);
-      p.sort((a, b) => {
-        const q2 = searchQuery.toLowerCase().trim();
-        const ws = tokenise(q2);
-        return scoreProduct(b, q2, ws) - scoreProduct(a, q2, ws);
-      });
+      p = p
+        .map((product) => ({ product, score: scoreProduct(product, q, words) }))
+        .filter(({ score }) => score > 0)
+        .sort((a, b) => b.score - a.score)
+        .map(({ product }) => product);
     } else {
       if (activeCat !== "all") {
         const sel = categories.find(c => c.slug === activeCat);
@@ -420,7 +419,7 @@ const Shop = () => {
     p = p.filter((x) => priceRule.test(x.price));
     if (minRating > 0) p = p.filter((x) => x.rating >= minRating);
     return p;
-  }, [activeCat, searchQuery, sort, products, categories, priceRange, minRating]);
+  }, [activeCat, debouncedQuery, sort, products, categories, priceRange, minRating]);
 
   // ── Paginated slice ──
   const paginated = useMemo(

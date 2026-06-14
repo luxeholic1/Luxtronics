@@ -1,12 +1,16 @@
 /**
- * Fix Pinterest Feed — Bulk update all WooCommerce products with:
+ * Fix Pinterest Feed — Bulk update WooCommerce catalog metadata with:
  *   1. condition = "new"
  *   2. google_product_category (mapped from WooCommerce category)
+ *   3. the same metadata on every variation
  *
  * Run: npm run fix:pinterest
+ * Dry run: npm run fix:pinterest -- --dry-run
+ * Quick test: npm run fix:pinterest -- --dry-run --limit=25
+ * Tune variation concurrency: npm run fix:pinterest -- --concurrency=6
+ * Target retry: npm run fix:pinterest -- --product-ids=123,456
  */
 
-import WooCommerceRestApi from '@woocommerce/woocommerce-rest-api';
 import * as dotenv from 'dotenv';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
@@ -16,24 +20,63 @@ const __dirname  = dirname(__filename);
 dotenv.config({ path: join(__dirname, '../../.env') });
 
 // ── WooCommerce API ───────────────────────────────────────────────────────────
-const Api = (WooCommerceRestApi as any).default ?? WooCommerceRestApi;
-const woo = new Api({
-  url:            process.env.VITE_WOOCOMMERCE_URL_INDIA    || '',
-  consumerKey:    process.env.VITE_WOOCOMMERCE_KEY_INDIA    || '',
-  consumerSecret: process.env.VITE_WOOCOMMERCE_SECRET_INDIA || '',
-  version: 'wc/v3',
-  timeout: 30000,
-});
+const STORE_URL = (process.env.VITE_WOOCOMMERCE_URL_INDIA || '').replace(/\/$/, '');
+const CONSUMER_KEY = process.env.VITE_WOOCOMMERCE_KEY_INDIA || '';
+const CONSUMER_SECRET = process.env.VITE_WOOCOMMERCE_SECRET_INDIA || '';
+const DRY_RUN = process.argv.includes('--dry-run');
+const LIMIT_ARG = process.argv.find(arg => arg.startsWith('--limit='));
+const PRODUCT_LIMIT = LIMIT_ARG ? Math.max(0, Number(LIMIT_ARG.split('=')[1]) || 0) : 0;
+const CONCURRENCY_ARG = process.argv.find(arg => arg.startsWith('--concurrency='));
+const VARIATION_CONCURRENCY = CONCURRENCY_ARG ? Math.max(1, Number(CONCURRENCY_ARG.split('=')[1]) || 8) : 8;
+const PRODUCT_IDS_ARG = process.argv.find(arg => arg.startsWith('--product-ids='));
+const PRODUCT_IDS = PRODUCT_IDS_ARG
+  ? PRODUCT_IDS_ARG.split('=')[1].split(',').map(id => Number(id.trim())).filter(Boolean)
+  : [];
+const AUTH_HEADER = 'Basic ' + Buffer.from(`${CONSUMER_KEY}:${CONSUMER_SECRET}`).toString('base64');
+const API_BASE = `${STORE_URL}/wp-json/wc/v3`;
+const BATCH_SIZE = 100;
+
+if (!STORE_URL || !CONSUMER_KEY || !CONSUMER_SECRET) {
+  console.error('Missing WooCommerce env vars: VITE_WOOCOMMERCE_URL_INDIA, VITE_WOOCOMMERCE_KEY_INDIA, VITE_WOOCOMMERCE_SECRET_INDIA');
+  process.exit(1);
+}
+
+async function wooRequest<T>(method: 'GET' | 'PUT' | 'POST', endpoint: string, body?: unknown): Promise<T> {
+  const res = await fetch(`${API_BASE}/${endpoint.replace(/^\//, '')}`, {
+    method,
+    headers: {
+      Authorization: AUTH_HEADER,
+      'Content-Type': 'application/json',
+    },
+    body: body ? JSON.stringify(body) : undefined,
+  });
+
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`WooCommerce ${res.status} ${res.statusText}: ${text.slice(0, 500)}`);
+  }
+
+  return res.json() as Promise<T>;
+}
 
 // ── Google Product Category mapping ──────────────────────────────────────────
 // Full taxonomy: https://www.google.com/basepages/producttype/taxonomy-with-ids.en-US.txt
 const CATEGORY_MAP: Record<string, string> = {
   // Smartphones & Tablets
+  'phone':                '267',
+  'phones':               '267',
+  'mobile-phone':         '267',
+  'mobile phones':        '267',
   'smart-phone':          '267',   // Electronics > Communications > Telephony > Mobile Phones
   'smartphones':          '267',
+  'smart phones':         '267',
   'smart phone':          '267',
+  'rugged-phone':         '267',
+  'rugged phones':        '267',
   'android-tablet-pc':    '4745',  // Electronics > Computers > Tablet Computers
   'android tablet pc':    '4745',
+  'tablet':               '4745',
+  'tablets':              '4745',
   'feature-phones':       '267',
   'google':               '267',
   'huawei':               '267',
@@ -79,6 +122,12 @@ const CATEGORY_MAP: Record<string, string> = {
 
   // Wearables
   'wearables':            '201',   // Electronics > Electronics Accessories > Wearable Technology
+  'smart-watch':          '201',
+  'smart watch':          '201',
+  'smart-watches':        '201',
+  'smart watches':        '201',
+  'watch':                '201',
+  'watches':              '201',
   'garmin-watch':         '201',
   'fitbit-watch':         '201',
   'huawei-watch':         '201',
@@ -151,17 +200,61 @@ function getGoogleCategory(categories: any[]): string {
   return DEFAULT_GOOGLE_CATEGORY;
 }
 
+function metaValue(item: any, key: string): string {
+  const meta = Array.isArray(item?.meta_data) ? item.meta_data : [];
+  return String(meta.find((entry: any) => entry?.key === key)?.value || '').trim();
+}
+
+function needsPinterestMeta(item: any, googleCat: string): boolean {
+  return metaValue(item, 'condition') !== 'new' || metaValue(item, 'google_product_category') !== googleCat;
+}
+
+function pinterestMeta(googleCat: string) {
+  return [
+    { key: 'condition', value: 'new' },
+    { key: 'google_product_category', value: googleCat },
+  ];
+}
+
+function chunk<T>(items: T[], size: number): T[][] {
+  const chunks: T[][] = [];
+  for (let index = 0; index < items.length; index += size) {
+    chunks.push(items.slice(index, index + size));
+  }
+  return chunks;
+}
+
 // ── Fetch all products ────────────────────────────────────────────────────────
 async function fetchAllProducts(): Promise<any[]> {
   const all: any[] = [];
   let page = 1;
+
+  if (PRODUCT_IDS.length > 0) {
+    console.log(`📦 Fetching targeted products: ${PRODUCT_IDS.join(', ')}`);
+    for (const ids of chunk(PRODUCT_IDS, 100)) {
+      const params = new URLSearchParams({
+        include: ids.join(','),
+        per_page: String(ids.length),
+      });
+      all.push(...await wooRequest<any[]>('GET', `products?${params}`));
+    }
+    console.log(`✅ Total: ${all.length} targeted products\n`);
+    return all;
+  }
+
   console.log('📦 Fetching all products...');
   while (true) {
     try {
-      const { data } = await woo.get('products', { per_page: 100, page, status: 'publish' });
-      if (!data?.length) break;
-      all.push(...data);
+      const params = new URLSearchParams({
+        per_page: '100',
+        page: String(page),
+        status: 'publish',
+      });
+      const data = await wooRequest<any[]>('GET', `products?${params}`);
+      if (!data.length) break;
+      all.push(...(PRODUCT_LIMIT ? data.slice(0, Math.max(PRODUCT_LIMIT - all.length, 0)) : data));
       process.stdout.write(`\r   Fetched ${all.length} products (page ${page})...`);
+      if (PRODUCT_LIMIT && all.length >= PRODUCT_LIMIT) break;
       page++;
     } catch (err: any) {
       console.error(`\n❌ Fetch error page ${page}:`, err.message);
@@ -172,92 +265,136 @@ async function fetchAllProducts(): Promise<any[]> {
   return all;
 }
 
-// ── Update single product ─────────────────────────────────────────────────────
-async function updateProduct(id: number, data: any): Promise<boolean> {
-  try {
-    await woo.put(`products/${id}`, data);
-    return true;
-  } catch (err: any) {
-    return false;
+async function fetchAllVariations(productId: number): Promise<any[]> {
+  const all: any[] = [];
+  let page = 1;
+
+  while (true) {
+    const params = new URLSearchParams({
+      per_page: '100',
+      page: String(page),
+    });
+    const data = await wooRequest<any[]>('GET', `products/${productId}/variations?${params}`);
+    if (!data.length) break;
+    all.push(...data);
+    page++;
   }
+
+  return all;
+}
+
+// ── Update products in WooCommerce batch calls ────────────────────────────────
+async function updateProductBatch(updates: Array<{ id: number; meta_data: ReturnType<typeof pinterestMeta> }>) {
+  if (DRY_RUN || updates.length === 0) return { updated: updates.length, failed: 0 };
+
+  let updated = 0;
+  let failed = 0;
+
+  for (const batch of chunk(updates, BATCH_SIZE)) {
+    try {
+      await wooRequest('POST', 'products/batch', { update: batch });
+      updated += batch.length;
+    } catch (err: any) {
+      failed += batch.length;
+      console.error(`\n   Product batch failed: ${err.message}`);
+    }
+  }
+
+  return { updated, failed };
 }
 
 // ── Update product variations ─────────────────────────────────────────────────
-async function updateVariations(productId: number, googleCat: string): Promise<void> {
-  try {
-    const { data: variations } = await woo.get(`products/${productId}/variations`, { per_page: 100 });
-    if (!variations?.length) return;
-
-    // Batch update variations
-    const updates = variations.map((v: any) => ({
+async function updateVariations(productId: number, googleCat: string): Promise<{ updated: number; skipped: number; failed: number }> {
+  const variations = await fetchAllVariations(productId);
+  const updates = variations
+    .filter((variation: any) => needsPinterestMeta(variation, googleCat))
+    .map((v: any) => ({
       id: v.id,
-      meta_data: [
-        { key: 'condition', value: 'new' },
-        { key: 'google_product_category', value: googleCat },
-      ],
+      meta_data: pinterestMeta(googleCat),
     }));
 
-    // WooCommerce batch endpoint
-    await woo.post(`products/${productId}/variations/batch`, { update: updates });
-  } catch {
-    // Non-fatal — variations update failure won't stop main flow
+  if (DRY_RUN || updates.length === 0) {
+    return { updated: updates.length, skipped: variations.length - updates.length, failed: 0 };
   }
+
+  let updated = 0;
+  let failed = 0;
+
+  for (const batch of chunk(updates, BATCH_SIZE)) {
+    try {
+      await wooRequest('POST', `products/${productId}/variations/batch`, { update: batch });
+      updated += batch.length;
+    } catch (err: any) {
+      failed += batch.length;
+      console.error(`\n   Variation batch failed for product ${productId}: ${err.message}`);
+    }
+  }
+
+  return { updated, skipped: variations.length - updates.length, failed };
 }
 
 // ── Main ──────────────────────────────────────────────────────────────────────
 async function main() {
-  console.log('🚀 Pinterest Feed Fix — Starting...\n');
+  console.log(`🚀 Pinterest Feed Fix — Starting${DRY_RUN ? ' (dry run)' : ''}...\n`);
   const t0 = Date.now();
 
   const products = await fetchAllProducts();
 
-  let success = 0, failed = 0, skipped = 0;
+  let productUpdated = 0, productFailed = 0, productSkipped = 0;
+  let variationUpdated = 0, variationFailed = 0, variationSkipped = 0;
 
-  console.log('🔄 Updating products...\n');
+  console.log('🔄 Preparing product updates...\n');
 
-  for (let i = 0; i < products.length; i++) {
-    const p = products[i];
-    const googleCat = getGoogleCategory(p.categories || []);
+  const productUpdates = products
+    .map((p: any) => ({
+      id: p.id,
+      googleCat: getGoogleCategory(p.categories || []),
+      needsUpdate: needsPinterestMeta(p, getGoogleCategory(p.categories || [])),
+    }))
+    .filter(item => item.needsUpdate)
+    .map(item => ({ id: item.id, meta_data: pinterestMeta(item.googleCat) }));
 
-    // Check if already set correctly
-    const existingCondition = p.meta_data?.find((m: any) => m.key === 'condition')?.value;
-    const existingGCat = p.meta_data?.find((m: any) => m.key === 'google_product_category')?.value;
+  productSkipped = products.length - productUpdates.length;
+  const productResult = await updateProductBatch(productUpdates);
+  productUpdated = productResult.updated;
+  productFailed = productResult.failed;
 
-    if (existingCondition === 'new' && existingGCat === googleCat) {
-      skipped++;
-      process.stdout.write(`\r   [${i + 1}/${products.length}] ✓ ${success} updated | ${skipped} skipped | ${failed} failed`);
-      continue;
-    }
+  console.log(
+    `   Products: ${productUpdated} ${DRY_RUN ? 'would update' : 'updated'} | ${productSkipped} skipped | ${productFailed} failed`
+  );
 
-    const updateData: any = {
-      meta_data: [
-        { key: 'condition', value: 'new' },
-        { key: 'google_product_category', value: googleCat },
-      ],
-    };
+  const variableProducts = products.filter((p: any) => p.type === 'variable');
+  console.log(`\n🔄 Checking variations for ${variableProducts.length} variable products (${VARIATION_CONCURRENCY} parallel)...\n`);
 
-    const ok = await updateProduct(p.id, updateData);
-    if (ok) {
-      success++;
-      // Also update variations if variable product
-      if (p.type === 'variable') {
-        await updateVariations(p.id, googleCat);
+  let processedVariations = 0;
+  for (const group of chunk(variableProducts, VARIATION_CONCURRENCY)) {
+    await Promise.all(group.map(async (p: any) => {
+      const googleCat = getGoogleCategory(p.categories || []);
+      try {
+        const result = await updateVariations(p.id, googleCat);
+        variationUpdated += result.updated;
+        variationSkipped += result.skipped;
+        variationFailed += result.failed;
+      } catch (err: any) {
+        variationFailed++;
+        console.error(`\n   Variations for product ${p.id} failed: ${err.message}`);
       }
-    } else {
-      failed++;
-    }
+    }));
 
-    process.stdout.write(`\r   [${i + 1}/${products.length}] ✓ ${success} updated | ${skipped} skipped | ${failed} failed`);
-
-    // Small delay to avoid rate limiting
-    await new Promise(r => setTimeout(r, 150));
+    processedVariations += group.length;
+    process.stdout.write(
+      `\r   [${processedVariations}/${variableProducts.length}] variations ${variationUpdated} ${DRY_RUN ? 'would update' : 'updated'} / ${variationSkipped} skipped / ${variationFailed} failed`
+    );
   }
 
   const secs = ((Date.now() - t0) / 1000).toFixed(1);
   console.log(`\n\n🎉 Done in ${secs}s`);
-  console.log(`   ✅ Updated:  ${success}`);
-  console.log(`   ⏭️  Skipped:  ${skipped} (already correct)`);
-  console.log(`   ❌ Failed:   ${failed}`);
+  console.log(`   Products updated:   ${productUpdated}`);
+  console.log(`   Products skipped:   ${productSkipped}`);
+  console.log(`   Products failed:    ${productFailed}`);
+  console.log(`   Variations updated: ${variationUpdated}`);
+  console.log(`   Variations skipped: ${variationSkipped}`);
+  console.log(`   Variations failed:  ${variationFailed}`);
   console.log('\n📌 Next: Regenerate your Pinterest feed in WooCommerce → Pinterest → Sync');
   process.exit(0);
 }

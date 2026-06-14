@@ -97,6 +97,43 @@ function resolveCategories(product: any) {
   return inferred ? [inferred] : [];
 }
 
+function normalizeSearchText(value: string): string {
+  return String(value || '')
+    .toLowerCase()
+    .replace(/&amp;/g, ' and ')
+    .replace(/[^a-z0-9]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function buildSearchTerms(product: any): string[] {
+  const categories = resolveCategories(product);
+  const source = normalizeSearchText([
+    product?.name,
+    product?.slug,
+    product?.sku,
+    product?.type,
+    ...(Array.isArray(product?.tags) ? product.tags.map((tag: any) => `${tag?.name || ''} ${tag?.slug || ''}`) : []),
+    ...categories.map((category: any) => `${category.name} ${category.slug}`),
+  ].filter(Boolean).join(' '));
+
+  const tokens = source
+    .split(' ')
+    .map((token) => token.trim())
+    .filter((token) => token.length >= 2 && token.length <= 32);
+
+  const terms = new Set<string>();
+  for (const token of tokens) {
+    terms.add(token);
+    const maxPrefix = Math.min(token.length, 12);
+    for (let len = 2; len <= maxPrefix; len++) {
+      terms.add(token.slice(0, len));
+    }
+  }
+
+  return [...terms].slice(0, 160);
+}
+
 // ── Fetch all products (paginated) ────────────────────────────────────────────
 async function fetchAllProducts(): Promise<any[]> {
   console.log('📦 Fetching products from WooCommerce...');
@@ -120,6 +157,7 @@ async function fetchAllProducts(): Promise<any[]> {
   return all.map((product) => ({
     ...product,
     categories: resolveCategories(product),
+    searchTerms: buildSearchTerms(product),
   }));
 }
 
