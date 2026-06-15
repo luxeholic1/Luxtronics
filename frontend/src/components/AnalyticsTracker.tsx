@@ -1,6 +1,7 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useLocation } from "react-router-dom";
 import { trackAnalyticsEvent, updateLiveVisitor } from "@/lib/analytics";
+import { COOKIE_CONSENT_KEY } from "@/components/CookieConsent";
 
 const getElementLabel = (element: HTMLElement) => {
   const explicit = element.getAttribute("data-analytics-label") || element.getAttribute("aria-label");
@@ -27,8 +28,27 @@ const getProductMeta = (element: HTMLElement) => {
 
 const AnalyticsTracker = () => {
   const location = useLocation();
+  const [analyticsAllowed, setAnalyticsAllowed] = useState(() => {
+    try {
+      return localStorage.getItem(COOKIE_CONSENT_KEY) === "accepted";
+    } catch {
+      return false;
+    }
+  });
 
   useEffect(() => {
+    const onConsent = (event: Event) => {
+      const value = (event as CustomEvent).detail;
+      setAnalyticsAllowed(value === "accepted");
+    };
+
+    window.addEventListener("luxtronics-cookie-consent", onConsent);
+    return () => window.removeEventListener("luxtronics-cookie-consent", onConsent);
+  }, []);
+
+  useEffect(() => {
+    if (!analyticsAllowed) return;
+
     trackAnalyticsEvent({
       type: "page_view",
       path: `${location.pathname}${location.search}`,
@@ -41,9 +61,11 @@ const AnalyticsTracker = () => {
       lastAction: "Opened page",
       scrollDepth: 0,
     });
-  }, [location.pathname, location.search]);
+  }, [analyticsAllowed, location.pathname, location.search]);
 
   useEffect(() => {
+    if (!analyticsAllowed) return;
+
     let lastScrollDepth = 0;
 
     const getScrollDepth = () => {
@@ -85,9 +107,11 @@ const AnalyticsTracker = () => {
       window.removeEventListener("scroll", onScroll);
       window.removeEventListener("focus", heartbeat);
     };
-  }, [location.pathname, location.search]);
+  }, [analyticsAllowed, location.pathname, location.search]);
 
   useEffect(() => {
+    if (!analyticsAllowed) return;
+
     const seenSections = new Set<string>();
     const observer = new IntersectionObserver(
       (entries) => {
@@ -125,9 +149,11 @@ const AnalyticsTracker = () => {
     sections.forEach((section) => observer.observe(section));
 
     return () => observer.disconnect();
-  }, [location.pathname, location.search]);
+  }, [analyticsAllowed, location.pathname, location.search]);
 
   useEffect(() => {
+    if (!analyticsAllowed) return;
+
     const onClick = (event: MouseEvent) => {
       const target = event.target as HTMLElement | null;
       const clickable = target?.closest("a,button,[role='button']") as HTMLElement | null;
@@ -182,7 +208,7 @@ const AnalyticsTracker = () => {
       document.removeEventListener("click", onClick, true);
       document.removeEventListener("submit", onSubmit, true);
     };
-  }, []);
+  }, [analyticsAllowed]);
 
   return null;
 };

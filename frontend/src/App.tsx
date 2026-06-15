@@ -17,6 +17,7 @@ import Shop from "./pages/Shop.tsx";
 import ProductDetail from "./pages/ProductDetail.tsx";
 import GeoRedirectPopup from "./components/GeoRedirectPopup.tsx";
 import AnalyticsTracker from "./components/AnalyticsTracker.tsx";
+import CookieConsent from "./components/CookieConsent.tsx";
 
 // Lazy load non-critical pages
 const Categories = lazy(() => import("./pages/Categories.tsx"));
@@ -76,6 +77,7 @@ const App = () => {
                   <BrowserRouter>
                     <GeoRedirectPopup />
                     <AnalyticsTracker />
+                    <CookieConsent />
                     <Suspense fallback={<PageLoader />}>
                       <Routes>
                         <Route path="/" element={<Index />} />
