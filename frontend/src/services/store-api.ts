@@ -238,6 +238,15 @@ async function fetchProductsFromStoreCache(
   return { products, total, totalPages };
 }
 
+export async function fetchStoreProductsPage(
+  page = 1,
+  perPage = 100,
+  search?: string,
+  category?: string
+): Promise<{ products: StoreProduct[]; total: number; totalPages: number }> {
+  return fetchProductsFromStoreCache(page, perPage, search, category);
+}
+
 export async function fetchStoreProducts(page = 1, perPage = 100, search?: string, category?: string): Promise<StoreProduct[]> {
   console.log('[Store API] Fetching products from Mongo cache API');
 

@@ -1,11 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import {
-  bulkFetchProducts,
-  getProductsOptimized,
-  prefetchNextPage,
-  clearExpiredCaches,
-} from '@/services/bulk-import';
-import { WooProduct } from '@/services/woocommerce';
+import { fetchStoreProducts, StoreProduct } from '@/services/store-api';
 
 interface UseLazyProductsOptions {
   perPage?: number;
@@ -24,7 +18,7 @@ export function useLazyProducts(options: UseLazyProductsOptions = {}) {
     category = undefined,
   } = options;
 
-  const [products, setProducts] = useState<WooProduct[]>([]);
+  const [products, setProducts] = useState<StoreProduct[]>([]);
   const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(false);
   const [hasMore, setHasMore] = useState(true);
@@ -36,7 +30,7 @@ export function useLazyProducts(options: UseLazyProductsOptions = {}) {
     async (pageNum: number) => {
       try {
         setLoading(true);
-        const data = await getProductsOptimized(pageNum, perPage, category);
+        const data = await fetchStoreProducts(pageNum, perPage, undefined, category);
 
         if (pageNum === 1) {
           setProducts(data);
@@ -48,10 +42,6 @@ export function useLazyProducts(options: UseLazyProductsOptions = {}) {
         setError(null);
         pageRef.current = pageNum;
 
-        // Prefetch next page
-        if (data.length === perPage) {
-          prefetchNextPage(pageNum, perPage, category);
-        }
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Failed to load products');
       } finally {
@@ -67,10 +57,6 @@ export function useLazyProducts(options: UseLazyProductsOptions = {}) {
       loadPage(1);
     }
 
-    // Cleanup: clear expired caches periodically
-    const interval = setInterval(clearExpiredCaches, 60 * 60 * 1000); // Every hour
-
-    return () => clearInterval(interval);
   }, [autoLoad, loadPage]);
 
   // Load more handler for infinite scroll
@@ -148,7 +134,7 @@ export function useInfiniteScroll(
  */
 export function useProductSearch(debounceMs = 500) {
   const [searchTerm, setSearchTerm] = useState('');
-  const [results, setResults] = useState<WooProduct[]>([]);
+  const [results, setResults] = useState<StoreProduct[]>([]);
   const [loading, setLoading] = useState(false);
   const debounceTimer = useRef<NodeJS.Timeout>();
 
@@ -171,16 +157,7 @@ export function useProductSearch(debounceMs = 500) {
       }
 
       try {
-        // Since WooCommerce search is limited, we search in local products
-        // For better performance, implement server-side search
-        // Or use Elasticsearch/Algolia for large datasets
-        
-        // Use backend proxy to avoid CORS — no credentials needed in the browser
-        const response = await fetch(
-          `/api/woo/products?search=${encodeURIComponent(term)}&per_page=50`
-        );
-
-        const data: WooProduct[] = await response.json();
+        const data = await fetchStoreProducts(1, 50, term);
         setResults(data);
       } catch (error) {
         console.error('Search error:', error);

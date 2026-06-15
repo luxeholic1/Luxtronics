@@ -605,7 +605,7 @@ app.get(['/feeds/google-merchant.csv', '/google-merchant-feed.csv'], sendGoogleM
 // ── WOOCOMMERCE API ───────────────────────────────────────────────────────────
 app.get('/api/products', async (req, res) => {
   const page = parseInt(req.query.page || '1', 10);
-  const perPage = Math.min(parseInt(req.query.per_page || '50', 10), 72);
+  const perPage = Math.min(Math.max(parseInt(req.query.per_page || '50', 10), 1), 500);
   const search = req.query.search;
   const category = req.query.category;
 

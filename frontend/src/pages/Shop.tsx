@@ -6,7 +6,7 @@ import ProductCard from "@/components/ProductCard";
 import ImageCursorCard from "@/components/ImageCursorCard";
 import SEO from "@/components/SEO";
 import { absoluteUrl, breadcrumbSchema } from "@/lib/seo";
-import { fetchStoreCategories, fetchStoreProducts, mapStoreProductToLocalProduct } from "@/services/store-api";
+import { fetchStoreCategories, fetchStoreProductsPage, mapStoreProductToLocalProduct } from "@/services/store-api";
 import type { Product } from "@/data/products";
 import { scoreTextMatch } from "@/lib/smart-search";
 import { filterVisibleCategories } from "@/lib/visible-categories";
@@ -34,15 +34,6 @@ function wordMatchesToken(qw: string, pt: string): boolean {
 function allWordsInTokens(words: string[], tokens: string[]): boolean {
   return words.every(w => tokens.some(t => wordMatchesToken(w, t)));
 }
-function slugify(value: string): string {
-  return value
-    .toLowerCase()
-    .trim()
-    .replace(/&/g, "and")
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "");
-}
-
 // ─── Levenshtein distance ─────────────────────────────────────────────────────
 function levenshtein(a: string, b: string): number {
   const m = a.length, n = b.length;
@@ -319,19 +310,16 @@ const Shop = () => {
         setLoading(true);
         const search = debouncedQuery.trim();
         const category = activeCat !== "all" ? activeCat : undefined;
-        const [catData, prodData] = await Promise.all([
+        const [catData, prodResult] = await Promise.all([
           fetchStoreCategories(),
-          fetchStoreProducts(currentPage, PAGE_SIZE, search || undefined, category),
+          fetchStoreProductsPage(currentPage, PAGE_SIZE, search || undefined, category),
         ]);
         if (!mounted) return;
         const categoryList = Array.isArray(catData?.data) ? catData.data : [];
-        const productList = Array.isArray(prodData) ? prodData : [];
+        const productList = Array.isArray(prodResult.products) ? prodResult.products : [];
         setCategories(filterVisibleCategories(categoryList));
         setProducts(productList.map(mapStoreProductToLocalProduct));
-        const activeCategoryCount = category
-          ? categoryList.find((cat) => cat.slug === category)?.count
-          : undefined;
-        setTotalCount(Number(activeCategoryCount || productList.length || categoryList.reduce((sum, cat) => sum + Number(cat.count || 0), 0)));
+        setTotalCount(Number(prodResult.total || 0));
         setError(null);
       } catch (e) {
         if (!mounted) return;
@@ -356,32 +344,6 @@ const Shop = () => {
         .sort((a, b) => b.score - a.score)
         .map(({ product }) => product);
     } else {
-      if (activeCat !== "all") {
-        const sel = categories.find(c => c.slug === activeCat);
-        if (sel) {
-          p = p.filter(x => {
-            // Check all possible category fields — Firebase stores raw WooCommerce data
-            const cats: Array<{ id?: number; name?: string; slug?: string }> = Array.isArray(x.categories) ? x.categories : [];
-            const productCategoryName = String(x.category || '').toLowerCase().trim();
-            const productCategorySlug = slugify(x.category || '');
-
-            return cats.some((c) => {
-              const cId   = Number(c.id);
-              const cSlug = slugify(String(c.slug || c.name || ''));
-              const cName = String(c.name  || '').toLowerCase().trim();
-              return (
-                cId   === sel.id   ||
-                cSlug === slugify(sel.slug) ||
-                cSlug === slugify(sel.name) ||
-                cName === sel.name.toLowerCase().trim() ||
-                productCategorySlug === slugify(sel.slug) ||
-                productCategorySlug === slugify(sel.name) ||
-                productCategoryName === sel.name.toLowerCase().trim()
-              );
-            });
-          });
-        }
-      }
       if (sort === "new") p = [...p].sort((a, b) => {
         const aNew = a.badge === "New" ? 1 : 0;
         const bNew = b.badge === "New" ? 1 : 0;

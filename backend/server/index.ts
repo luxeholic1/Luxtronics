@@ -203,7 +203,7 @@ export async function setupServer(config: ServerConfig = {}): Promise<Express> {
   // ── GET /api/products ──────────────────────────────────────────────────────
   app.get('/api/products', async (req, res) => {
     const page = parseInt(req.query.page as string) || 1;
-    const perPage = Math.min(parseInt(req.query.per_page as string) || 50, 72);
+    const perPage = Math.min(Math.max(parseInt(req.query.per_page as string) || 50, 1), 500);
     const category = req.query.category as string | undefined;
     const search = req.query.search as string | undefined;
 

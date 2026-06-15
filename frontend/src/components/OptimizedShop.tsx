@@ -8,15 +8,15 @@ import { useSearchParams } from 'react-router-dom';
 import Layout from '@/components/Layout';
 import ProductCard from '@/components/ProductCard';
 import { cn } from '@/lib/utils';
-import { useInfiniteScroll, useProductSearch } from '@/hooks/use-lazy-products';
-import { convertWooProductToLocalProduct } from '@/services/product-converter';
-import { useWooCategories } from '@/hooks/use-woo-products';
+import { useInfiniteScroll } from '@/hooks/use-lazy-products';
+import { fetchStoreCategories, mapStoreProductToLocalProduct } from '@/services/store-api';
+import { useQuery } from '@tanstack/react-query';
+import { filterVisibleCategories } from '@/lib/visible-categories';
 
 const OptimizedShop = () => {
   const [params, setParams] = useSearchParams();
   const activeCat = params.get('cat') || 'all';
   const [sort, setSort] = useState('featured');
-  const [searchInput, setSearchInput] = useState('');
   const containerRef = useRef<HTMLDivElement>(null);
 
   // Fetch products with infinite scroll
@@ -33,10 +33,15 @@ const OptimizedShop = () => {
   });
 
   // Fetch categories
-  const { categories } = useWooCategories();
+  const { data: categoryPayload } = useQuery({
+    queryKey: ['categories', 'shop-filter'],
+    queryFn: () => fetchStoreCategories(1, 200),
+    staleTime: 1000 * 60 * 10,
+  });
+  const categories = filterVisibleCategories(categoryPayload?.data || []);
 
   // Convert WooCommerce products to local format
-  const localProducts = wooProducts.map(convertWooProductToLocalProduct);
+  const localProducts = wooProducts.map(mapStoreProductToLocalProduct);
 
   // Sort products
   const displayedProducts = useMemo(() => {
