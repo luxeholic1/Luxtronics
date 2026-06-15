@@ -306,7 +306,7 @@ const Shop = () => {
   const [products,   setProducts]   = useState<Product[]>([]);
   const [totalCount, setTotalCount] = useState(0); // real total from source
   const [loading,    setLoading]    = useState(true);
-  const [hydratingAll, setHydratingAll] = useState(false);
+  const [hydratingAll] = useState(false);
   const [error,      setError]      = useState<string | null>(null);
 
   const debouncedQuery = useDebounce(searchQuery, 350);
@@ -318,9 +318,10 @@ const Shop = () => {
       try {
         setLoading(true);
         const search = debouncedQuery.trim();
+        const category = activeCat !== "all" ? activeCat : undefined;
         const [catData, prodData] = await Promise.all([
           fetchStoreCategories(),
-          fetchStoreProducts(1, 100, search || undefined),
+          fetchStoreProducts(currentPage, PAGE_SIZE, search || undefined, category),
         ]);
         if (!mounted) return;
         const categoryList = Array.isArray(catData?.data) ? catData.data : [];
@@ -331,7 +332,10 @@ const Shop = () => {
           ),
         );
         setProducts(productList.map(mapStoreProductToLocalProduct));
-        setTotalCount(Math.max(productList.length, categoryList.reduce((sum, cat) => sum + Number(cat.count || 0), 0)));
+        const activeCategoryCount = category
+          ? categoryList.find((cat) => cat.slug === category)?.count
+          : undefined;
+        setTotalCount(Number(activeCategoryCount || productList.length || categoryList.reduce((sum, cat) => sum + Number(cat.count || 0), 0)));
         setError(null);
       } catch (e) {
         if (!mounted) return;
@@ -342,31 +346,7 @@ const Shop = () => {
     };
     load();
     return () => { mounted = false; };
-  }, [debouncedQuery]);
-
-  useEffect(() => {
-    if (searchQuery.trim()) return;
-    let mounted = true;
-    const hydrateCatalog = async () => {
-      try {
-        setHydratingAll(true);
-        const allProducts = await fetchStoreProducts(1, 0);
-        const productList = Array.isArray(allProducts) ? allProducts : [];
-        if (!mounted || productList.length === 0) return;
-        setProducts(productList.map(mapStoreProductToLocalProduct));
-        setTotalCount(productList.length);
-      } catch (e) {
-        console.warn("Background product hydration failed:", e);
-      } finally {
-        if (mounted) setHydratingAll(false);
-      }
-    };
-    const timer = window.setTimeout(hydrateCatalog, 250);
-    return () => {
-      mounted = false;
-      window.clearTimeout(timer);
-    };
-  }, [searchQuery]);
+  }, [activeCat, currentPage, debouncedQuery]);
 
   // ── Filtered + sorted list ──
   const list = useMemo(() => {
@@ -422,10 +402,7 @@ const Shop = () => {
   }, [activeCat, debouncedQuery, sort, products, categories, priceRange, minRating]);
 
   // ── Paginated slice ──
-  const paginated = useMemo(
-    () => list.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE),
-    [list, currentPage]
-  );
+  const paginated = list;
 
   const setPage = (p: number) => {
     const next = new URLSearchParams(params);
@@ -581,9 +558,9 @@ const Shop = () => {
                     </button>
                   )}
 
-                  {!loading && list.length > PAGE_SIZE && (
+                  {!loading && totalCount > PAGE_SIZE && (
                     <span className="inline-flex h-9 items-center justify-center rounded-lg bg-muted px-3 text-xs font-semibold text-muted-foreground">
-                      {(currentPage - 1) * PAGE_SIZE + 1}-{Math.min(currentPage * PAGE_SIZE, list.length)} of {list.length.toLocaleString()}
+                      {(currentPage - 1) * PAGE_SIZE + 1}-{Math.min(currentPage * PAGE_SIZE, totalCount)} of {totalCount.toLocaleString()}
                     </span>
                   )}
                 </div>
@@ -651,7 +628,7 @@ const Shop = () => {
 
                 <Pagination
                   page={currentPage}
-                  total={list.length}
+                  total={totalCount}
                   pageSize={PAGE_SIZE}
                   onChange={setPage}
                 />

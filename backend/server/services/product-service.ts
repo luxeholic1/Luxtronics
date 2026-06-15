@@ -6,6 +6,30 @@
 import { Db, Filter, UpdateFilter } from 'mongodb';
 import { MongoProduct, MongoCategory, CacheMetadata } from '../models/mongo-models';
 
+function escapeRegex(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+const PRODUCT_LIST_PROJECTION = {
+  id: 1,
+  type: 1,
+  slug: 1,
+  name: 1,
+  shortDescription: 1,
+  categories: 1,
+  price: 1,
+  salePrice: 1,
+  regularPrice: 1,
+  images: { $slice: 2 },
+  rating: 1,
+  reviewCount: 1,
+  stockStatus: 1,
+  sku: 1,
+  seo: 1,
+  updatedAt: 1,
+  syncedAt: 1,
+};
+
 export class ProductService {
   private db: Db;
   private readonly PRODUCTS_COLLECTION = 'products';
@@ -88,7 +112,7 @@ export class ProductService {
 
     const [products, total] = await Promise.all([
       collection
-        .find(query)
+        .find(query, { projection: PRODUCT_LIST_PROJECTION })
         .skip(skip)
         .limit(perPage)
         .sort({ createdAt: -1 })
@@ -107,9 +131,15 @@ export class ProductService {
     page: number = 1,
     perPage: number = 50
   ): Promise<{ products: MongoProduct[]; total: number }> {
-    const regex = new RegExp(category.replace(/-/g, '[\\s-]'), 'i');
+    const safeCategory = escapeRegex(String(category || '').trim());
+    const regex = new RegExp(safeCategory.replace(/-/g, '[\\s-]'), 'i');
     return this.getProducts(page, perPage, {
-      $or: [{ category: regex }, { categorySlug: category }],
+      $or: [
+        { 'categories.slug': category },
+        { 'categories.name': regex },
+        { category: regex },
+        { categorySlug: category },
+      ],
     } as any);
   }
 
@@ -119,22 +149,44 @@ export class ProductService {
   async searchProducts(
     searchTerm: string,
     page: number = 1,
-    perPage: number = 50
+    perPage: number = 50,
+    category?: string
   ): Promise<{ products: MongoProduct[]; total: number }> {
     const collection = this.db.collection(this.PRODUCTS_COLLECTION);
 
     const skip = (page - 1) * perPage;
+    const safeSearchTerm = escapeRegex(String(searchTerm || '').trim());
+    const textSearch = String(searchTerm || '').trim();
 
-    const query = {
+    const textQuery = textSearch.length >= 2 ? { $text: { $search: textSearch } } : null;
+    const regexQuery = {
       $or: [
-        { name: { $regex: searchTerm, $options: 'i' } },
-        { category: { $regex: searchTerm, $options: 'i' } }
+        { name: { $regex: safeSearchTerm, $options: 'i' } },
+        { slug: { $regex: safeSearchTerm, $options: 'i' } },
+        { searchText: { $regex: safeSearchTerm, $options: 'i' } },
+        { description: { $regex: safeSearchTerm, $options: 'i' } },
+        { 'categories.name': { $regex: safeSearchTerm, $options: 'i' } },
+        { 'categories.slug': { $regex: safeSearchTerm, $options: 'i' } },
+        { category: { $regex: safeSearchTerm, $options: 'i' } },
       ]
     };
 
+    const categoryFilter = category
+      ? {
+        $or: [
+          { 'categories.slug': category },
+          { 'categories.name': new RegExp(escapeRegex(category).replace(/-/g, '[\\s-]'), 'i') },
+          { categorySlug: category },
+        ],
+      }
+      : null;
+    const searchQuery = textQuery || regexQuery;
+    const query = categoryFilter ? { $and: [searchQuery, categoryFilter] } : searchQuery;
+
     const [products, total] = await Promise.all([
       collection
-        .find(query)
+        .find(query, { projection: PRODUCT_LIST_PROJECTION })
+        .sort(textQuery ? { score: { $meta: 'textScore' } } : { updatedAt: -1 })
         .skip(skip)
         .limit(perPage)
         .toArray() as Promise<MongoProduct[]>,
@@ -194,6 +246,19 @@ export class ProductService {
       .sort({ createdAt: -1 })
       .limit(limit)
       .toArray() as Promise<MongoProduct[]>;
+  }
+
+  async getSitemapProducts(limit: number = 50000): Promise<Array<Pick<MongoProduct, 'slug' | 'updatedAt' | 'syncedAt'>>> {
+    const collection = this.db.collection<MongoProduct>(this.PRODUCTS_COLLECTION);
+
+    return collection
+      .find(
+        { slug: { $exists: true, $ne: '' } },
+        { projection: { slug: 1, updatedAt: 1, syncedAt: 1, _id: 0 } },
+      )
+      .sort({ updatedAt: -1 })
+      .limit(limit)
+      .toArray();
   }
 
   /**
@@ -274,7 +339,7 @@ export class ProductService {
   async saveCategory(category: MongoCategory): Promise<void> {
     const collection = this.db.collection(this.CATEGORIES_COLLECTION);
     await collection.updateOne(
-      { id: category.id },
+      { slug: category.slug },
       { $set: category },
       { upsert: true }
     );
@@ -285,10 +350,18 @@ export class ProductService {
    */
   async saveCategories(categories: MongoCategory[]): Promise<number> {
     const collection = this.db.collection(this.CATEGORIES_COLLECTION);
+    const uniqueCategories = new Map<string, MongoCategory>();
 
-    const operations = categories.map(category => ({
+    for (const category of categories) {
+      const existing = uniqueCategories.get(category.slug);
+      if (!existing || category.count > existing.count) {
+        uniqueCategories.set(category.slug, category);
+      }
+    }
+
+    const operations = Array.from(uniqueCategories.values()).map(category => ({
       updateOne: {
-        filter: { id: category.id },
+        filter: { slug: category.slug },
         update: { $set: category },
         upsert: true,
       },

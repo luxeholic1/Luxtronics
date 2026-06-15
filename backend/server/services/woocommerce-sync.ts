@@ -16,6 +16,8 @@ interface SyncOptions {
   batchSize?: number;
   delay?: number;
   onProgress?: (current: number, total: number) => void;
+  concurrency?: number;
+  syncVariations?: boolean;
 }
 
 export class WooCommerceSync {
@@ -41,6 +43,8 @@ export class WooCommerceSync {
     // WooCommerce API hard limit is 100 per page — always use 100
     const WC_PAGE_SIZE = 100;
     const delay = options.delay || 500;
+    const concurrency = Math.max(1, options.concurrency || Number(process.env.WOO_SYNC_CONCURRENCY || 4));
+    const syncVariations = options.syncVariations ?? process.env.SYNC_VARIATIONS === 'true';
 
     let synced = 0;
     let failed = 0;
@@ -55,18 +59,18 @@ export class WooCommerceSync {
       const totalPages = Math.ceil(totalProducts / WC_PAGE_SIZE);
       console.log(`Starting sync of ${totalProducts} products across ${totalPages} pages...`);
 
-      // Iterate every page (100 products each)
-      for (let page = 1; page <= totalPages; page++) {
+      let nextPage = 1;
+      const syncPage = async (page: number) => {
         try {
           const products = await this.fetchProductsFromWooCommerce(page, WC_PAGE_SIZE);
 
-          if (products.length === 0) break;
+          if (products.length === 0) return;
 
           // Convert and save to MongoDB
           const mongoProducts = [];
           for (const product of products) {
             let variations: any[] = [];
-            if (product.type === 'variable') {
+            if (syncVariations && product.type === 'variable') {
               try {
                 variations = await this.fetchVariationsFromWooCommerce(product.id);
                 console.log(`Fetched ${variations.length} variations for product ${product.id}`);
@@ -98,7 +102,18 @@ export class WooCommerceSync {
           console.error(`❌ Page ${page} failed:`, errorMsg);
           // Continue to next page even if this one failed
         }
-      }
+      };
+
+      const workers = Array.from({ length: Math.min(concurrency, totalPages) }, async () => {
+        while (nextPage <= totalPages) {
+          const page = nextPage;
+          nextPage += 1;
+          await syncPage(page);
+          if (delay > 0) await new Promise(resolve => setTimeout(resolve, delay));
+        }
+      });
+
+      await Promise.all(workers);
 
       // Record sync completion
       await this.recordSyncStatus('products', 'completed', synced, failed, errors);
@@ -269,22 +284,42 @@ export class WooCommerceSync {
       throw new Error('WooCommerce credentials not configured');
     }
 
-    const url = `${storeUrl}/wp-json/wc/v3/products/categories?per_page=100`;
     const auth = btoa(`${consumerKey}:${consumerSecret}`);
+    const allCategories: any[] = [];
+    let page = 1;
+    let totalPages = 1;
 
-    const response = await fetch(url, {
-      method: 'GET',
-      headers: {
-        'Authorization': `Basic ${auth}`,
-        'Content-Type': 'application/json',
-      },
-    });
+    do {
+      const params = new URLSearchParams({
+        per_page: '100',
+        page: String(page),
+        hide_empty: 'false',
+        orderby: 'count',
+        order: 'desc',
+      });
+      const url = `${storeUrl}/wp-json/wc/v3/products/categories?${params}`;
 
-    if (!response.ok) {
-      throw new Error(`Failed to fetch categories: ${response.statusText}`);
-    }
+      const response = await fetch(url, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Basic ${auth}`,
+          'Content-Type': 'application/json',
+        },
+      });
 
-    return response.json();
+      if (!response.ok) {
+        const body = await response.text();
+        throw new Error(`Failed to fetch categories page ${page}: ${response.status} ${body.slice(0, 300)}`);
+      }
+
+      const categories = await response.json();
+      allCategories.push(...categories);
+      totalPages = Number(response.headers.get('X-WP-TotalPages') || '1');
+      console.log(`Fetched categories page ${page}/${totalPages} (${allCategories.length} total)`);
+      page += 1;
+    } while (page <= totalPages);
+
+    return allCategories;
   }
 
   /**

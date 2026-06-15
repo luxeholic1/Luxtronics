@@ -49,8 +49,9 @@ async function main() {
     console.log('🔄 Syncing products from WooCommerce...\n');
 
     const result = await syncService.syncProducts({
-      batchSize: 100,
-      delay: 1000,
+      concurrency: Number(process.env.WOO_SYNC_CONCURRENCY || 6),
+      delay: Number(process.env.WOO_SYNC_DELAY_MS || 0),
+      syncVariations: process.env.SYNC_VARIATIONS === 'true',
       onProgress: (current, total) => {
         const percentage = Math.round((current / total) * 100);
         const progressBar = createProgressBar(percentage, 50);

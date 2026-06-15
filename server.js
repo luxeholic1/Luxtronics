@@ -21,6 +21,7 @@ const BUILD_DIR = path.join(__dirname, 'build');
 // ── MONGODB STATE ────────────────────────────────────────────────────────────
 let db = null;
 let productsCol = null;
+let categoriesCol = null;
 let mongoReady = false;
 
 async function initMongo() {
@@ -28,11 +29,23 @@ async function initMongo() {
     console.warn('⚠️ MONGODB_URI not set. Running in WooCommerce-only mode.');
     return;
   }
+
   try {
     const client = new MongoClient(process.env.MONGODB_URI);
     await client.connect();
     db = client.db();
     productsCol = db.collection('products');
+    categoriesCol = db.collection('categories');
+    await Promise.all([
+      productsCol.createIndex({ id: 1 }, { unique: true }),
+      productsCol.createIndex({ slug: 1 }),
+      productsCol.createIndex({ updatedAt: -1 }),
+      productsCol.createIndex({ 'categories.slug': 1 }),
+      productsCol.createIndex({ 'categories.name': 1 }),
+      productsCol.createIndex({ name: 'text', description: 'text', searchText: 'text' }),
+      categoriesCol.createIndex({ slug: 1 }, { unique: true }),
+      categoriesCol.createIndex({ count: -1, name: 1 }),
+    ]);
     mongoReady = true;
     console.log('✅ MongoDB connected successfully');
   } catch (err) {
@@ -90,6 +103,14 @@ function getWooAuth(req) {
   return 'Basic ' + Buffer.from(`${key}:${secret}`).toString('base64');
 }
 
+function wooFallbackEnabled() {
+  return process.env.ENABLE_WOO_FALLBACK === 'true';
+}
+
+function escapeRegex(value = '') {
+  return String(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
 const PUBLIC_HOSTS = ['luxtronics.in', 'luxtronics.com.au', 'luxtronics.co.nz'];
 const HREFLANG_BY_HOST = {
   'luxtronics.in': 'en-in',
@@ -117,6 +138,25 @@ const BLOG_SLUGS = [
 ];
 const sitemapCache = new Map();
 const SITEMAP_CACHE_MS = 6 * 60 * 60 * 1000;
+const PRODUCT_LIST_PROJECTION = {
+  id: 1,
+  type: 1,
+  slug: 1,
+  name: 1,
+  shortDescription: 1,
+  categories: 1,
+  price: 1,
+  salePrice: 1,
+  regularPrice: 1,
+  images: { $slice: 2 },
+  rating: 1,
+  reviewCount: 1,
+  stockStatus: 1,
+  sku: 1,
+  seo: 1,
+  updatedAt: 1,
+  syncedAt: 1,
+};
 
 function getPublicHost(req) {
   const host = String(req.headers.host || '').split(':')[0].replace(/^www\./, '');
@@ -162,6 +202,80 @@ function sitemapUrlEntry(host, pathname, { changefreq = 'weekly', priority = '0.
     priority ? `    <priority>${priority}</priority>` : '',
     '  </url>',
   ].filter(Boolean).join('\n');
+}
+
+function stripHtml(value = '') {
+  return String(value)
+    .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, ' ')
+    .replace(/<style\b[^<]*(?:(?!<\/style>)<[^<]*)*<\/style>/gi, ' ')
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/&nbsp;/gi, ' ')
+    .replace(/&amp;/gi, ' and ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function csvField(value = '') {
+  return `"${String(value ?? '').replace(/"/g, '""').replace(/\r?\n/g, ' ').trim()}"`;
+}
+
+function feedTitle(product) {
+  const title = stripHtml(product.name || '');
+  return title.length > 150 ? title.slice(0, 150).replace(/\s+\S*$/, '') : title;
+}
+
+function feedDescription(product) {
+  const text = stripHtml(product.seo?.description || product.shortDescription || product.short_description || product.description || `Shop ${product.name} online at Luxtronics.`);
+  return text.length > 5000 ? text.slice(0, 5000).replace(/\s+\S*$/, '') : text;
+}
+
+function feedCategory(product) {
+  return product.categories?.[0]?.name || 'Electronics';
+}
+
+function feedGoogleCategory(product) {
+  const text = `${product.name || ''} ${feedCategory(product)} ${product.categories?.[0]?.slug || ''}`.toLowerCase();
+  if (/phone|mobile|smartphone|iphone|android/.test(text)) return 'Electronics > Communications > Telephony > Mobile Phones';
+  if (/case|cover|protector|charger|cable|adapter|power bank|holder|mount/.test(text)) return 'Electronics > Electronics Accessories';
+  if (/camera|surveillance|cctv|lens|tripod/.test(text)) return 'Cameras & Optics > Cameras';
+  if (/headphone|earbud|earphone|speaker|audio|microphone/.test(text)) return 'Electronics > Audio';
+  if (/watch|wearable|fitness band/.test(text)) return 'Electronics > Wearable Technology > Smart Watches';
+  if (/laptop|notebook|keyboard|mouse|computer/.test(text)) return 'Electronics > Computers';
+  if (/game|controller|console/.test(text)) return 'Electronics > Video Game Consoles';
+  return 'Electronics > Consumer Electronics';
+}
+
+function feedPrice(product, currency = 'INR') {
+  const value = Number(product.price || product.regularPrice || product.regular_price || 0);
+  return `${value.toFixed(2)} ${currency}`;
+}
+
+function feedSalePrice(product, currency = 'INR') {
+  const regular = Number(product.regularPrice || product.regular_price || 0);
+  const current = Number(product.price || 0);
+  return regular && current && current < regular ? `${current.toFixed(2)} ${currency}` : '';
+}
+
+function feedImage(product) {
+  return product.images?.find((image) => image?.src)?.src || '';
+}
+
+function feedAttr(product, name) {
+  const found = product.attributes?.find((item) => item?.name?.toLowerCase() === name.toLowerCase());
+  return found?.options?.[0] || found?.value || '';
+}
+
+async function fetchFeedProducts() {
+  if (!mongoReady || !productsCol) return [];
+  return productsCol
+    .find({ slug: { $exists: true, $ne: '' }, price: { $gt: 0 } })
+    .project({
+      id: 1, name: 1, slug: 1, description: 1, shortDescription: 1, short_description: 1,
+      price: 1, regularPrice: 1, regular_price: 1, stockStatus: 1, stock_status: 1,
+      sku: 1, images: 1, categories: 1, attributes: 1, weight: 1, seo: 1,
+    })
+    .limit(50000)
+    .toArray();
 }
 
 async function fetchSitemapProducts(req) {
@@ -228,41 +342,147 @@ app.get('/debug', (req, res) => {
   });
 });
 
+async function sendPinterestFeed(req, res) {
+  const host = getPublicHost(req);
+  const products = (await fetchFeedProducts()).filter((product) => feedImage(product));
+  const header = [
+    'id', 'title', 'description', 'link', 'image_link', 'additional_image_link',
+    'price', 'sale_price', 'availability', 'brand', 'condition', 'product_type',
+    'google_product_category', 'gtin', 'mpn', 'item_group_id', 'color', 'size',
+    'age_group', 'gender', 'material', 'pattern', 'shipping_weight',
+  ];
+  const rows = products.map((product) => [
+    product.id,
+    feedTitle(product),
+    feedDescription(product),
+    absoluteForHost(host, `/product/${encodeURIComponent(product.slug)}`),
+    feedImage(product),
+    product.images?.slice(1, 4).map((image) => image?.src).filter(Boolean).join(',') || '',
+    feedPrice(product),
+    feedSalePrice(product),
+    (product.stockStatus || product.stock_status) === 'outofstock' ? 'out of stock' : 'in stock',
+    'Luxtronics',
+    'new',
+    feedCategory(product),
+    feedGoogleCategory(product),
+    '',
+    product.sku || product.id,
+    product.id,
+    feedAttr(product, 'Color'),
+    feedAttr(product, 'Size'),
+    'adult',
+    'unisex',
+    feedAttr(product, 'Material'),
+    '',
+    product.weight || '',
+  ].map(csvField).join(','));
+
+  res.set('Cache-Control', 'public, max-age=3600');
+  res.type('text/csv').send([header.join(','), ...rows].join('\n'));
+}
+
+app.get(['/feeds/pinterest.csv', '/pinterest-feed.csv'], sendPinterestFeed);
+
+async function sendGoogleMerchantFeed(req, res) {
+  const host = getPublicHost(req);
+  const products = (await fetchFeedProducts()).filter((product) => feedImage(product));
+  const header = [
+    'id', 'title', 'description', 'link', 'image_link', 'additional_image_link',
+    'availability', 'price', 'sale_price', 'condition', 'brand',
+    'google_product_category', 'product_type', 'mpn', 'identifier_exists',
+  ];
+  const rows = products.map((product) => [
+    product.id,
+    feedTitle(product),
+    feedDescription(product),
+    absoluteForHost(host, `/product/${encodeURIComponent(product.slug)}`),
+    feedImage(product),
+    product.images?.slice(1, 10).map((image) => image?.src).filter(Boolean).join(',') || '',
+    (product.stockStatus || product.stock_status) === 'outofstock' ? 'out of stock' : 'in stock',
+    feedPrice(product),
+    feedSalePrice(product),
+    'new',
+    'Luxtronics',
+    feedGoogleCategory(product),
+    feedCategory(product),
+    product.sku || product.id,
+    product.sku ? 'yes' : 'no',
+  ].map(csvField).join(','));
+
+  res.set('Cache-Control', 'public, max-age=3600');
+  res.type('text/csv').send([header.join(','), ...rows].join('\n'));
+}
+
+app.get(['/feeds/google-merchant.csv', '/google-merchant-feed.csv'], sendGoogleMerchantFeed);
+
 // ── WOOCOMMERCE API ───────────────────────────────────────────────────────────
 // ── WOOCOMMERCE API ───────────────────────────────────────────────────────────
 app.get('/api/products', async (req, res) => {
   const page = parseInt(req.query.page || '1', 10);
-  const perPage = parseInt(req.query.per_page || '50', 10);
+  const perPage = Math.min(parseInt(req.query.per_page || '50', 10), 72);
   const search = req.query.search;
   const category = req.query.category;
 
-  // Try MongoDB
+  // Public storefront reads from MongoDB. Woo fallback is opt-in only.
   if (mongoReady && productsCol) {
     try {
-      const query = {};
-      if (search) query.name = { $regex: search, $options: 'i' };
-      if (category) {
-        query.$or = [
-          { 'categories.name': { $regex: category, $options: 'i' } },
-          { 'categories.slug': { $regex: category, $options: 'i' } }
-        ];
+      const filters = [];
+      let sort = { updatedAt: -1 };
+      if (search) {
+        const searchText = String(search).trim();
+        if (searchText.length >= 2) {
+          filters.push({ $text: { $search: searchText } });
+          sort = { score: { $meta: 'textScore' } };
+        } else {
+          const safeSearch = escapeRegex(searchText);
+          filters.push({ $or: [
+            { name: { $regex: safeSearch, $options: 'i' } },
+            { slug: { $regex: safeSearch, $options: 'i' } },
+            { searchText: { $regex: safeSearch, $options: 'i' } },
+            { description: { $regex: safeSearch, $options: 'i' } },
+            { 'categories.name': { $regex: safeSearch, $options: 'i' } },
+            { 'categories.slug': { $regex: safeSearch, $options: 'i' } },
+          ] });
+        }
       }
+      if (category) {
+        const safeCategory = escapeRegex(category).replace(/-/g, '[\\s-]');
+        filters.push({ $or: [
+          { 'categories.name': { $regex: safeCategory, $options: 'i' } },
+          { 'categories.slug': category }
+        ] });
+      }
+      const query = filters.length > 1 ? { $and: filters } : filters[0] || {};
 
       const total = await productsCol.countDocuments(query);
       const items = await productsCol.find(query)
+        .project(PRODUCT_LIST_PROJECTION)
+        .sort(sort)
         .skip((page - 1) * perPage)
         .limit(perPage)
         .toArray();
 
-      if (items.length > 0) {
-        return res.json({ success: true, data: items, total, source: 'mongodb' });
-      }
+      res.set('Cache-Control', 'public, max-age=120, stale-while-revalidate=600');
+      return res.json({
+        success: true,
+        data: items,
+        total,
+        pagination: { page, perPage, total, totalPages: Math.ceil(total / perPage) },
+        source: 'mongodb',
+      });
     } catch (err) {
       console.error('MongoDB query error:', err.message);
+      if (!wooFallbackEnabled()) {
+        return res.status(503).json({ success: false, error: 'Unable to load products from MongoDB', source: 'mongodb' });
+      }
     }
   }
 
-  // Fallback to WooCommerce
+  if (!wooFallbackEnabled()) {
+    return res.status(503).json({ success: false, error: 'MongoDB product cache is not ready', source: 'mongodb' });
+  }
+
+  // Optional WooCommerce fallback for maintenance/dev only.
   try {
     const wooUrl = getWooUrl(req);
     const url = `${wooUrl}/wp-json/wc/v3/products?${new URLSearchParams(req.query)}`;
@@ -281,17 +501,24 @@ app.get('/api/products', async (req, res) => {
 app.get('/api/products/slug/:slug', async (req, res) => {
   const { slug } = req.params;
 
-  // Try MongoDB
+  // Public storefront reads from MongoDB. Woo fallback is opt-in only.
   if (mongoReady && productsCol) {
     try {
       const product = await productsCol.findOne({ slug });
       if (product) return res.json({ success: true, data: product, source: 'mongodb' });
     } catch (err) {
       console.error('MongoDB slug error:', err.message);
+      if (!wooFallbackEnabled()) {
+        return res.status(503).json({ success: false, error: 'Unable to load product from MongoDB', source: 'mongodb' });
+      }
     }
   }
 
-  // Fallback to WooCommerce
+  if (!wooFallbackEnabled()) {
+    return res.status(404).json({ success: false, error: 'Product not found in MongoDB', source: 'mongodb' });
+  }
+
+  // Optional WooCommerce fallback for maintenance/dev only.
   try {
     const wooUrl = getWooUrl(req);
     const auth = getWooAuth(req);
@@ -325,17 +552,24 @@ app.get('/api/products/slug/:slug', async (req, res) => {
 app.get('/api/products/:id', async (req, res) => {
   const { id } = req.params;
 
-  // Try MongoDB
+  // Public storefront reads from MongoDB. Woo fallback is opt-in only.
   if (mongoReady && productsCol) {
     try {
       const product = await productsCol.findOne({ id: parseInt(id) });
       if (product) return res.json({ success: true, data: product, source: 'mongodb' });
     } catch (err) {
       console.error('MongoDB ID error:', err.message);
+      if (!wooFallbackEnabled()) {
+        return res.status(503).json({ success: false, error: 'Unable to load product from MongoDB', source: 'mongodb' });
+      }
     }
   }
 
-  // Fallback to WooCommerce
+  if (!wooFallbackEnabled()) {
+    return res.status(404).json({ success: false, error: 'Product not found in MongoDB', source: 'mongodb' });
+  }
+
+  // Optional WooCommerce fallback for maintenance/dev only.
   try {
     const wooUrl = getWooUrl(req);
     const auth = getWooAuth(req);
@@ -460,6 +694,37 @@ app.get('/api/woo/categories', async (req, res) => {
 });
 
 app.get('/api/categories', async (req, res) => {
+  const page = parseInt(req.query.page || '1', 10);
+  const perPage = parseInt(req.query.per_page || '100', 10);
+
+  if (mongoReady && categoriesCol) {
+    try {
+      const total = await categoriesCol.countDocuments({});
+      const categories = await categoriesCol
+        .find({})
+        .sort({ count: -1, name: 1 })
+        .skip((page - 1) * perPage)
+        .limit(perPage)
+        .toArray();
+
+      return res.json({
+        success: true,
+        data: categories,
+        pagination: { page, perPage, total, totalPages: Math.ceil(total / perPage) },
+        source: 'mongodb',
+      });
+    } catch (err) {
+      console.error('MongoDB categories error:', err.message);
+      if (!wooFallbackEnabled()) {
+        return res.status(503).json({ success: false, error: 'Unable to load categories from MongoDB', source: 'mongodb' });
+      }
+    }
+  }
+
+  if (!wooFallbackEnabled()) {
+    return res.status(503).json({ success: false, error: 'MongoDB category cache is not ready', source: 'mongodb' });
+  }
+
   try {
     const wooUrl = getWooUrl(req);
     const url = `${wooUrl}/wp-json/wc/v3/products/categories?${new URLSearchParams(req.query)}`;

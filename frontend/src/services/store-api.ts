@@ -2,12 +2,6 @@ import type { Product } from '@/data/products';
 import { storeConfig } from '@/config/storeConfig';
 import { getMarketRating } from '@/lib/market-ratings';
 import { scoreTextMatch } from '@/lib/smart-search';
-import { 
-  fetchProductsFromFirebase, 
-  fetchProductFromFirebase,
-  fetchCategoriesFromFirebase,
-  searchProductsInFirebase,
-} from './firebase-products';
 
 // Backend API URL - empty in production means same-origin Hostinger Express server.
 // Guard against accidentally baking local dev URLs into deployed bundles.
@@ -175,6 +169,24 @@ function resolveProductCategories(product: StoreProduct) {
   return inferred ? [inferred] : [];
 }
 
+function compactProductTitle(value: string, maxLength = 82) {
+  const cleaned = String(value || '')
+    .replace(/&amp;/gi, 'and')
+    .replace(/\bSUNSKY\b/gi, '')
+    .replace(/\bSKU[:\s-]*[A-Z0-9-]+\b/gi, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+  const parts = cleaned
+    .split(',')
+    .map((part) => part.trim())
+    .filter(Boolean);
+  const primary = parts.slice(0, 2).join(', ') || cleaned;
+
+  if (primary.length <= maxLength) return primary;
+  return primary.slice(0, maxLength).replace(/\s+\S*$/, '').replace(/[,\s-]+$/, '');
+}
+
 interface ApiResponse<T> {
   success: boolean;
   data: T;
@@ -188,23 +200,35 @@ interface ApiResponse<T> {
   };
 }
 
+const jsonCache = new Map<string, { expiresAt: number; value: unknown }>();
+const JSON_CACHE_TTL = 60 * 1000;
+
 async function fetchJson<T>(url: string): Promise<T> {
+  const cached = jsonCache.get(url);
+  if (cached && cached.expiresAt > Date.now()) {
+    return cached.value as T;
+  }
+
   const response = await fetch(url);
 
   if (!response.ok) {
     throw new Error(`Request failed: ${response.status} ${response.statusText}`);
   }
 
-  return response.json() as Promise<T>;
+  const value = await response.json() as T;
+  jsonCache.set(url, { expiresAt: Date.now() + JSON_CACHE_TTL, value });
+  return value;
 }
 
 async function fetchProductsFromStoreCache(
   page: number,
   perPage: number,
-  search?: string
+  search?: string,
+  category?: string
 ): Promise<{ products: StoreProduct[]; total: number; totalPages: number }> {
   let url = apiUrl(`/api/products?per_page=${perPage}&page=${page}`);
   if (search) url += `&search=${encodeURIComponent(search)}`;
+  if (category && category !== 'all') url += `&category=${encodeURIComponent(category)}`;
 
   const response = await fetchJson<ApiResponse<StoreProduct[]>>(url);
   const products = Array.isArray(response.data) ? response.data : [];
@@ -214,69 +238,24 @@ async function fetchProductsFromStoreCache(
   return { products, total, totalPages };
 }
 
-export async function fetchStoreProducts(page = 1, perPage = 100, search?: string): Promise<StoreProduct[]> {
-  // Try Firestore first (fastest path). If the collection has products, use it
-  // even when sync_status is stale or missing.
-  try {
-    console.log('[Store API] Fetching from Firestore (fast)');
-    const firebaseProducts = await fetchProductsFromFirebase(page, perPage, search);
-    const products = Array.isArray(firebaseProducts) ? firebaseProducts : [];
+export async function fetchStoreProducts(page = 1, perPage = 100, search?: string, category?: string): Promise<StoreProduct[]> {
+  console.log('[Store API] Fetching products from Mongo cache API');
 
-    if (products.length > 0) {
-      console.log(`[Store API] Firestore returned ${products.length} products`);
-      return products;
-    }
-  } catch (error) {
-    console.warn('[Store API] Firestore fetch failed, falling back:', error);
-  }
-
-  // Fallback to same-origin server proxy. This avoids browser CORS and keeps Woo keys server-side.
-  console.log('[Store API] Fetching from store cache API (fallback)');
-
-  // perPage=0 means "fetch ALL" — paginate through WooCommerce 100 at a time
+  // perPage=0 means "fetch ALL" — paginate through Mongo cache in larger pages.
   if (perPage === 0 || perPage > 100) {
-    try {
-      const allProducts: StoreProduct[] = [];
-      const maxPerPage = 500;
-      let currentPage = 1;
-
-      while (true) {
-        const cacheResult = await fetchProductsFromStoreCache(currentPage, maxPerPage, search);
-        const products = Array.isArray(cacheResult.products) ? cacheResult.products : [];
-        const totalPages = Number(cacheResult.totalPages || 1);
-        if (products.length === 0) break;
-
-        allProducts.push(...products);
-
-        if (currentPage >= totalPages) break;
-        if (perPage > 0 && allProducts.length >= perPage) break;
-
-        currentPage++;
-      }
-
-      return perPage > 0 ? allProducts.slice(0, perPage) : allProducts;
-    } catch (error) {
-      console.warn('[Store API] Store cache failed, falling back to WooCommerce proxy:', error);
-    }
-
     const allProducts: StoreProduct[] = [];
-    const maxPerPage = 100;
+    const maxPerPage = 500;
     let currentPage = 1;
 
     while (true) {
-      let url = apiUrl(`/api/woo/products?per_page=${maxPerPage}&page=${currentPage}&status=publish`);
-      if (search) url += `&search=${encodeURIComponent(search)}`;
-
-      const response = await fetch(url, { headers: { 'Accept': 'application/json' } });
-
-      if (!response.ok) throw new Error(`Failed to fetch products: ${response.statusText}`);
-
-      const products = await response.json();
-      if (!Array.isArray(products) || products.length === 0) break;
+      const cacheResult = await fetchProductsFromStoreCache(currentPage, maxPerPage, search, category);
+      const products = Array.isArray(cacheResult.products) ? cacheResult.products : [];
+      const totalPages = Number(cacheResult.totalPages || 1);
+      if (products.length === 0) break;
 
       allProducts.push(...products);
 
-      if (products.length < maxPerPage) break;
+      if (currentPage >= totalPages) break;
       if (perPage > 0 && allProducts.length >= perPage) break;
 
       currentPage++;
@@ -286,21 +265,8 @@ export async function fetchStoreProducts(page = 1, perPage = 100, search?: strin
   }
 
   // Single page fetch (perPage ≤ 100)
-  try {
-    const cacheResult = await fetchProductsFromStoreCache(page, perPage, search);
-    const products = Array.isArray(cacheResult.products) ? cacheResult.products : [];
-    if (products.length > 0) return products;
-  } catch (error) {
-    console.warn('[Store API] Store cache failed, falling back to WooCommerce proxy:', error);
-  }
-
-  let url = apiUrl(`/api/woo/products?per_page=${perPage}&page=${page}&status=publish`);
-  if (search) url += `&search=${encodeURIComponent(search)}`;
-
-  const response = await fetch(url, { headers: { 'Accept': 'application/json' } });
-  if (!response.ok) throw new Error(`Failed to fetch products: ${response.statusText}`);
-  const products = await response.json();
-  return Array.isArray(products) ? products : [];
+  const cacheResult = await fetchProductsFromStoreCache(page, perPage, search, category);
+  return Array.isArray(cacheResult.products) ? cacheResult.products : [];
 }
 
 // Get store-specific credentials
@@ -332,71 +298,25 @@ function getStoreCredentials() {
 }
 
 export async function fetchStoreProduct(slug: string): Promise<StoreProduct | null> {
-  // Try Firestore first (fastest path)
+  console.log('[Store API] Fetching product from Mongo cache API');
+
   try {
-    console.log('[Store API] Fetching product from Firestore (fast)');
-    const product = await fetchProductFromFirebase(slug);
-
-    if (product) {
-      console.log(`[Store API] Firestore returned product: ${product.name}`);
-
-      // If it's a variable product, fetch variations through the same-origin proxy
-      if (product.type === 'variable' && product.id) {
-        try {
-          const variationsResponse = await fetch(
-            apiUrl(`/api/woo/products/${product.id}/variations?per_page=100`),
-            { headers: { 'Accept': 'application/json' } },
-          );
-
-          if (variationsResponse.ok) {
-            const variations = await variationsResponse.json();
-            product.variations = Array.isArray(variations) ? variations : [];
-          }
-        } catch (error) {
-          console.error('Failed to fetch variations:', error);
-        }
-      }
-
-      return product;
-    }
-  } catch (error) {
-    console.warn('[Store API] Firestore fetch failed, falling back to WooCommerce:', error);
-  }
-
-  // Fallback to same-origin WooCommerce proxy
-  console.log('[Store API] Fetching product from WooCommerce proxy (fallback)');
-  
-  try {
-    const response = await fetch(
-      apiUrl(`/api/woo/products?slug=${encodeURIComponent(slug)}&per_page=1&status=publish`),
-      { headers: { 'Accept': 'application/json' } },
-    );
-    
+    const response = await fetch(apiUrl(`/api/products/slug/${encodeURIComponent(slug)}`));
     if (!response.ok) return null;
-    
-    const products = await response.json();
-    const product = Array.isArray(products) && products.length > 0 ? products[0] : null;
-    
-    if (!product) return null;
-    
-    // If it's a variable product, fetch variations
-    if (product.type === 'variable' && product.id) {
+
+    const payload = await response.json();
+    const product = payload?.data || null;
+    if (product?.type === 'variable' && product.id && !Array.isArray(product.variations)) {
       try {
-        const variationsResponse = await fetch(
-          apiUrl(`/api/woo/products/${product.id}/variations?per_page=100`),
-          { headers: { 'Accept': 'application/json' } },
-        );
-        
+        const variationsResponse = await fetch(apiUrl(`/api/woo/products/${product.id}/variations?per_page=100`));
         if (variationsResponse.ok) {
           const variations = await variationsResponse.json();
           product.variations = Array.isArray(variations) ? variations : [];
         }
-      } catch (error) {
-        console.error('Failed to fetch variations:', error);
-        // Continue without variations
+      } catch {
+        product.variations = [];
       }
     }
-    
     return product;
   } catch {
     return null;
@@ -407,51 +327,20 @@ export async function fetchStoreCategories(page = 1, perPage = 20): Promise<{
   data: StoreCategory[];
   pagination: { page: number; perPage: number; total: number; totalPages: number };
 }> {
-  // Try Firestore first (fastest path)
-  try {
-    console.log('[Store API] Fetching categories from Firestore (fast)');
+  console.log('[Store API] Fetching categories from Mongo cache API');
 
-    // Warm product cache in the background; don't block first render on the full catalog.
-    void fetchProductsFromFirebase().catch(() => {});
-
-    const firebaseCategories = await fetchCategoriesFromFirebase();
-    const categories = Array.isArray(firebaseCategories) ? firebaseCategories : [];
-
-    if (categories.length > 0) {
-      console.log(`[Store API] Firestore returned ${categories.length} categories`);
-      return {
-        data: categories,
-        pagination: {
-          page: 1,
-          perPage: categories.length,
-          total: categories.length,
-          totalPages: 1
-        },
-      };
-    }
-  } catch (error) {
-    console.warn('[Store API] Firestore fetch failed, falling back to WooCommerce:', error);
-  }
-
-  // Fallback to same-origin WooCommerce proxy
-  console.log('[Store API] Fetching categories from WooCommerce proxy (fallback)');
-  
-  const response = await fetch(
-    apiUrl(`/api/woo/categories?page=${page}&per_page=${perPage}&hide_empty=false`),
-    { headers: { 'Accept': 'application/json' } },
-  );
+  const response = await fetch(apiUrl(`/api/categories?page=${page}&per_page=${perPage}`));
   
   if (!response.ok) {
     throw new Error(`Failed to fetch categories: ${response.statusText}`);
   }
 
-  const categories = await response.json();
-  const total = parseInt(response.headers.get('X-WP-Total') || '0');
-  const totalPages = parseInt(response.headers.get('X-WP-TotalPages') || '1');
+  const payload = await response.json();
+  const categories = Array.isArray(payload?.data) ? payload.data : [];
   
   return {
-    data: Array.isArray(categories) ? categories : [],
-    pagination: { page, perPage, total, totalPages },
+    data: categories,
+    pagination: payload?.pagination || { page, perPage, total: categories.length, totalPages: 1 },
   };
 }
 
@@ -461,38 +350,15 @@ export async function fetchStoreCategories(page = 1, perPage = 20): Promise<{
 export async function fetchSearchSuggestions(query: string): Promise<Product[]> {
   if (!query || query.length < 2) return [];
 
-  // Try Firestore first (fastest path)
-  try {
-    console.log('[Store API] Searching in Firestore (fast)');
-    const firebaseProducts = await searchProductsInFirebase(query);
-    const products = Array.isArray(firebaseProducts) ? firebaseProducts : [];
+  console.log('[Store API] Searching Mongo cache API');
 
-    if (products.length > 0) {
-      console.log(`[Store API] Firestore search returned ${products.length} results`);
-      return products.slice(0, 8).map(mapStoreProductToLocalProduct).filter((product): product is Product => product !== null);
-    }
-  } catch (error) {
-    console.warn('[Store API] Firestore search failed, falling back to WooCommerce:', error);
-  }
-
-  // Fallback to same-origin WooCommerce proxy
-  console.log('[Store API] Searching in WooCommerce proxy (fallback)');
-  
   try {
-    const response = await fetch(
-      apiUrl(`/api/woo/products?search=${encodeURIComponent(query)}&per_page=8&status=publish`),
-      { headers: { 'Accept': 'application/json' } },
-    );
-    
+    const response = await fetch(apiUrl(`/api/products?search=${encodeURIComponent(query)}&per_page=8&page=1`));
     if (!response.ok) return [];
-    
-    const products = await response.json();
-    
-    if (Array.isArray(products) && products.length > 0) {
-      return products.map(mapStoreProductToLocalProduct).filter((product): product is Product => product !== null);
-    }
 
-    return [];
+    const payload = await response.json();
+    const products = Array.isArray(payload?.data) ? payload.data : [];
+    return products.map(mapStoreProductToLocalProduct).filter((product): product is Product => product !== null);
   } catch {
     return [];
   }
@@ -522,7 +388,7 @@ export function mapStoreProductToLocalProduct(product: StoreProduct): Product {
   return {
     id: (product.id ?? Math.random()).toString(),
     slug: product.slug || '',
-    name: product.name || 'Unnamed Product',
+    name: compactProductTitle(product.name || 'Unnamed Product'),
     // Normalise categories — handle both WooCommerce raw format and already-mapped format
     categories: resolvedCategories,
     category: resolvedCategories[0]?.name || 'Uncategorized',
@@ -541,6 +407,8 @@ export function mapStoreProductToLocalProduct(product: StoreProduct): Product {
       return {
         rating: market ? market.rating : (wooRating > 0 ? wooRating : 4.2),
         reviews: market ? market.reviews : (wooReviews > 0 ? wooReviews : 4800),
+        sourceRating: wooRating,
+        sourceReviewCount: wooReviews,
       };
     })(),
     description: (product as any).short_description || product.description || product.shortDescription || '',

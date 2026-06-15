@@ -23,7 +23,7 @@ const FeaturedProducts = () => {
 
   const { data: storeProducts = [], isLoading } = useQuery({
     queryKey: ['products', 'featured'],
-    queryFn: () => fetchStoreProducts(1, 48),
+    queryFn: () => fetchStoreProducts(1, 16),
     staleTime: 1000 * 60 * 30, // 30 minutes
   });
 

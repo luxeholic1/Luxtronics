@@ -44,16 +44,7 @@ const ProductDetail = () => {
         const mapped = mapStoreProductToLocalProduct(detail);
         if (mapped) return mapped;
       }
-      
-      // If not found by slug directly, try to find in the products list as a backup
-      const allProducts = await fetchStoreProducts(1, 100);
-      const productList = Array.isArray(allProducts) ? allProducts : [];
-      const found = productList.find(p => p.slug === slug);
-      if (found) {
-        const mapped = mapStoreProductToLocalProduct(found);
-        if (mapped) return mapped;
-      }
-      
+
       return null;
     },
     staleTime: 1000 * 60 * 5, // 5 minutes
@@ -110,6 +101,9 @@ const ProductDetail = () => {
   const offerCurrency = country.currency || "INR";
   const schemaPrice = currentPrice * (country.exchangeRate || 1);
   const schemaShippingMax = 15 * (country.exchangeRate || 1);
+  const sourceRating = Number((product as any)?.sourceRating || 0);
+  const sourceReviewCount = Number((product as any)?.sourceReviewCount || 0);
+  const seoProductName = product ? cleanText(product.name, 58) : '';
 
   // Build images list (product images)
   const productImages: string[] = useMemo(() => {
@@ -234,7 +228,7 @@ const ProductDetail = () => {
   return (
     <Layout>
       <SEO
-        title={`${product.name} — Buy Online | Luxtronics`}
+        title={`${seoProductName} — Buy Online | Luxtronics`}
         description={cleanText(product.description || `Buy ${product.name} online at Luxtronics. Check product availability, coverage details, and shipping options before checkout.`)}
         keywords={`${product.name}, ${product.category}, buy ${product.name} online, luxtronics`}
         url={`/product/${slug}`}
@@ -281,10 +275,10 @@ const ProductDetail = () => {
                 maxShippingValue: schemaShippingMax,
               })
             },
-            "aggregateRating": product.reviews > 0 ? {
+            "aggregateRating": sourceReviewCount > 0 && sourceRating > 0 ? {
               "@type": "AggregateRating",
-              "ratingValue": product.rating,
-              "reviewCount": toSchemaInteger(product.reviews),
+              "ratingValue": sourceRating,
+              "reviewCount": toSchemaInteger(sourceReviewCount),
               "bestRating": 5,
               "worstRating": 1
             } : undefined,
@@ -361,7 +355,7 @@ const ProductDetail = () => {
                         : "border-border hover:border-primary/50"
                     }`}
                   >
-                    <img src={img} alt="" className="h-14 w-14 object-contain" />
+                    <img src={img} alt={`${product.name} thumbnail ${idx + 1}`} className="h-14 w-14 object-contain" />
                   </button>
                 ))}
               </div>

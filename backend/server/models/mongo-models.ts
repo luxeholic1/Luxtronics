@@ -9,12 +9,121 @@ const CATEGORY_RULES = [
   { name: 'Smartphones', slug: 'smartphones', patterns: [/phone/i, /iphone/i, /mobile/i, /smartphone/i, /handset/i] },
   { name: 'Laptops', slug: 'laptops', patterns: [/laptop/i, /macbook/i, /notebook/i, /ultrabook/i] },
   { name: 'Audio', slug: 'audio', patterns: [/headphone/i, /earbud/i, /speaker/i, /audio/i, /sound/i, /buds?/i] },
-  { name: 'Wearables', slug: 'wearables', patterns: [/watch/i, /smartwatch/i, /wearable/i, /fitness band/i, /band/i] },
+  { name: 'Wearables', slug: 'wearables', patterns: [/watch/i, /smartwatch/i, /wearable/i, /fitness band/i, /band/i, /\bring\b/i, /smart ring/i] },
   { name: 'Gaming', slug: 'gaming', patterns: [/gaming/i, /gamepad/i, /controller/i, /console/i, /ps5/i, /xbox/i] },
   { name: 'Cameras', slug: 'cameras', patterns: [/camera/i, /dslr/i, /mirrorless/i, /lens/i, /photograph/i] },
   { name: 'Chargers & Cables', slug: 'chargers-cables', patterns: [/charger/i, /cable/i, /adapter/i, /usb-c/i, /type-c/i, /power bank/i] },
-  { name: 'Smart Home', slug: 'smart-home', patterns: [/smart home/i, /home device/i, /automation/i, /robot/i, /sensor/i, /smart bulb/i] },
+  { name: 'Smart Home', slug: 'smart-home', patterns: [/smart home/i, /home device/i, /automation/i, /robot/i, /sensor/i, /smart bulb/i, /fan/i, /cooler/i, /air condition/i, /refrigeration/i, /humidif/i, /mug warmer/i, /heating cup/i] },
+  { name: 'Outdoor Electronics', slug: 'outdoor-electronics', patterns: [/outdoor/i, /camping/i, /fishing/i, /running/i, /led light/i, /illumination/i] },
+  { name: 'Electronics Accessories', slug: 'electronics-accessories', patterns: [/cover/i, /case/i, /holder/i, /stand/i, /mount/i, /protector/i] },
 ];
+
+const PRODUCT_STOP_WORDS = new Set([
+  'and',
+  'for',
+  'with',
+  'the',
+  'new',
+  'hot',
+  'sale',
+  'pcs',
+  'piece',
+  'set',
+  'box',
+  'cm',
+  'mm',
+  'inch',
+  'inches',
+  'color',
+  'colour',
+  'black',
+  'white',
+]);
+
+function stripHtml(value: string): string {
+  return String(value || '')
+    .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, ' ')
+    .replace(/<style\b[^<]*(?:(?!<\/style>)<[^<]*)*<\/style>/gi, ' ')
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/&nbsp;/gi, ' ')
+    .replace(/&amp;/gi, ' and ')
+    .replace(/&quot;/gi, '"')
+    .replace(/&#39;/gi, "'")
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function cleanProductName(value: string): string {
+  const cleaned = stripHtml(value)
+    .replace(/\bSUNSKY\b/gi, '')
+    .replace(/\bSKU[:\s-]*[A-Z0-9-]+\b/gi, '')
+    .replace(/\s*,\s*/g, ', ')
+    .replace(/\s+/g, ' ')
+    .replace(/^[,\s-]+|[,\s-]+$/g, '')
+    .trim();
+
+  const primary = cleaned
+    .split(',')
+    .map((part) => part.trim())
+    .filter(Boolean)
+    .slice(0, 2)
+    .join(', ') || cleaned;
+
+  return primary.length > 90
+    ? primary.slice(0, 90).replace(/\s+\S*$/, '').replace(/[,\s-]+$/, '')
+    : primary;
+}
+
+function slugify(value: string): string {
+  return String(value || '')
+    .toLowerCase()
+    .replace(/&/g, ' and ')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .replace(/-{2,}/g, '-');
+}
+
+function buildSeoSlug(wooProduct: any, categories: Array<{ name: string; slug: string }>): string {
+  const nameTokens = slugify(cleanProductName(wooProduct?.name || wooProduct?.slug || 'product'))
+    .split('-')
+    .filter((token) => token.length > 1 && !PRODUCT_STOP_WORDS.has(token))
+    .slice(0, 7);
+  const categoryToken = categories[0]?.slug && !PRODUCT_STOP_WORDS.has(categories[0].slug)
+    ? categories[0].slug
+    : '';
+  const tokens = [...new Set([categoryToken, ...nameTokens].filter(Boolean))];
+  const base = tokens.join('-').slice(0, 64).replace(/-+[^-]*$/, '').replace(/-+$/g, '');
+  const suffix = wooProduct?.id ? `-${wooProduct.id}` : '';
+  return `${base || 'product'}${suffix}`;
+}
+
+function buildMetaDescription(wooProduct: any, cleanName: string, categories: Array<{ name: string }>): string {
+  const source = stripHtml(wooProduct?.short_description || wooProduct?.description || '');
+  const category = categories[0]?.name ? `${categories[0].name} ` : '';
+  const base = source || `Shop ${cleanName} online at Luxtronics with secure checkout and regional delivery.`;
+  const normalized = `${base} ${category ? `Browse more ${category}products at Luxtronics.` : ''}`
+    .replace(/\s+/g, ' ')
+    .trim();
+  return normalized.length > 158 ? `${normalized.slice(0, 155).replace(/\s+\S*$/, '')}...` : normalized;
+}
+
+function buildSearchText(wooProduct: any, cleanName: string, categories: Array<{ name: string; slug: string }>): string {
+  return [
+    cleanName,
+    wooProduct?.slug,
+    wooProduct?.sku,
+    stripHtml(wooProduct?.short_description || ''),
+    stripHtml(wooProduct?.description || ''),
+    ...(Array.isArray(wooProduct?.tags) ? wooProduct.tags.map((tag: any) => `${tag?.name || ''} ${tag?.slug || ''}`) : []),
+    ...categories.map((category) => `${category.name} ${category.slug}`),
+  ]
+    .filter(Boolean)
+    .join(' ')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
 
 function normalizeCategoryName(name: string): string {
   return String(name || '').trim().toLowerCase();
@@ -76,6 +185,7 @@ function resolveProductCategories(wooProduct: any): Array<{ id: number; name: st
 export interface MongoProduct {
   _id?: ObjectId;
   id: number; // WooCommerce product ID
+  type?: string;
   slug: string;
   name: string;
   description: string;
@@ -136,6 +246,12 @@ export interface MongoProduct {
 
   // Search optimization
   searchText?: string;
+  seo?: {
+    title: string;
+    description: string;
+    slug: string;
+    keywords: string[];
+  };
 }
 
 /**
@@ -228,11 +344,24 @@ export interface UserSession {
  */
 export function createProductDocument(wooProduct: any, variations?: any[]): MongoProduct {
   const resolvedCategories = resolveProductCategories(wooProduct);
+  const cleanName = cleanProductName(wooProduct.name || '');
+  const seoSlug = buildSeoSlug(wooProduct, resolvedCategories);
+  const seoDescription = buildMetaDescription(wooProduct, cleanName || wooProduct.name || 'Product', resolvedCategories);
+  const searchText = buildSearchText(wooProduct, cleanName || wooProduct.name || '', resolvedCategories);
+  const keywords = [
+    cleanName,
+    wooProduct.sku,
+    ...resolvedCategories.flatMap((category) => [category.name, category.slug]),
+  ]
+    .filter(Boolean)
+    .map((value) => String(value).toLowerCase())
+    .slice(0, 12);
 
   return {
     id: wooProduct.id,
-    slug: wooProduct.slug,
-    name: wooProduct.name,
+    type: wooProduct.type,
+    slug: seoSlug,
+    name: cleanName || wooProduct.name,
     description: wooProduct.description || '',
     shortDescription: wooProduct.short_description,
     categories: resolvedCategories,
@@ -242,7 +371,7 @@ export function createProductDocument(wooProduct: any, variations?: any[]): Mong
     images: (wooProduct.images || []).map((img: any) => ({
       id: img.id,
       src: img.src,
-      alt: img.alt || '',
+      alt: img.alt || `${cleanName || wooProduct.name} product image`,
     })),
     rating: parseFloat(wooProduct.average_rating || 0),
     reviewCount: wooProduct.rating_count || 0,
@@ -284,7 +413,13 @@ export function createProductDocument(wooProduct: any, variations?: any[]): Mong
     updatedAt: new Date(),
     createdAt: new Date(),
     lastWooSyncAt: new Date(),
-    searchText: `${wooProduct.name} ${wooProduct.description} ${resolvedCategories.map((c: any) => c.name).join(' ')}`.toLowerCase(),
+    searchText,
+    seo: {
+      title: `${cleanName || wooProduct.name} | Luxtronics`.slice(0, 68),
+      description: seoDescription,
+      slug: seoSlug,
+      keywords,
+    },
   };
 }
 

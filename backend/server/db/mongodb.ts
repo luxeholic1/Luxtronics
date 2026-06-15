@@ -129,6 +129,8 @@ class MongoDBConnection {
       productsCollection.createIndex({ price: 1 }),
       productsCollection.createIndex({ rating: -1 }),
       productsCollection.createIndex({ createdAt: -1 }),
+      productsCollection.createIndex({ updatedAt: -1 }),
+      productsCollection.createIndex({ syncedAt: -1 }),
       productsCollection.createIndex({ name: 'text', description: 'text' }), // Text search
     ]);
 

@@ -48,6 +48,10 @@ function wooAuthHeader(): string {
   return 'Basic ' + Buffer.from(`${key}:${secret}`).toString('base64');
 }
 
+function wooFallbackEnabled(): boolean {
+  return process.env.ENABLE_WOO_FALLBACK === 'true';
+}
+
 async function wooFetch(endpoint: string): Promise<any> {
   const base = wooUrl();
   if (!base) throw new Error('WooCommerce URL not configured in environment');
@@ -198,22 +202,23 @@ export async function setupServer(config: ServerConfig = {}): Promise<Express> {
   // ── GET /api/products ──────────────────────────────────────────────────────
   app.get('/api/products', async (req, res) => {
     const page = parseInt(req.query.page as string) || 1;
-    const perPage = parseInt(req.query.per_page as string) || 50;
+    const perPage = Math.min(parseInt(req.query.per_page as string) || 50, 72);
     const category = req.query.category as string | undefined;
     const search = req.query.search as string | undefined;
 
-    // Try MongoDB first
+    // MongoDB is the storefront read source. WooCommerce fallback is opt-in
+    // for maintenance/dev via ENABLE_WOO_FALLBACK=true.
     if (mongoReady && productService) {
       try {
         let result;
         if (search) {
-          result = await productService.searchProducts(search, page, perPage);
+          result = await productService.searchProducts(search, page, perPage, category);
         } else if (category) {
           result = await productService.getProductsByCategory(category, page, perPage);
         } else {
           result = await productService.getProducts(page, perPage);
         }
-        res.set('Cache-Control', 'public, max-age=3600');
+        res.set('Cache-Control', 'public, max-age=120, stale-while-revalidate=600');
         return res.json({
           success: true,
           data: result.products,
@@ -221,11 +226,22 @@ export async function setupServer(config: ServerConfig = {}): Promise<Express> {
           source: 'mongodb',
         });
       } catch (err) {
-        console.error('MongoDB products error, falling back to WooCommerce:', err);
+        console.error('MongoDB products error:', err);
+        if (!wooFallbackEnabled()) {
+          return res.status(503).json({ success: false, error: 'Unable to load products from MongoDB', source: 'mongodb' });
+        }
       }
     }
 
-    // WooCommerce fallback
+    if (!wooFallbackEnabled()) {
+      return res.status(503).json({
+        success: false,
+        error: mongoReady ? 'No MongoDB product cache available' : 'MongoDB is not ready',
+        source: 'mongodb',
+      });
+    }
+
+    // Optional WooCommerce fallback.
     try {
       const params = new URLSearchParams({ page: String(page), per_page: String(perPage), status: 'publish' });
       if (category) params.set('category', category);
@@ -256,11 +272,18 @@ export async function setupServer(config: ServerConfig = {}): Promise<Express> {
           return res.json({ success: true, data: product, source: 'mongodb' });
         }
       } catch (err) {
-        console.error('MongoDB slug error, falling back:', err);
+        console.error('MongoDB slug error:', err);
+        if (!wooFallbackEnabled()) {
+          return res.status(503).json({ success: false, error: 'Unable to load product from MongoDB', source: 'mongodb' });
+        }
       }
     }
 
-    // WooCommerce fallback
+    if (!wooFallbackEnabled()) {
+      return res.status(404).json({ success: false, error: 'Product not found in MongoDB', source: 'mongodb' });
+    }
+
+    // Optional WooCommerce fallback.
     try {
       const params = new URLSearchParams({ slug, per_page: '1', status: 'publish' });
       const { items } = await fetchWooProductsRaw(params);
@@ -290,10 +313,17 @@ export async function setupServer(config: ServerConfig = {}): Promise<Express> {
         }
       } catch (err) {
         console.error('MongoDB product by ID error:', err);
+        if (!wooFallbackEnabled()) {
+          return res.status(503).json({ success: false, error: 'Unable to load product from MongoDB', source: 'mongodb' });
+        }
       }
     }
 
-    // WooCommerce fallback
+    if (!wooFallbackEnabled()) {
+      return res.status(404).json({ success: false, error: 'Product not found in MongoDB', source: 'mongodb' });
+    }
+
+    // Optional WooCommerce fallback.
     try {
       const raw = await wooFetch(`products/${productId}`);
       const variations = raw.type === 'variable' ? await fetchWooVariations(productId) : [];
@@ -310,7 +340,36 @@ export async function setupServer(config: ServerConfig = {}): Promise<Express> {
     const page = parseInt(req.query.page as string) || 1;
     const perPage = parseInt(req.query.per_page as string) || 20;
 
-    // Always try WooCommerce first for live category data
+    // MongoDB is the storefront category source.
+    if (mongoReady && productService) {
+      try {
+        const categories = await productService.getAllCategoriesWithCount();
+        const start = (page - 1) * perPage;
+        const paginated = categories.slice(start, start + perPage);
+        res.set('Cache-Control', 'public, max-age=3600');
+        return res.json({
+          success: true,
+          data: paginated,
+          pagination: { page, perPage, total: categories.length, totalPages: Math.ceil(categories.length / perPage) },
+          source: 'mongodb',
+        });
+      } catch (err) {
+        console.error('MongoDB categories error:', err);
+        if (!wooFallbackEnabled()) {
+          return res.status(503).json({ success: false, error: 'Unable to load categories from MongoDB', source: 'mongodb' });
+        }
+      }
+    }
+
+    if (!wooFallbackEnabled()) {
+      return res.status(503).json({
+        success: false,
+        error: mongoReady ? 'No MongoDB category cache available' : 'MongoDB is not ready',
+        source: 'mongodb',
+      });
+    }
+
+    // Optional WooCommerce fallback.
     try {
       const params = new URLSearchParams({
         per_page: String(perPage),
@@ -350,25 +409,7 @@ export async function setupServer(config: ServerConfig = {}): Promise<Express> {
         source: 'woocommerce',
       });
     } catch (wooErr) {
-      console.error('WooCommerce categories error, falling back to MongoDB:', wooErr);
-    }
-
-    // MongoDB fallback
-    if (mongoReady && productService) {
-      try {
-        const categories = await productService.getAllCategoriesWithCount();
-        const start = (page - 1) * perPage;
-        const paginated = categories.slice(start, start + perPage);
-        res.set('Cache-Control', 'public, max-age=3600');
-        return res.json({
-          success: true,
-          data: paginated,
-          pagination: { page, perPage, total: categories.length, totalPages: Math.ceil(categories.length / perPage) },
-          source: 'mongodb',
-        });
-      } catch (err) {
-        console.error('MongoDB categories error:', err);
-      }
+      console.error('WooCommerce categories error:', wooErr);
     }
 
     return res.status(503).json({ success: false, error: 'Unable to load categories' });
@@ -443,6 +484,114 @@ export async function setupServer(config: ServerConfig = {}): Promise<Express> {
 
     res.json({ success: true, message: 'Sync triggered successfully in background' });
     console.log('Manual sync triggered via API');
+  });
+
+  const siteBaseUrl = (hostHeader?: string) => {
+    const host = String(hostHeader || 'luxtronics.in').replace(/^www\./, '').split(':')[0];
+    if (host === 'luxtronics.com.au') return 'https://luxtronics.com.au';
+    if (host === 'luxtronics.co.nz') return 'https://luxtronics.co.nz';
+    return 'https://luxtronics.in';
+  };
+
+  const xmlEscape = (value: string) =>
+    value
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&apos;');
+
+  const sitemapUrl = ({
+    loc,
+    lastmod,
+    changefreq,
+    priority,
+  }: {
+    loc: string;
+    lastmod?: string;
+    changefreq: string;
+    priority: string;
+  }) => [
+    '  <url>',
+    `    <loc>${xmlEscape(loc)}</loc>`,
+    lastmod ? `    <lastmod>${lastmod}</lastmod>` : '',
+    `    <changefreq>${changefreq}</changefreq>`,
+    `    <priority>${priority}</priority>`,
+    '  </url>',
+  ].filter(Boolean).join('\n');
+
+  app.get('/robots.txt', (req, res) => {
+    const baseUrl = siteBaseUrl(req.headers.host);
+    res.type('text/plain').send([
+      'User-agent: *',
+      'Allow: /',
+      'Disallow: /admin',
+      'Disallow: /admin/',
+      'Disallow: /account',
+      'Disallow: /account/',
+      'Disallow: /cart',
+      'Disallow: /checkout',
+      '',
+      'Allow: /shop',
+      'Allow: /product/',
+      'Allow: /categories',
+      'Allow: /latest-arrivals',
+      'Allow: /blog',
+      '',
+      `Sitemap: ${baseUrl}/sitemap.xml`,
+      '',
+    ].join('\n'));
+  });
+
+  app.get('/sitemap.xml', async (req, res) => {
+    const baseUrl = siteBaseUrl(req.headers.host);
+    const now = new Date().toISOString();
+    const staticPaths = [
+      { path: '/', changefreq: 'daily', priority: '1.0' },
+      { path: '/shop', changefreq: 'daily', priority: '0.95' },
+      { path: '/latest-arrivals', changefreq: 'daily', priority: '0.9' },
+      { path: '/categories', changefreq: 'weekly', priority: '0.85' },
+      { path: '/blog', changefreq: 'weekly', priority: '0.75' },
+      { path: '/about', changefreq: 'monthly', priority: '0.55' },
+      { path: '/contact', changefreq: 'monthly', priority: '0.55' },
+      { path: '/faq', changefreq: 'monthly', priority: '0.5' },
+      { path: '/shipping-returns', changefreq: 'monthly', priority: '0.45' },
+      { path: '/privacy', changefreq: 'yearly', priority: '0.3' },
+      { path: '/terms', changefreq: 'yearly', priority: '0.3' },
+    ];
+
+    const urls = staticPaths.map((entry) =>
+      sitemapUrl({
+        loc: `${baseUrl}${entry.path}`,
+        lastmod: now,
+        changefreq: entry.changefreq,
+        priority: entry.priority,
+      }),
+    );
+
+    if (mongoReady && productService) {
+      try {
+        const products = await productService.getSitemapProducts(50000);
+        for (const product of products) {
+          const date = product.updatedAt || product.syncedAt;
+          urls.push(sitemapUrl({
+            loc: `${baseUrl}/product/${encodeURIComponent(product.slug)}`,
+            lastmod: date ? new Date(date).toISOString() : now,
+            changefreq: 'weekly',
+            priority: '0.8',
+          }));
+        }
+      } catch (err) {
+        console.error('Sitemap product URL generation failed:', err);
+      }
+    }
+
+    res.type('application/xml').send([
+      '<?xml version="1.0" encoding="UTF-8"?>',
+      '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">',
+      ...urls,
+      '</urlset>',
+    ].join('\n'));
   });
 
   // ── Start server ───────────────────────────────────────────────────────────
