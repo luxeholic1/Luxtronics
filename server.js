@@ -33,7 +33,7 @@ async function initMongo() {
   try {
     const client = new MongoClient(process.env.MONGODB_URI);
     await client.connect();
-    db = client.db();
+    db = client.db(process.env.MONGODB_DB_NAME || 'Luxtronics');
     productsCol = db.collection('products');
     categoriesCol = db.collection('categories');
     await Promise.all([
@@ -334,6 +334,7 @@ app.get('/debug', (req, res) => {
     buildExists: existsSync(path.join(BUILD_DIR, 'index.html')),
     env_check: {
       FIREBASE_KEY: mask(process.env.VITE_FIREBASE_API_KEY),
+      MONGODB_DB_NAME: process.env.MONGODB_DB_NAME || 'Luxtronics',
       WOO_URL: process.env.VITE_WOOCOMMERCE_URL_INDIA || process.env.VITE_WOOCOMMERCE_URL,
       WOO_KEY: mask(process.env.VITE_WOOCOMMERCE_KEY_INDIA || process.env.VITE_WOOCOMMERCE_KEY),
       WOO_SEC: mask(process.env.VITE_WOOCOMMERCE_SECRET_INDIA || process.env.VITE_WOOCOMMERCE_SECRET),
