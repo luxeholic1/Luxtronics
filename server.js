@@ -279,37 +279,44 @@ function mask(str) {
 }
 
 // ── DYNAMIC STORE CONFIG ─────────────────────────────────────────────────────
-const WOO_DOMAINS = {
-  'luxtronics.in': 'https://luxtronics.luxtronics.in',
-  'luxtronics.luxtronics.in': 'https://luxtronics.luxtronics.in',
-  'luxtronics.com.au': 'https://luxtronics.luxtronics.in',
-  'luxtronics.co.nz': 'https://luxtronics.luxtronics.in',
-  // Default fallback
-  'default': 'https://luxtronics.luxtronics.in'
+const DEFAULT_WOO_URLS = {
+  IN: 'https://luxtronics.luxtronics.in',
+  AU: 'https://storeau.luxtronics.luxtronics.in',
+  NZ: 'https://storenz.luxtronics.luxtronics.in',
 };
 
 let wooCategoryCache = { expiresAt: 0, bySlug: new Map(), ordered: [] };
 
-function getWooUrl(req) {
-  const host = req.headers.host || '';
-  for (const [domain, url] of Object.entries(WOO_DOMAINS)) {
-    if (host.includes(domain)) return url;
-  }
-  return WOO_DOMAINS.default;
+function cleanWooBaseUrl(value) {
+  return String(value || '')
+    .replace(/\/wp-json\/wc\/v3\/?$/i, '')
+    .replace(/\/+$/, '');
 }
 
-function getWooCredentials(req) {
-  const host = req.headers.host || '';
-  if (host.includes('com.au')) {
+function requestRegion(req) {
+  const host = String(req.headers.host || '').toLowerCase();
+  if (host.includes('com.au')) return 'AU';
+  if (host.includes('co.nz')) return 'NZ';
+  return 'IN';
+}
+
+function envWooUrl(region) {
+  if (region === 'AU') return cleanWooBaseUrl(process.env.VITE_WOOCOMMERCE_URL_AUSTRALIA);
+  if (region === 'NZ') return cleanWooBaseUrl(process.env.VITE_WOOCOMMERCE_URL_NEWZEALAND);
+  return cleanWooBaseUrl(process.env.VITE_WOOCOMMERCE_URL_INDIA || process.env.VITE_WOOCOMMERCE_URL);
+}
+
+function envWooCredentials(region) {
+  if (region === 'AU') {
     return {
-      key: process.env.VITE_WOOCOMMERCE_KEY_AUSTRALIA || process.env.VITE_WOOCOMMERCE_KEY_INDIA || process.env.VITE_WOOCOMMERCE_KEY,
-      secret: process.env.VITE_WOOCOMMERCE_SECRET_AUSTRALIA || process.env.VITE_WOOCOMMERCE_SECRET_INDIA || process.env.VITE_WOOCOMMERCE_SECRET,
+      key: process.env.VITE_WOOCOMMERCE_KEY_AUSTRALIA,
+      secret: process.env.VITE_WOOCOMMERCE_SECRET_AUSTRALIA,
     };
   }
-  if (host.includes('co.nz')) {
+  if (region === 'NZ') {
     return {
-      key: process.env.VITE_WOOCOMMERCE_KEY_NEWZEALAND || process.env.VITE_WOOCOMMERCE_KEY_INDIA || process.env.VITE_WOOCOMMERCE_KEY,
-      secret: process.env.VITE_WOOCOMMERCE_SECRET_NEWZEALAND || process.env.VITE_WOOCOMMERCE_SECRET_INDIA || process.env.VITE_WOOCOMMERCE_SECRET,
+      key: process.env.VITE_WOOCOMMERCE_KEY_NEWZEALAND,
+      secret: process.env.VITE_WOOCOMMERCE_SECRET_NEWZEALAND,
     };
   }
   return {
@@ -318,44 +325,115 @@ function getWooCredentials(req) {
   };
 }
 
+function getWooStoreCandidates(req) {
+  const region = requestRegion(req);
+  const candidates = [];
+  const addCandidate = (candidateRegion, label) => {
+    const credentials = envWooCredentials(candidateRegion);
+    const url = envWooUrl(candidateRegion) || DEFAULT_WOO_URLS[candidateRegion];
+    if (!url || !credentials.key || !credentials.secret) return;
+    const key = `${url}:${credentials.key}`;
+    if (candidates.some((candidate) => candidate.cacheKey === key)) return;
+    candidates.push({ region: candidateRegion, label, url, ...credentials, cacheKey: key });
+  };
+
+  addCandidate(region, 'regional');
+  if (region !== 'IN') addCandidate('IN', 'india-fallback');
+  if (candidates.length === 0) addCandidate('IN', 'default');
+  return candidates;
+}
+
+function getWooUrl(req) {
+  return getWooStoreCandidates(req)[0]?.url || DEFAULT_WOO_URLS.IN;
+}
+
+function getWooCredentials(req) {
+  const candidate = getWooStoreCandidates(req)[0];
+  return { key: candidate?.key, secret: candidate?.secret };
+}
+
 function getWooAuth(req) {
   const { key, secret } = getWooCredentials(req);
   if (!key || !secret) throw new Error('WooCommerce credentials are not configured');
   return 'Basic ' + Buffer.from(`${key}:${secret}`).toString('base64');
 }
 
+function wooCandidateAuth(candidate) {
+  return 'Basic ' + Buffer.from(`${candidate.key}:${candidate.secret}`).toString('base64');
+}
+
+async function fetchWooWithFallback(req, endpoint, init = {}) {
+  let lastResponse = null;
+  let lastError = null;
+  for (const candidate of getWooStoreCandidates(req)) {
+    const url = `${candidate.url}/wp-json/wc/v3/${endpoint.replace(/^\/+/, '')}`;
+    try {
+      const response = await fetch(url, {
+        ...init,
+        headers: {
+          ...(init.headers || {}),
+          Authorization: wooCandidateAuth(candidate),
+          Accept: 'application/json',
+        },
+      });
+      if (response.ok) return { response, candidate };
+      lastResponse = response;
+      if (![401, 403, 404].includes(response.status)) return { response, candidate };
+    } catch (err) {
+      lastError = err;
+    }
+  }
+
+  if (lastResponse) return { response: lastResponse, candidate: null };
+  throw lastError || new Error('WooCommerce request failed');
+}
+
 async function fetchWooCategoryMap(req) {
-  if (wooCategoryCache.expiresAt > Date.now() && wooCategoryCache.bySlug.size > 0) {
+  const cacheRegion = requestRegion(req);
+  if (wooCategoryCache.region === cacheRegion && wooCategoryCache.expiresAt > Date.now() && wooCategoryCache.bySlug.size > 0) {
     return wooCategoryCache;
   }
 
-  const wooUrl = getWooUrl(req);
-  const auth = getWooAuth(req);
-  const response = await fetch(`${wooUrl}/wp-json/wc/v3/products/categories?per_page=100&hide_empty=true&orderby=count&order=desc`, {
-    headers: {
-      Authorization: auth,
-      'User-Agent': 'LuxtronicsServer/1.0',
-      Accept: 'application/json',
-    },
-  });
+  let lastError = null;
+  for (const candidate of getWooStoreCandidates(req)) {
+    const auth = wooCandidateAuth(candidate);
+    const response = await fetch(`${candidate.url}/wp-json/wc/v3/products/categories?per_page=100&hide_empty=true&orderby=count&order=desc`, {
+      headers: {
+        Authorization: auth,
+        'User-Agent': 'LuxtronicsServer/1.0',
+        Accept: 'application/json',
+      },
+    });
 
-  if (!response.ok) {
-    throw new Error(`WooCommerce categories ${response.status}`);
+    if (!response.ok) {
+      lastError = new Error(`WooCommerce categories ${response.status} (${candidate.label})`);
+      if ([401, 403, 404].includes(response.status)) continue;
+      throw lastError;
+    }
+
+    const categories = (await response.json()).filter((category) => Number(category.count || 0) > 0);
+    if (categories.length === 0 && candidate.label === 'regional' && getWooStoreCandidates(req).length > 1) {
+      lastError = new Error(`WooCommerce categories empty (${candidate.label})`);
+      continue;
+    }
+
+    const bySlug = new Map();
+    for (const category of categories) {
+      bySlug.set(String(category.slug || '').toLowerCase(), category);
+    }
+
+    wooCategoryCache = {
+      region: cacheRegion,
+      activeStore: candidate,
+      expiresAt: Date.now() + 5 * 60 * 1000,
+      bySlug,
+      ordered: categories,
+    };
+
+    return wooCategoryCache;
   }
 
-  const categories = (await response.json()).filter((category) => Number(category.count || 0) > 0);
-  const bySlug = new Map();
-  for (const category of categories) {
-    bySlug.set(String(category.slug || '').toLowerCase(), category);
-  }
-
-  wooCategoryCache = {
-    expiresAt: Date.now() + 5 * 60 * 1000,
-    bySlug,
-    ordered: categories,
-  };
-
-  return wooCategoryCache;
+  throw lastError || new Error('WooCommerce categories unavailable');
 }
 
 function electronicsCategoryOrder(categories) {
@@ -829,9 +907,11 @@ app.get('/api/products', async (req, res) => {
 
   // Storefront fallback: if Mongo is cold/unavailable, keep the shop online via WooCommerce.
   try {
-    const wooUrl = getWooUrl(req);
     const params = new URLSearchParams(req.query);
     const categoryMap = await fetchWooCategoryMap(req);
+    const activeStore = categoryMap.activeStore || getWooStoreCandidates(req)[0];
+    const wooUrl = activeStore.url;
+    const auth = 'Basic ' + Buffer.from(`${activeStore.key}:${activeStore.secret}`).toString('base64');
     params.set('status', 'publish');
     params.set('per_page', String(Math.min(perPage, 100)));
     params.set('page', String(page));
@@ -844,7 +924,6 @@ app.get('/api/products', async (req, res) => {
     }
 
     const url = `${wooUrl}/wp-json/wc/v3/products?${params}`;
-    const auth = getWooAuth(req);
 
     if (!search && !category && page === 1) {
       const priorityCategories = electronicsCategoryOrder(categoryMap.ordered);
@@ -924,13 +1003,11 @@ app.get('/api/products/slug/:slug', async (req, res) => {
 
   // Storefront fallback: if Mongo is cold/unavailable, keep product pages online via WooCommerce.
   try {
-    const wooUrl = getWooUrl(req);
-    const auth = getWooAuth(req);
     const productId = productIdFromSlug(slug);
-    const url = productId
-      ? `${wooUrl}/wp-json/wc/v3/products/${encodeURIComponent(productId)}`
-      : `${wooUrl}/wp-json/wc/v3/products?slug=${encodeURIComponent(slug)}`;
-    const r = await fetch(url, { headers: { 'Authorization': auth } });
+    const endpoint = productId
+      ? `products/${encodeURIComponent(productId)}`
+      : `products?slug=${encodeURIComponent(slug)}`;
+    const { response: r, candidate } = await fetchWooWithFallback(req, endpoint);
     if (!r.ok) return res.status(r.status).json({ success: false, error: 'WooCommerce API error' });
     const body = await r.json();
     const item = Array.isArray(body) ? body[0] : body;
@@ -940,9 +1017,10 @@ app.get('/api/products/slug/:slug', async (req, res) => {
     // Fetch variations if it's a variable product
     let variations = [];
     if (item.type === 'variable') {
-      const vUrl = `${wooUrl}/wp-json/wc/v3/products/${item.id}/variations?per_page=100`;
-      const vr = await fetch(vUrl, { headers: { 'Authorization': auth } });
-      variations = await vr.json();
+      const vr = await fetch(`${candidate.url}/wp-json/wc/v3/products/${item.id}/variations?per_page=100`, {
+        headers: { Authorization: wooCandidateAuth(candidate), Accept: 'application/json' },
+      });
+      if (vr.ok) variations = await vr.json();
     }
 
     // Transform for frontend (minimal transformation needed as frontend expects MongoDB format or raw)
@@ -974,10 +1052,7 @@ app.get('/api/products/:id', async (req, res) => {
 
   // Storefront fallback: if Mongo is cold/unavailable, keep product pages online via WooCommerce.
   try {
-    const wooUrl = getWooUrl(req);
-    const auth = getWooAuth(req);
-    const url = `${wooUrl}/wp-json/wc/v3/products/${id}`;
-    const r = await fetch(url, { headers: { 'Authorization': auth } });
+    const { response: r, candidate } = await fetchWooWithFallback(req, `products/${encodeURIComponent(id)}`);
     const item = await r.json();
 
     if (!item || item.code === 'rest_no_route') return res.status(404).json({ success: false, error: 'Product not found' });
@@ -985,9 +1060,10 @@ app.get('/api/products/:id', async (req, res) => {
     // Fetch variations if it's a variable product
     let variations = [];
     if (item.type === 'variable') {
-      const vUrl = `${wooUrl}/wp-json/wc/v3/products/${item.id}/variations?per_page=100`;
-      const vr = await fetch(vUrl, { headers: { 'Authorization': auth } });
-      variations = await vr.json();
+      const vr = await fetch(`${candidate.url}/wp-json/wc/v3/products/${item.id}/variations?per_page=100`, {
+        headers: { Authorization: wooCandidateAuth(candidate), Accept: 'application/json' },
+      });
+      if (vr.ok) variations = await vr.json();
     }
 
     res.json({ success: true, data: { ...item, variations }, source: 'woocommerce' });
@@ -1073,24 +1149,11 @@ app.put('/api/woo/products/:id', async (req, res) => {
 
 app.get('/api/woo/categories', async (req, res) => {
   try {
-    const wooUrl = getWooUrl(req);
-    const params = new URLSearchParams();
-    const allowed = ['per_page', 'page', 'search', 'orderby', 'order', 'hide_empty'];
-    for (const key of allowed) {
-      if (req.query[key]) params.set(key, String(req.query[key]));
-    }
-    if (!params.has('per_page')) params.set('per_page', '100');
-
-    const url = `${wooUrl}/wp-json/wc/v3/products/categories?${params}`;
-    const auth = getWooAuth(req);
-
-    const r = await fetch(url, { headers: { Authorization: auth, 'Content-Type': 'application/json' } });
-    const text = await r.text();
-    if (!r.ok) {
-      return res.status(r.status).json({ success: false, error: `WooCommerce categories error: ${r.statusText}`, details: text.slice(0, 500) });
-    }
-
-    res.json(JSON.parse(text));
+    const page = Math.max(parseInt(req.query.page || '1', 10), 1);
+    const perPage = Math.min(Math.max(parseInt(req.query.per_page || '100', 10), 1), 100);
+    const categoryMap = await fetchWooCategoryMap(req);
+    const data = categoryMap.ordered.slice((page - 1) * perPage, page * perPage);
+    res.json(data);
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }
@@ -1141,30 +1204,11 @@ app.get('/api/categories', async (req, res) => {
   }
 
   try {
-    const wooUrl = getWooUrl(req);
-    const params = new URLSearchParams(req.query);
-    params.set('hide_empty', 'true');
-    params.set('per_page', String(perPage));
-    params.set('page', String(page));
-    const url = `${wooUrl}/wp-json/wc/v3/products/categories?${params}`;
-    const auth = getWooAuth(req);
-
-    const r = await fetch(url, {
-      headers: {
-        'Authorization': auth,
-        'User-Agent': 'LuxtronicsServer/1.0',
-        'Accept': 'application/json',
-      },
-    });
-
-    if (!r.ok) {
-      const errText = await r.text();
-      return res.status(500).json({ success: false, error: `Woo ${r.status}: ${errText.slice(0, 200)}` });
-    }
-
-    const data = (await r.json()).filter((category) => Number(category.count || 0) > 0);
-    const total = parseInt(r.headers.get('X-WP-Total') || String(data.length), 10);
-    const totalPages = parseInt(r.headers.get('X-WP-TotalPages') || String(Math.ceil(total / perPage) || 1), 10);
+    const categoryMap = await fetchWooCategoryMap(req);
+    const allCategories = categoryMap.ordered.filter((category) => Number(category.count || 0) > 0);
+    const total = allCategories.length;
+    const data = allCategories.slice((page - 1) * perPage, page * perPage);
+    const totalPages = Math.ceil(total / perPage) || 1;
     res.json({
       success: true,
       data,
