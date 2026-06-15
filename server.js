@@ -182,16 +182,7 @@ async function initMongo() {
     db = client.db(process.env.MONGODB_DB_NAME || 'Luxtronics');
     productsCol = db.collection('products');
     categoriesCol = db.collection('categories');
-    await Promise.all([
-      productsCol.createIndex({ id: 1 }, { unique: true }),
-      productsCol.createIndex({ slug: 1 }),
-      productsCol.createIndex({ updatedAt: -1 }),
-      productsCol.createIndex({ 'categories.slug': 1 }),
-      productsCol.createIndex({ 'categories.name': 1 }),
-      productsCol.createIndex({ name: 'text', description: 'text', searchText: 'text' }),
-      categoriesCol.createIndex({ slug: 1 }, { unique: true }),
-      categoriesCol.createIndex({ count: -1, name: 1 }),
-    ]);
+    await ensureMongoIndexes();
     mongoReady = true;
     mongoLastError = null;
     console.log('✅ MongoDB connected successfully');
@@ -201,6 +192,38 @@ async function initMongo() {
   }
 }
 initMongo();
+
+async function createIndexIfPossible(collection, keys, options = {}) {
+  try {
+    await collection.createIndex(keys, options);
+  } catch (err) {
+    const codeName = err?.codeName || '';
+    const message = err?.message || String(err);
+    if (
+      codeName === 'IndexOptionsConflict' ||
+      codeName === 'IndexKeySpecsConflict' ||
+      /equivalent index already exists|already exists with a different name/i.test(message)
+    ) {
+      console.warn(`⚠️ Reusing existing MongoDB index on ${collection.collectionName}: ${message}`);
+      return;
+    }
+
+    throw err;
+  }
+}
+
+async function ensureMongoIndexes() {
+  await Promise.all([
+    createIndexIfPossible(productsCol, { id: 1 }, { unique: true }),
+    createIndexIfPossible(productsCol, { slug: 1 }),
+    createIndexIfPossible(productsCol, { updatedAt: -1 }),
+    createIndexIfPossible(productsCol, { 'categories.slug': 1 }),
+    createIndexIfPossible(productsCol, { 'categories.name': 1 }),
+    createIndexIfPossible(productsCol, { name: 'text', description: 'text', searchText: 'text' }),
+    createIndexIfPossible(categoriesCol, { slug: 1 }, { unique: true }),
+    createIndexIfPossible(categoriesCol, { count: -1, name: 1 }),
+  ]);
+}
 
 function mask(str) {
   if (!str) return '❌ MISSING';
