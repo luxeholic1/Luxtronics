@@ -252,11 +252,40 @@ function getWooAuth(req) {
 }
 
 function wooFallbackEnabled() {
-  return process.env.ENABLE_WOO_FALLBACK !== 'false';
+  return process.env.ENABLE_WOO_FALLBACK === 'true';
 }
 
 function escapeRegex(value = '') {
   return String(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+function decodeHtmlEntities(value = '') {
+  return String(value)
+    .replace(/&amp;/gi, '&')
+    .replace(/&#038;/gi, '&')
+    .replace(/&quot;/gi, '"')
+    .replace(/&#039;/gi, "'")
+    .replace(/&apos;/gi, "'")
+    .replace(/&lt;/gi, '<')
+    .replace(/&gt;/gi, '>')
+    .trim();
+}
+
+function categorySearchVariants(value = '') {
+  const decoded = decodeHtmlEntities(value);
+  const raw = String(value || '').trim();
+  const dashed = decoded.replace(/\s*&\s*/g, '-').replace(/\s+/g, '-').toLowerCase();
+  const spaced = decoded.replace(/\s*&\s*/g, ' and ').replace(/[-_]+/g, ' ').replace(/\s+/g, ' ').trim();
+
+  return [...new Set([
+    raw,
+    decoded,
+    spaced,
+    dashed,
+    raw.replace(/&/g, '&amp;'),
+    decoded.replace(/&/g, '&amp;'),
+    spaced.replace(/\band\b/gi, '&'),
+  ].filter(Boolean))];
 }
 
 function productIdFromSlug(slug = '') {
@@ -632,10 +661,19 @@ app.get('/api/products', async (req, res) => {
         }
       }
       if (category) {
-        const safeCategory = escapeRegex(category).replace(/-/g, '[\\s-]');
+        const categoryVariants = categorySearchVariants(category);
+        const categoryRegexes = categoryVariants.map((variant) => {
+          const pattern = escapeRegex(variant)
+            .replace(/\\-/g, '[\\s-]')
+            .replace(/-/g, '[\\s-]')
+            .replace(/&/g, '(?:&|&amp;|and)');
+          return new RegExp(pattern, 'i');
+        });
         filters.push({ $or: [
-          { 'categories.name': { $regex: safeCategory, $options: 'i' } },
-          { 'categories.slug': category }
+          { 'categories.name': { $in: categoryRegexes } },
+          { 'categories.slug': { $in: categoryVariants } },
+          { category: { $in: categoryRegexes } },
+          { categorySlug: { $in: categoryVariants } },
         ] });
       }
       const query = filters.length > 1 ? { $and: filters } : filters[0] || {};

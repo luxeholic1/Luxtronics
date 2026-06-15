@@ -266,7 +266,7 @@ const CompactCategoriesMega = ({
                   return (
                     <Link
                       key={category.slug}
-                      to={`/shop?cat=${category.slug}`}
+                      to={`/shop?cat=${encodeURIComponent(category.slug)}`}
                       onClick={onClose}
                       className={`group flex items-start gap-2 rounded px-1 py-1 transition hover:bg-primary/5 hover:text-primary ${
                         isHeading ? "mb-1 text-sm font-black text-gray-900 dark:text-white" : "text-xs font-medium text-gray-700 dark:text-gray-300"
@@ -567,7 +567,7 @@ const Navbar = () => {
                                       return (
                                         <Link
                                           key={cat.slug}
-                                          to={`/shop?cat=${cat.slug}`}
+                                          to={`/shop?cat=${encodeURIComponent(cat.slug)}`}
                                           onClick={() => setActiveMega(null)}
                                           className="flex items-center gap-2.5 px-2 py-2 rounded-lg text-sm text-gray-700 dark:text-gray-200 hover:bg-primary/10 hover:text-primary transition-colors group"
                                         >
@@ -590,7 +590,7 @@ const Navbar = () => {
                                       return (
                                         <Link
                                           key={cat.slug}
-                                          to={`/shop?cat=${cat.slug}`}
+                                          to={`/shop?cat=${encodeURIComponent(cat.slug)}`}
                                           onClick={() => setActiveMega(null)}
                                           className="flex items-center gap-2.5 px-2 py-2 rounded-lg text-sm text-gray-700 dark:text-gray-200 hover:bg-primary/10 hover:text-primary transition-colors group"
                                         >
@@ -1024,7 +1024,7 @@ const Navbar = () => {
                                   return (
                                     <Link
                                       key={cat.slug}
-                                      to={`/shop?cat=${cat.slug}`}
+                                      to={`/shop?cat=${encodeURIComponent(cat.slug)}`}
                                       onClick={() => { setMobileOpen(false); setMobileExpanded(null); }}
                                       className="flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-sm text-gray-600 dark:text-gray-300 hover:bg-primary/10 hover:text-primary transition-colors"
                                     >
@@ -1278,7 +1278,7 @@ const SearchSuggestions = ({
               return (
                 <Link
                   key={cat.slug}
-                  to={`/shop?cat=${cat.slug}`}
+                  to={`/shop?cat=${encodeURIComponent(cat.slug)}`}
                   onClick={onSelect}
                   className="inline-flex items-center gap-1.5 rounded-full border border-gray-200 bg-white px-3 py-1.5 text-xs font-semibold text-gray-700 transition-colors hover:border-primary/50 hover:text-primary dark:border-gray-700 dark:bg-gray-950 dark:text-gray-200"
                 >

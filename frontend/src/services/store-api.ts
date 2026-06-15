@@ -128,6 +128,18 @@ function isUncategorizedCategory(name: string) {
   return !normalized || normalized === 'uncategorized' || normalized === 'uncategorised';
 }
 
+function decodeHtmlEntities(value: string) {
+  return String(value || '')
+    .replace(/&amp;/gi, '&')
+    .replace(/&#038;/gi, '&')
+    .replace(/&quot;/gi, '"')
+    .replace(/&#039;/gi, "'")
+    .replace(/&apos;/gi, "'")
+    .replace(/&lt;/gi, '<')
+    .replace(/&gt;/gi, '>')
+    .trim();
+}
+
 function inferCategoryFromProduct(product: StoreProduct) {
   const searchableText = [
     product?.name,
@@ -155,7 +167,7 @@ function resolveProductCategories(product: StoreProduct) {
         .filter((category: any) => category && !isUncategorizedCategory(category.name) && !isUncategorizedCategory(category.slug))
         .map((category: any) => ({
           id: Number(category.id ?? 0),
-          name: String(category.name ?? ''),
+          name: decodeHtmlEntities(String(category.name ?? '')),
           slug: String(category.slug ?? ''),
         }))
         .filter((category) => category.name && category.slug)
@@ -170,7 +182,7 @@ function resolveProductCategories(product: StoreProduct) {
 }
 
 function compactProductTitle(value: string, maxLength = 82) {
-  const cleaned = String(value || '')
+  const cleaned = decodeHtmlEntities(String(value || ''))
     .replace(/&amp;/gi, 'and')
     .replace(/\bSUNSKY\b/gi, '')
     .replace(/\bSKU[:\s-]*[A-Z0-9-]+\b/gi, '')
@@ -345,7 +357,12 @@ export async function fetchStoreCategories(page = 1, perPage = 20): Promise<{
   }
 
   const payload = await response.json();
-  const categories = Array.isArray(payload?.data) ? payload.data : [];
+  const categories = Array.isArray(payload?.data)
+    ? payload.data.map((category: StoreCategory) => ({
+        ...category,
+        name: decodeHtmlEntities(category.name),
+      }))
+    : [];
   
   return {
     data: categories,

@@ -92,7 +92,7 @@ const CategoryStrip = () => {
                 className="h-full"
               >
                 <Link
-                  to={`/shop?cat=${cat.slug}`}
+                  to={`/shop?cat=${encodeURIComponent(cat.slug)}`}
                   className="group relative flex h-full min-h-[190px] flex-col overflow-hidden rounded-2xl border border-white/20 bg-background/54 p-4 shadow-[0_18px_60px_rgba(0,0,0,0.08)] backdrop-blur-xl transition duration-300 hover:-translate-y-1 hover:border-primary/35 hover:bg-background/72 hover:shadow-[0_24px_80px_rgba(0,0,0,0.14)] dark:border-white/10 dark:bg-white/[0.055] dark:hover:bg-white/[0.08] sm:p-5"
                 >
                   <div className="absolute inset-x-4 top-0 h-px bg-gradient-to-r from-transparent via-primary/45 to-transparent opacity-0 transition duration-300 group-hover:opacity-100" />

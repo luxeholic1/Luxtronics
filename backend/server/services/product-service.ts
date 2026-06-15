@@ -10,6 +10,45 @@ function escapeRegex(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
+function decodeHtmlEntities(value: string): string {
+  return String(value || '')
+    .replace(/&amp;/gi, '&')
+    .replace(/&#038;/gi, '&')
+    .replace(/&quot;/gi, '"')
+    .replace(/&#039;/gi, "'")
+    .replace(/&apos;/gi, "'")
+    .replace(/&lt;/gi, '<')
+    .replace(/&gt;/gi, '>')
+    .trim();
+}
+
+function categorySearchVariants(value: string): string[] {
+  const raw = String(value || '').trim();
+  const decoded = decodeHtmlEntities(raw);
+  const dashed = decoded.replace(/\s*&\s*/g, '-').replace(/\s+/g, '-').toLowerCase();
+  const spaced = decoded.replace(/\s*&\s*/g, ' and ').replace(/[-_]+/g, ' ').replace(/\s+/g, ' ').trim();
+
+  return [...new Set([
+    raw,
+    decoded,
+    spaced,
+    dashed,
+    raw.replace(/&/g, '&amp;'),
+    decoded.replace(/&/g, '&amp;'),
+    spaced.replace(/\band\b/gi, '&'),
+  ].filter(Boolean))];
+}
+
+function categoryRegexes(value: string): RegExp[] {
+  return categorySearchVariants(value).map((variant) => {
+    const pattern = escapeRegex(variant)
+      .replace(/\\-/g, '[\\s-]')
+      .replace(/-/g, '[\\s-]')
+      .replace(/&/g, '(?:&|&amp;|and)');
+    return new RegExp(pattern, 'i');
+  });
+}
+
 const PRODUCT_LIST_PROJECTION = {
   id: 1,
   type: 1,
@@ -131,14 +170,14 @@ export class ProductService {
     page: number = 1,
     perPage: number = 50
   ): Promise<{ products: MongoProduct[]; total: number }> {
-    const safeCategory = escapeRegex(String(category || '').trim());
-    const regex = new RegExp(safeCategory.replace(/-/g, '[\\s-]'), 'i');
+    const variants = categorySearchVariants(category);
+    const regexes = categoryRegexes(category);
     return this.getProducts(page, perPage, {
       $or: [
-        { 'categories.slug': category },
-        { 'categories.name': regex },
-        { category: regex },
-        { categorySlug: category },
+        { 'categories.slug': { $in: variants } },
+        { 'categories.name': { $in: regexes } },
+        { category: { $in: regexes } },
+        { categorySlug: { $in: variants } },
       ],
     } as any);
   }
@@ -174,9 +213,9 @@ export class ProductService {
     const categoryFilter = category
       ? {
         $or: [
-          { 'categories.slug': category },
-          { 'categories.name': new RegExp(escapeRegex(category).replace(/-/g, '[\\s-]'), 'i') },
-          { categorySlug: category },
+          { 'categories.slug': { $in: categorySearchVariants(category) } },
+          { 'categories.name': { $in: categoryRegexes(category) } },
+          { categorySlug: { $in: categorySearchVariants(category) } },
         ],
       }
       : null;

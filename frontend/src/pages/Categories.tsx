@@ -115,7 +115,7 @@ const ChildCard = ({ cat }: { cat: StoreCategory }) => {
 
   return (
     <Link
-      to={`/shop?cat=${cat.slug}`}
+      to={`/shop?cat=${encodeURIComponent(cat.slug)}`}
       className="group overflow-hidden rounded-lg border border-border bg-card/90 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-primary/35 hover:shadow-lg"
     >
       <CategoryImage cat={cat} />
@@ -141,7 +141,7 @@ const ChildRow = ({ cat }: { cat: StoreCategory }) => {
 
   return (
     <Link
-      to={`/shop?cat=${cat.slug}`}
+      to={`/shop?cat=${encodeURIComponent(cat.slug)}`}
       className="group flex items-center gap-3 rounded-lg border border-transparent px-2 py-1.5 transition-colors hover:border-border hover:bg-muted/60"
     >
       <div className="h-14 w-14 shrink-0 overflow-hidden rounded-lg bg-muted">
@@ -322,7 +322,7 @@ const CompactCategoryBrowser = ({
                   return (
                     <Link
                       key={category.slug}
-                      to={`/shop?cat=${category.slug}`}
+                      to={`/shop?cat=${encodeURIComponent(category.slug)}`}
                       className={`group flex items-start gap-2 rounded px-1 py-1.5 transition hover:bg-primary/5 hover:text-primary ${
                         isHeading ? "mb-1 text-base font-black text-foreground" : "text-sm font-medium text-muted-foreground"
                       }`}
@@ -567,7 +567,7 @@ const Categories = () => {
                       className="w-[150px] shrink-0 sm:w-[176px]"
                     >
                       <Link
-                        to={`/shop?cat=${cat.slug}`}
+                        to={`/shop?cat=${encodeURIComponent(cat.slug)}`}
                         className="group block overflow-hidden rounded-xl border border-border bg-background shadow-sm transition hover:-translate-y-0.5 hover:border-primary/35 hover:shadow-lg"
                       >
                         <div className="relative aspect-[4/3] overflow-hidden bg-muted">
