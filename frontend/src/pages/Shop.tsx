@@ -326,11 +326,7 @@ const Shop = () => {
         if (!mounted) return;
         const categoryList = Array.isArray(catData?.data) ? catData.data : [];
         const productList = Array.isArray(prodData) ? prodData : [];
-        setCategories(
-          filterVisibleCategories(
-            categoryList.filter(c => String(c.name || "").toLowerCase() !== "uncategorized" || c.count > 0),
-          ),
-        );
+        setCategories(filterVisibleCategories(categoryList));
         setProducts(productList.map(mapStoreProductToLocalProduct));
         const activeCategoryCount = category
           ? categoryList.find((cat) => cat.slug === category)?.count

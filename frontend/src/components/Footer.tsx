@@ -30,9 +30,11 @@ const footerColumns = [
     title: "Support",
     links: [
       { label: "FAQ", to: "/faq" },
-      { label: "Shipping & Returns", to: "/shipping-returns" },
-      { label: "Privacy", to: "/privacy" },
-      { label: "Terms", to: "/terms" },
+      { label: "Shipping Information", to: "/shipping-returns" },
+      { label: "Payment Method", to: "/payment-method" },
+      { label: "Return Policy", to: "/return-exchange" },
+      { label: "Privacy Policy", to: "/privacy" },
+      { label: "Terms & Conditions", to: "/terms" },
     ],
   },
 ];
@@ -55,8 +57,8 @@ const Footer = () => {
     "@context": "https://schema.org",
     "@type": "Organization",
     "name": "Luxtronics",
-    "url": "https://luxtronics.com",
-    "logo": "https://luxtronics.com/logo.png",
+    "url": "https://luxtronics.in",
+    "logo": "https://luxtronics.in/logo.jpeg",
     "description": "Premium electronics curated for the next generation of creators and tech enthusiasts",
     "sameAs": [
       "https://instagram.com/luxtronics",
@@ -65,12 +67,18 @@ const Footer = () => {
     ],
     "address": {
       "@type": "PostalAddress",
+      "streetAddress": "Suite 2601, Tower 16, Lotus Boulevard, Sector 100",
+      "addressLocality": "Noida",
+      "addressRegion": "Uttar Pradesh",
+      "postalCode": "201304",
       "addressCountry": "IN"
     },
     "contactPoint": {
       "@type": "ContactPoint",
       "contactType": "Customer Support",
-      "availableLanguageID": "en"
+      "email": "support@luxtronics.in",
+      "telephone": "+91-92664-33722",
+      "availableLanguage": ["en", "hi"]
     }
   };
 
@@ -100,6 +108,9 @@ const Footer = () => {
           </Link>
           <p className="mb-6 max-w-sm text-sm leading-6 text-white/72">
             Premium electronics curated for the next generation of creators and tech enthusiasts.
+          </p>
+          <p className="mb-5 max-w-sm text-xs leading-5 text-white/55">
+            Suite 2601, Tower 16, Lotus Boulevard, Sector 100, Noida 201304, Uttar Pradesh, India
           </p>
           <div className="flex flex-wrap gap-2 mb-6">
           <span className="rounded-full border border-white/10 px-3 py-1 text-[11px] text-white/70">
@@ -194,11 +205,12 @@ const Footer = () => {
       
       <div className="relative z-10 border-t border-white/12 bg-black/14 backdrop-blur-md">
         <div className="mx-auto flex w-full max-w-[1920px] flex-col items-center justify-between gap-4 px-4 py-6 text-center text-xs font-medium text-white/62 sm:flex-row sm:gap-6 sm:px-6 sm:py-8 sm:text-left md:px-8 lg:px-12 xl:px-16">
-          <p>©️ {currentYear} Luxtronics. All rights reserved. Premium electronics for creators.</p>
+          <p>© {currentYear} Luxtronics. All rights reserved. Premium electronics for creators.</p>
           
-          <div className="flex gap-4 sm:gap-6">
+          <div className="flex flex-wrap justify-center gap-4 sm:gap-6">
             <Link to="/privacy" className="hover:text-white transition-colors">Privacy</Link>
             <Link to="/terms" className="hover:text-white transition-colors">Terms</Link>
+            <Link to="/payment-method" className="hover:text-white transition-colors">Payments</Link>
             <Link to="/faq" className="hover:text-white transition-colors">Help</Link>
           </div>
         </div>

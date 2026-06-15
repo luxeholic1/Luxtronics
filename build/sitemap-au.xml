@@ -61,6 +61,24 @@
   </url>
 
   <url>
+    <loc>https://luxtronics.com.au/payment-method</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.45</priority>
+  </url>
+
+  <url>
+    <loc>https://luxtronics.com.au/return-exchange</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.55</priority>
+  </url>
+
+  <url>
+    <loc>https://luxtronics.com.au/return-policy</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.55</priority>
+  </url>
+
+  <url>
     <loc>https://luxtronics.com.au/privacy</loc>
     <changefreq>yearly</changefreq>
     <priority>0.3</priority>

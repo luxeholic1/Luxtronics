@@ -1,0 +1,6 @@
+Contact: mailto:support@luxtronics.in
+Preferred-Languages: en, hi
+Canonical: https://luxtronics.in/.well-known/security.txt
+Policy: https://luxtronics.in/privacy
+Expires: 2027-06-15T00:00:00Z
+

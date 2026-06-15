@@ -47,7 +47,7 @@ const KB: Array<{
   {
     patterns: [/ship|deliver|delivery|dispatch|courier|how long|when.*arrive|arrival/i],
     response:
-      "🚚 **Shipping Info:**\n\n• Shipping options and charges are shown at checkout.\n• Delivery timelines vary by location, product availability, and courier service.\n• Tracking details are shared once the order is dispatched.",
+      "🚚 **Shipping Info:**\n\n• India: 3-7 business days.\n• Australia & New Zealand: 3-5 working days after dispatch.\n• Shipping charges are shown at checkout.\n• Tracking details are shared once the order is dispatched.",
     quickReplies: ["Return policy", "Track my order", "Contact support"],
     link: { label: "Full Shipping Details", to: "/shipping-returns" },
   },
@@ -58,7 +58,7 @@ const KB: Array<{
     response:
       "↩️ **Return & Refund Policy:**\n\n• Return eligibility depends on product type, condition, and applicable policy.\n• Items generally need original packaging, accessories, and proof of purchase.\n• Refund timelines depend on inspection and payment-provider processing.\n• Damaged or defective cases are reviewed by support.\n\nTo start a request, contact us via WhatsApp or email.",
     quickReplies: ["Contact support", "Shipping info", "Coverage info"],
-    link: { label: "Full Return Policy", to: "/shipping-returns" },
+    link: { label: "Full Return Policy", to: "/return-exchange" },
   },
 
   // Coverage

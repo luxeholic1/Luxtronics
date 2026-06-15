@@ -17,6 +17,108 @@ for (const file of ['.env', '.env.local', '.env.india']) {
 const app = express();
 const port = parseInt(process.env.PORT || '3001', 10);
 const BUILD_DIR = path.join(__dirname, 'build');
+const ALLOWED_ORIGINS = new Set([
+  'https://luxtronics.in',
+  'https://www.luxtronics.in',
+  'https://luxtronics.com.au',
+  'https://www.luxtronics.com.au',
+  'https://luxtronics.co.nz',
+  'https://www.luxtronics.co.nz',
+  'http://localhost:5173',
+  'http://localhost:4173',
+  'http://localhost:3001',
+]);
+const rateBuckets = new Map();
+
+function isAllowedOrigin(origin = '') {
+  return !origin || ALLOWED_ORIGINS.has(origin);
+}
+
+function clientIp(req) {
+  return String(req.headers['x-forwarded-for'] || req.socket.remoteAddress || 'unknown').split(',')[0].trim();
+}
+
+function applySecurityHeaders(req, res, next) {
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('X-Frame-Options', 'SAMEORIGIN');
+  res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+  res.setHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=(), payment=(self)');
+  res.setHeader('Cross-Origin-Opener-Policy', 'same-origin-allow-popups');
+  res.setHeader('X-DNS-Prefetch-Control', 'on');
+  if (req.secure || req.headers['x-forwarded-proto'] === 'https') {
+    res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains; preload');
+  }
+  next();
+}
+
+function securityRateLimit(req, res, next) {
+  const now = Date.now();
+  const windowMs = 60 * 1000;
+  const max = req.path.startsWith('/api') ? 120 : 240;
+  const key = `${clientIp(req)}:${req.path.startsWith('/api') ? 'api' : 'site'}`;
+  const bucket = rateBuckets.get(key) || { count: 0, resetAt: now + windowMs };
+
+  if (bucket.resetAt <= now) {
+    bucket.count = 0;
+    bucket.resetAt = now + windowMs;
+  }
+
+  bucket.count += 1;
+  rateBuckets.set(key, bucket);
+
+  if (rateBuckets.size > 5000) {
+    for (const [bucketKey, value] of rateBuckets) {
+      if (value.resetAt <= now) rateBuckets.delete(bucketKey);
+    }
+  }
+
+  res.setHeader('RateLimit-Limit', String(max));
+  res.setHeader('RateLimit-Remaining', String(Math.max(0, max - bucket.count)));
+  res.setHeader('RateLimit-Reset', String(Math.ceil(bucket.resetAt / 1000)));
+
+  if (bucket.count > max) {
+    return res.status(429).json({ success: false, error: 'Too many requests. Please try again shortly.' });
+  }
+
+  next();
+}
+
+function rejectSuspiciousRequests(req, res, next) {
+  const origin = req.headers.origin;
+  if (origin && !isAllowedOrigin(origin)) {
+    return res.status(403).json({ success: false, error: 'Origin not allowed' });
+  }
+
+  if (req.method !== 'GET' && req.method !== 'HEAD') {
+    const contentType = String(req.headers['content-type'] || '');
+    if (contentType && !/^application\/json\b|^application\/x-www-form-urlencoded\b|^multipart\/form-data\b/i.test(contentType)) {
+      return res.status(415).json({ success: false, error: 'Unsupported content type' });
+    }
+  }
+
+  const rawUrl = decodeURIComponent(req.originalUrl || req.url || '').toLowerCase();
+  if (/<script|javascript:|union\s+select|information_schema|\.\.\//i.test(rawUrl)) {
+    return res.status(400).json({ success: false, error: 'Bad request' });
+  }
+
+  next();
+}
+
+function sanitizeObject(value) {
+  if (Array.isArray(value)) return value.map(sanitizeObject);
+  if (!value || typeof value !== 'object') {
+    return typeof value === 'string'
+      ? value.replace(/<script[\s\S]*?>[\s\S]*?<\/script>/gi, '').replace(/\u0000/g, '').trim()
+      : value;
+  }
+
+  const clean = {};
+  for (const [key, val] of Object.entries(value)) {
+    if (key.startsWith('$') || key.includes('.')) continue;
+    clean[key] = sanitizeObject(val);
+  }
+  return clean;
+}
 
 // ── MONGODB STATE ────────────────────────────────────────────────────────────
 let db = null;
@@ -135,6 +237,9 @@ const STATIC_PUBLIC_PATHS = [
   { path: '/contact', changefreq: 'monthly', priority: '0.55' },
   { path: '/faq', changefreq: 'monthly', priority: '0.5' },
   { path: '/shipping-returns', changefreq: 'monthly', priority: '0.45' },
+  { path: '/payment-method', changefreq: 'monthly', priority: '0.45' },
+  { path: '/return-exchange', changefreq: 'monthly', priority: '0.55' },
+  { path: '/return-policy', changefreq: 'monthly', priority: '0.55' },
   { path: '/privacy', changefreq: 'yearly', priority: '0.3' },
   { path: '/terms', changefreq: 'yearly', priority: '0.3' },
 ];
@@ -328,11 +433,33 @@ async function fetchSitemapProducts(req) {
   }
 }
 
-app.use(cors());
-app.use(express.json());
+app.set('trust proxy', 1);
+app.disable('x-powered-by');
+app.use(applySecurityHeaders);
+app.use(securityRateLimit);
+app.use(rejectSuspiciousRequests);
+app.use(cors({
+  origin(origin, callback) {
+    if (isAllowedOrigin(origin)) return callback(null, true);
+    return callback(new Error('Not allowed by CORS'));
+  },
+  credentials: true,
+  methods: ['GET', 'HEAD', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Sync-Token'],
+}));
+app.use(express.json({ limit: '1mb' }));
+app.use(express.urlencoded({ limit: '1mb', extended: true }));
+app.use((req, _res, next) => {
+  if (req.body) req.body = sanitizeObject(req.body);
+  next();
+});
 
 // ── DEBUG ─────────────────────────────────────────────────────────────────────
 app.get('/debug', (req, res) => {
+  if (!process.env.DEBUG_TOKEN || req.query.token !== process.env.DEBUG_TOKEN) {
+    return res.status(404).json({ success: false, error: 'Not found' });
+  }
+
   let assets = [];
   try { assets = readdirSync(path.join(BUILD_DIR, 'assets')); } catch (e) { }
 
@@ -719,9 +846,10 @@ app.get('/api/categories', async (req, res) => {
 
   if (mongoReady && categoriesCol) {
     try {
-      const total = await categoriesCol.countDocuments({});
+      const filter = { count: { $gt: 0 } };
+      const total = await categoriesCol.countDocuments(filter);
       const categories = await categoriesCol
-        .find({})
+        .find(filter)
         .sort({ count: -1, name: 1 })
         .skip((page - 1) * perPage)
         .limit(perPage)
@@ -747,7 +875,9 @@ app.get('/api/categories', async (req, res) => {
 
   try {
     const wooUrl = getWooUrl(req);
-    const url = `${wooUrl}/wp-json/wc/v3/products/categories?${new URLSearchParams(req.query)}`;
+    const params = new URLSearchParams(req.query);
+    params.set('hide_empty', 'true');
+    const url = `${wooUrl}/wp-json/wc/v3/products/categories?${params}`;
     const auth = getWooAuth(req);
 
     const r = await fetch(url, {
@@ -763,7 +893,8 @@ app.get('/api/categories', async (req, res) => {
       return res.status(500).json({ success: false, error: `Woo ${r.status}: ${errText.slice(0, 200)}` });
     }
 
-    res.json({ success: true, data: await r.json() });
+    const data = (await r.json()).filter((category) => Number(category.count || 0) > 0);
+    res.json({ success: true, data });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }
@@ -861,6 +992,19 @@ app.get('/robots.txt', (req, res) => {
     'Allow: /blog',
     '',
     `Sitemap: ${absoluteForHost(host, '/sitemap.xml')}`,
+    '',
+  ].join('\n'));
+});
+
+app.get('/.well-known/security.txt', (_req, res) => {
+  res.type('text/plain; charset=utf-8');
+  res.set('Cache-Control', 'public, max-age=86400');
+  res.send([
+    'Contact: mailto:support@luxtronics.in',
+    'Preferred-Languages: en, hi',
+    'Canonical: https://luxtronics.in/.well-known/security.txt',
+    'Policy: https://luxtronics.in/privacy',
+    'Expires: 2027-06-15T00:00:00Z',
     '',
   ].join('\n'));
 });

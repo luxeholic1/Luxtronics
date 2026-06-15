@@ -36,7 +36,14 @@ const servicePeriod = (minValue: number, maxValue: number) => ({
   },
 });
 
-const shippingDeliveryTime = () => ({
+const shippingTransitWindow = (countryCode: string) => {
+  if (countryCode === "IN") return { minValue: 3, maxValue: 7 };
+  return { minValue: 3, maxValue: 5 };
+};
+
+const shippingDeliveryTime = (countryCode: string) => {
+  const transit = shippingTransitWindow(countryCode);
+  return ({
   "@type": "ShippingDeliveryTime",
   handlingTime: {
     "@type": "QuantitativeValue",
@@ -46,11 +53,12 @@ const shippingDeliveryTime = () => ({
   },
   transitTime: {
     "@type": "QuantitativeValue",
-    minValue: 3,
-    maxValue: 7,
+    minValue: transit.minValue,
+    maxValue: transit.maxValue,
     unitCode: DAY_UNIT,
   },
 });
+};
 
 const toPlainNumber = (value: unknown) => {
   if (typeof value === "number") return Number.isFinite(value) ? value : 0;
@@ -71,16 +79,18 @@ export const toSchemaPrice = (value: unknown) => {
 
 export const toSchemaInteger = (value: unknown) => Math.max(0, Math.round(toPlainNumber(value)));
 
+const returnWindowDays = (countryCode: string) => (countryCode === "IN" ? 7 : 14);
+
 export const merchantReturnPolicySchema = (countryCode: string) => ({
   "@type": "MerchantReturnPolicy",
-  "@id": `${getSiteUrl()}/shipping-returns#return-policy-${countryCode.toLowerCase()}`,
+  "@id": `${getSiteUrl()}/return-exchange#return-policy-${countryCode.toLowerCase()}`,
   applicableCountry: countryCode,
   returnPolicyCategory: "https://schema.org/MerchantReturnFiniteReturnWindow",
-  merchantReturnDays: 30,
+  merchantReturnDays: returnWindowDays(countryCode),
   returnMethod: "https://schema.org/ReturnByMail",
   returnFees: "https://schema.org/ReturnFeesCustomerResponsibility",
   refundType: "https://schema.org/FullRefund",
-  merchantReturnLink: `${getSiteUrl()}/shipping-returns`,
+  merchantReturnLink: `${getSiteUrl()}/return-exchange`,
 });
 
 export const shippingServiceSchema = (countryCode: string) => ({
@@ -96,7 +106,7 @@ export const shippingServiceSchema = (countryCode: string) => ({
       "@type": "DefinedRegion",
       addressCountry: countryCode,
     },
-    transitTime: servicePeriod(3, 7),
+    transitTime: servicePeriod(shippingTransitWindow(countryCode).minValue, shippingTransitWindow(countryCode).maxValue),
   },
 });
 
@@ -119,11 +129,11 @@ export const offerShippingDetailsSchema = ({
     currency,
     maxValue: toSchemaPrice(maxShippingValue),
   },
-  deliveryTime: shippingDeliveryTime(),
+  deliveryTime: shippingDeliveryTime(countryCode),
 });
 
 export const offerReturnPolicyReference = (countryCode: string) => ({
-  "@id": `${getSiteUrl()}/shipping-returns#return-policy-${countryCode.toLowerCase()}`,
+  "@id": `${getSiteUrl()}/return-exchange#return-policy-${countryCode.toLowerCase()}`,
 });
 
 export const getSiteUrl = () => {

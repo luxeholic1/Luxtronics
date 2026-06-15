@@ -9,11 +9,17 @@ const VISIBLE_CATEGORY_PATTERNS = [
   /dji|insta360|osmo|mavic|gopro|drone/i,
 ];
 
-export function isVisibleCategory(category: Pick<StoreCategory, "name" | "slug" | "description">): boolean {
+type VisibleCategoryInput = Pick<StoreCategory, "name" | "slug" | "description"> & Partial<Pick<StoreCategory, "count" | "productCount">>;
+
+export function isVisibleCategory(category: VisibleCategoryInput): boolean {
+  const count = Number(category.productCount ?? category.count ?? 0);
+  if (!Number.isFinite(count) || count <= 0) return false;
+  if (String(category.name || "").toLowerCase().trim() === "uncategorized") return false;
+
   const text = `${category.name || ""} ${category.slug || ""} ${category.description || ""}`;
   return VISIBLE_CATEGORY_PATTERNS.some((pattern) => pattern.test(text));
 }
 
-export function filterVisibleCategories<T extends Pick<StoreCategory, "name" | "slug" | "description">>(categories: T[]): T[] {
+export function filterVisibleCategories<T extends VisibleCategoryInput>(categories: T[]): T[] {
   return categories.filter(isVisibleCategory);
 }

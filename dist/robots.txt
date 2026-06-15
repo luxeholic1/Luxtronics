@@ -12,6 +12,12 @@ Allow: /product/
 Allow: /categories
 Allow: /latest-arrivals
 Allow: /blog
+Allow: /shipping-returns
+Allow: /payment-method
+Allow: /return-exchange
+Allow: /return-policy
+Allow: /privacy
+Allow: /terms
 
 Sitemap: https://luxtronics.in/sitemap.xml
 Sitemap: https://luxtronics.com.au/sitemap.xml

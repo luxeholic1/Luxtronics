@@ -11,7 +11,7 @@ import { existsSync } from 'fs';
 import { fileURLToPath } from 'url';
 import { initializeMongoDB } from './db/mongodb';
 import { createProductDocument, createCategoryDocument } from './models/mongo-models';
-import { globalRateLimiter, sanitizeRequestBody, securityHeaders } from './middleware/security';
+import { globalRateLimiter, requireSafeContentType, sanitizeRequestBody, securityHeaders } from './middleware/security';
 import { createWooCommerceProxyRoutes } from './routes/woocommerce-proxy';
 import WooCommerceSync from './services/woocommerce-sync';
 
@@ -115,6 +115,7 @@ export async function setupServer(config: ServerConfig = {}): Promise<Express> {
   app.use(globalRateLimiter);
   app.use(express.json({ limit: '1mb' }));
   app.use(express.urlencoded({ limit: '1mb', extended: true }));
+  app.use(requireSafeContentType);
   app.use(sanitizeRequestBody);
   app.use(cors({
     origin: corsOrigins.includes('*') ? true : corsOrigins,
@@ -343,7 +344,8 @@ export async function setupServer(config: ServerConfig = {}): Promise<Express> {
     // MongoDB is the storefront category source.
     if (mongoReady && productService) {
       try {
-        const categories = await productService.getAllCategoriesWithCount();
+        const categories = (await productService.getAllCategoriesWithCount())
+          .filter((category: any) => Number(category.productCount ?? category.count ?? 0) > 0);
         const start = (page - 1) * perPage;
         const paginated = categories.slice(start, start + perPage);
         res.set('Cache-Control', 'public, max-age=3600');
@@ -374,7 +376,7 @@ export async function setupServer(config: ServerConfig = {}): Promise<Express> {
       const params = new URLSearchParams({
         per_page: String(perPage),
         page: String(page),
-        hide_empty: 'false',
+        hide_empty: 'true',
         orderby: 'count',
         order: 'desc',
       });
@@ -390,7 +392,9 @@ export async function setupServer(config: ServerConfig = {}): Promise<Express> {
       const total = parseInt(response.headers.get('X-WP-Total') || '0', 10);
       const totalPages = parseInt(response.headers.get('X-WP-TotalPages') || '0', 10);
 
-      const data = raw.map((c: any) => ({
+      const data = raw
+        .filter((c: any) => Number(c.count || 0) > 0)
+        .map((c: any) => ({
         id: c.id,
         name: c.name,
         slug: c.slug,
@@ -543,6 +547,19 @@ export async function setupServer(config: ServerConfig = {}): Promise<Express> {
     ].join('\n'));
   });
 
+  app.get('/.well-known/security.txt', (_req, res) => {
+    res.type('text/plain; charset=utf-8');
+    res.set('Cache-Control', 'public, max-age=86400');
+    res.send([
+      'Contact: mailto:support@luxtronics.in',
+      'Preferred-Languages: en, hi',
+      'Canonical: https://luxtronics.in/.well-known/security.txt',
+      'Policy: https://luxtronics.in/privacy',
+      'Expires: 2027-06-15T00:00:00Z',
+      '',
+    ].join('\n'));
+  });
+
   app.get('/sitemap.xml', async (req, res) => {
     const baseUrl = siteBaseUrl(req.headers.host);
     const now = new Date().toISOString();
@@ -556,6 +573,9 @@ export async function setupServer(config: ServerConfig = {}): Promise<Express> {
       { path: '/contact', changefreq: 'monthly', priority: '0.55' },
       { path: '/faq', changefreq: 'monthly', priority: '0.5' },
       { path: '/shipping-returns', changefreq: 'monthly', priority: '0.45' },
+      { path: '/payment-method', changefreq: 'monthly', priority: '0.45' },
+      { path: '/return-exchange', changefreq: 'monthly', priority: '0.55' },
+      { path: '/return-policy', changefreq: 'monthly', priority: '0.55' },
       { path: '/privacy', changefreq: 'yearly', priority: '0.3' },
       { path: '/terms', changefreq: 'yearly', priority: '0.3' },
     ];

@@ -101,6 +101,24 @@
   </url>
 
   <url>
+    <loc>https://luxtronics.in/payment-method</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.45</priority>
+  </url>
+
+  <url>
+    <loc>https://luxtronics.in/return-exchange</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.55</priority>
+  </url>
+
+  <url>
+    <loc>https://luxtronics.in/return-policy</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.55</priority>
+  </url>
+
+  <url>
     <loc>https://luxtronics.in/privacy</loc>
     <changefreq>yearly</changefreq>
     <priority>0.3</priority>

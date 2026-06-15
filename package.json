@@ -17,6 +17,8 @@
     "fix:slug-index": "tsx backend/scripts/fix-slug-index.ts",
     "seo:audit": "tsx backend/scripts/audit-product-seo.ts",
     "seo:fix:mongo": "tsx backend/scripts/fix-mongo-product-seo.ts",
+    "pinterest:pins:split": "tsx backend/scripts/split-pinterest-pins.ts",
+    "pinterest:pins:gan": "tsx backend/scripts/filter-pinterest-pins.ts --query=gan-chargers --board=\"GaN Chargers\" --out=pinterest-gan-chargers.csv",
     "slugs:shorten": "tsx backend/scripts/shorten-product-slugs.ts",
     "build": "node scripts/hostinger-build.cjs",
     "build:dev": "vite build --mode development",

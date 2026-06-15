@@ -28,6 +28,8 @@ const Contact = lazy(() => import("./pages/Contact.tsx"));
 const About = lazy(() => import("./pages/About.tsx"));
 const FAQ = lazy(() => import("./pages/FAQ.tsx"));
 const ShippingReturns = lazy(() => import("./pages/ShippingReturns.tsx"));
+const PaymentMethod = lazy(() => import("./pages/PaymentMethod.tsx"));
+const ReturnExchange = lazy(() => import("./pages/ReturnExchange.tsx"));
 const Privacy = lazy(() => import("./pages/Privacy.tsx"));
 const Terms = lazy(() => import("./pages/Terms.tsx"));
 const AccountLogin = lazy(() => import("./pages/AccountLogin.tsx"));
@@ -88,6 +90,11 @@ const App = () => {
                         <Route path="/about" element={<About />} />
                         <Route path="/faq" element={<FAQ />} />
                         <Route path="/shipping-returns" element={<ShippingReturns />} />
+                        <Route path="/payment-method" element={<PaymentMethod />} />
+                        <Route path="/return-exchange" element={<ReturnExchange />} />
+                        <Route path="/return-policy" element={<ReturnExchange />} />
+                        <Route path="/returns" element={<ReturnExchange />} />
+                        <Route path="/refund-policy" element={<ReturnExchange />} />
                         <Route path="/privacy" element={<Privacy />} />
                         <Route path="/terms" element={<Terms />} />
                         <Route path="/account" element={<AccountDashboard />} />

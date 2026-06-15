@@ -38,8 +38,23 @@ function sanitizeInput(value: unknown): unknown {
 }
 
 export const securityHeaders = helmet({
-  contentSecurityPolicy: false,
+  contentSecurityPolicy: {
+    useDefaults: true,
+    directives: {
+      "default-src": ["'self'"],
+      "script-src": ["'self'", "'unsafe-inline'", "https://www.googletagmanager.com", "https://embed.tawk.to", "https://s.pinimg.com"],
+      "style-src": ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
+      "img-src": ["'self'", "data:", "https:"],
+      "font-src": ["'self'", "https://fonts.gstatic.com"],
+      "connect-src": ["'self'", "https:", "wss:"],
+      "frame-src": ["'self'", "https://embed.tawk.to"],
+      "object-src": ["'none'"],
+      "base-uri": ["'self'"],
+      "frame-ancestors": ["'self'"],
+    },
+  },
   crossOriginEmbedderPolicy: false,
+  referrerPolicy: { policy: 'strict-origin-when-cross-origin' },
 });
 
 export const globalRateLimiter = rateLimit({
@@ -85,6 +100,24 @@ export function sanitizeRequestBody(req: Request, res: Response, next: NextFunct
   if (req.params && typeof req.params === 'object') {
     const sanitizedParams = sanitizeInput(req.params) as Record<string, unknown>;
     overwriteObjectValues(req.params as unknown as Record<string, unknown>, sanitizedParams);
+  }
+
+  next();
+}
+
+export function requireSafeContentType(req: Request, res: Response, next: NextFunction): void {
+  if (['GET', 'HEAD', 'OPTIONS'].includes(req.method)) {
+    next();
+    return;
+  }
+
+  const contentType = req.headers['content-type'];
+  if (
+    contentType &&
+    !/^application\/json\b|^application\/x-www-form-urlencoded\b|^multipart\/form-data\b/i.test(String(contentType))
+  ) {
+    res.status(415).json({ success: false, error: 'Unsupported content type' });
+    return;
   }
 
   next();
