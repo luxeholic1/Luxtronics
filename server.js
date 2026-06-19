@@ -8,7 +8,7 @@ import { fileURLToPath } from 'url';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-import { MongoClient } from 'mongodb';
+import { MongoClient, ObjectId } from 'mongodb';
 
 for (const file of ['.env', '.env.local', '.env.india']) {
   dotenv.config({ path: path.join(__dirname, file), override: false });
@@ -167,6 +167,7 @@ function sanitizeObject(value) {
 let db = null;
 let productsCol = null;
 let categoriesCol = null;
+let blogPostsCol = null;
 let mongoReady = false;
 let mongoLastError = null;
 let mongoInitPromise = null;
@@ -183,6 +184,7 @@ async function initMongo() {
     db = client.db(process.env.MONGODB_DB_NAME || 'Luxtronics');
     productsCol = db.collection('products');
     categoriesCol = db.collection('categories');
+    blogPostsCol = db.collection('blog_posts');
     await ensureMongoIndexes();
     mongoReady = true;
     mongoLastError = null;
@@ -235,7 +237,32 @@ async function ensureMongoIndexes() {
     createIndexIfPossible(productsCol, { name: 'text', description: 'text', searchText: 'text' }),
     createIndexIfPossible(categoriesCol, { slug: 1 }, { unique: true }),
     createIndexIfPossible(categoriesCol, { count: -1, name: 1 }),
+    createIndexIfPossible(blogPostsCol, { slug: 1 }, { unique: true }),
+    createIndexIfPossible(blogPostsCol, { tag: 1 }),
+    createIndexIfPossible(blogPostsCol, { createdAt: -1 }),
   ]);
+}
+
+function slugifyBlogTitle(value) {
+  return String(value || '')
+    .toLowerCase()
+    .replace(/&/g, ' and ')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .replace(/-{2,}/g, '-');
+}
+
+async function uniqueBlogSlug(baseSlug, excludeId) {
+  let candidate = baseSlug || 'post';
+  let suffix = 1;
+  while (true) {
+    const existing = await blogPostsCol.findOne({ slug: candidate });
+    if (!existing || (excludeId && existing._id.toString() === excludeId)) {
+      return candidate;
+    }
+    suffix += 1;
+    candidate = `${baseSlug}-${suffix}`;
+  }
 }
 
 async function deriveCategoriesFromProducts(page = 1, perPage = 100) {
@@ -1279,6 +1306,125 @@ app.get('/api/categories', async (req, res) => {
     });
   } catch (err) {
     res.status(503).json({ success: false, error: 'Unable to load categories', details: err.message, mongoLastError });
+  }
+});
+
+// ── BLOG POSTS ────────────────────────────────────────────────────────────────
+app.get('/api/blogs', async (req, res) => {
+  await waitForMongoReady();
+  if (!mongoReady || !blogPostsCol) {
+    return res.status(503).json({ success: false, error: 'Blog service is not ready', mongoLastError });
+  }
+  try {
+    const filter = req.query.tag ? { tag: req.query.tag } : {};
+    const posts = await blogPostsCol.find(filter).sort({ createdAt: -1 }).toArray();
+    res.set('Cache-Control', 'public, max-age=60, stale-while-revalidate=300');
+    res.json({ success: true, data: posts });
+  } catch (err) {
+    res.status(500).json({ success: false, error: 'Unable to load blog posts', details: err.message });
+  }
+});
+
+app.get('/api/blogs/slug/:slug', async (req, res) => {
+  await waitForMongoReady();
+  if (!mongoReady || !blogPostsCol) {
+    return res.status(503).json({ success: false, error: 'Blog service is not ready', mongoLastError });
+  }
+  try {
+    const post = await blogPostsCol.findOne({ slug: req.params.slug });
+    if (!post) return res.status(404).json({ success: false, error: 'Blog post not found' });
+    res.set('Cache-Control', 'public, max-age=300');
+    res.json({ success: true, data: post });
+  } catch (err) {
+    res.status(500).json({ success: false, error: 'Unable to load blog post', details: err.message });
+  }
+});
+
+app.post('/api/blogs', async (req, res) => {
+  await waitForMongoReady();
+  if (!mongoReady || !blogPostsCol) {
+    return res.status(503).json({ success: false, error: 'Blog service is not ready', mongoLastError });
+  }
+  const body = req.body || {};
+  const content = Array.isArray(body.content) ? body.content.map((p) => String(p || '').trim()).filter(Boolean) : [];
+  if (!body.title?.trim() || !body.excerpt?.trim() || !body.tag?.trim() || content.length === 0) {
+    return res.status(400).json({ success: false, error: 'Title, excerpt, tag and content are required' });
+  }
+  try {
+    const baseSlug = slugifyBlogTitle(body.title) || 'post';
+    const slug = await uniqueBlogSlug(baseSlug);
+    const now = new Date();
+    const doc = {
+      slug,
+      title: body.title.trim(),
+      excerpt: body.excerpt.trim(),
+      tag: body.tag.trim(),
+      date: body.date || now.toLocaleDateString('en-US', { month: 'short', day: '2-digit', year: 'numeric' }),
+      image: body.image?.trim() || undefined,
+      background: body.background?.trim() || undefined,
+      foreground: body.foreground?.trim() || undefined,
+      content,
+      createdAt: now,
+      updatedAt: now,
+    };
+    const result = await blogPostsCol.insertOne(doc);
+    res.status(201).json({ success: true, data: { ...doc, _id: result.insertedId } });
+  } catch (err) {
+    res.status(500).json({ success: false, error: 'Unable to create blog post', details: err.message });
+  }
+});
+
+app.put('/api/blogs/:id', async (req, res) => {
+  await waitForMongoReady();
+  if (!mongoReady || !blogPostsCol) {
+    return res.status(503).json({ success: false, error: 'Blog service is not ready', mongoLastError });
+  }
+  const { id } = req.params;
+  if (!ObjectId.isValid(id)) return res.status(404).json({ success: false, error: 'Blog post not found' });
+  try {
+    const existing = await blogPostsCol.findOne({ _id: new ObjectId(id) });
+    if (!existing) return res.status(404).json({ success: false, error: 'Blog post not found' });
+
+    const body = req.body || {};
+    const update = { updatedAt: new Date() };
+    if (body.title !== undefined) {
+      update.title = body.title.trim();
+      const baseSlug = slugifyBlogTitle(body.title) || 'post';
+      if (baseSlug !== slugifyBlogTitle(existing.title)) {
+        update.slug = await uniqueBlogSlug(baseSlug, id);
+      }
+    }
+    if (body.excerpt !== undefined) update.excerpt = body.excerpt.trim();
+    if (body.tag !== undefined) update.tag = body.tag.trim();
+    if (body.date !== undefined) update.date = body.date;
+    if (body.image !== undefined) update.image = body.image.trim() || undefined;
+    if (body.background !== undefined) update.background = body.background.trim() || undefined;
+    if (body.foreground !== undefined) update.foreground = body.foreground.trim() || undefined;
+    if (body.content !== undefined) {
+      update.content = Array.isArray(body.content) ? body.content.map((p) => String(p || '').trim()).filter(Boolean) : [];
+    }
+
+    await blogPostsCol.updateOne({ _id: new ObjectId(id) }, { $set: update });
+    const updated = await blogPostsCol.findOne({ _id: new ObjectId(id) });
+    res.json({ success: true, data: updated });
+  } catch (err) {
+    res.status(500).json({ success: false, error: 'Unable to update blog post', details: err.message });
+  }
+});
+
+app.delete('/api/blogs/:id', async (req, res) => {
+  await waitForMongoReady();
+  if (!mongoReady || !blogPostsCol) {
+    return res.status(503).json({ success: false, error: 'Blog service is not ready', mongoLastError });
+  }
+  const { id } = req.params;
+  if (!ObjectId.isValid(id)) return res.status(404).json({ success: false, error: 'Blog post not found' });
+  try {
+    const result = await blogPostsCol.deleteOne({ _id: new ObjectId(id) });
+    if (result.deletedCount === 0) return res.status(404).json({ success: false, error: 'Blog post not found' });
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ success: false, error: 'Unable to delete blog post', details: err.message });
   }
 });
 
