@@ -106,7 +106,7 @@ const LatestArrivals = () => {
           <div className="absolute inset-0 bg-black/58" />
           <div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(0,0,0,0.82)_0%,rgba(0,0,0,0.52)_54%,rgba(0,0,0,0.2)_100%)]" />
 
-          <div className="relative z-10 mx-auto grid min-h-[680px] max-w-[1500px] gap-8 px-4 py-12 text-white sm:px-6 lg:grid-cols-[0.9fr_1.1fr] lg:items-center lg:px-8">
+          <div className="relative z-10 mx-auto grid max-w-[1500px] gap-8 px-4 py-12 text-white sm:px-6 lg:min-h-[680px] lg:grid-cols-[0.9fr_1.1fr] lg:items-center lg:px-8">
             <motion.div
               initial={{ opacity: 0, y: 18 }}
               animate={{ opacity: 1, y: 0 }}
@@ -122,7 +122,7 @@ const LatestArrivals = () => {
                 <span className="block text-white/62">Built to explore.</span>
               </h1>
               <p className="mt-5 max-w-xl text-sm leading-6 text-white/72 sm:text-base">
-                New gadgets, power accessories and premium tech essentials ko ek interactive drop page mein browse karo.
+                Browse new gadgets, power accessories and premium tech essentials on one interactive drop page.
               </p>
 
               <div className="mt-7 flex flex-wrap gap-2">
