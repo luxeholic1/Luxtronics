@@ -1,3 +1,5 @@
+import { motion } from "framer-motion";
+
 type Brand = { name: string; logo: string };
 
 const defaultBrands: Brand[] = [
@@ -24,12 +26,18 @@ const BrandMarquee = ({
 }) => {
   return (
     <section className={`w-full overflow-hidden border-y border-border/70 bg-background ${compact ? "py-6 sm:py-8" : "py-8 sm:py-10 md:py-12"}`}>
-      <div className={`mx-auto flex max-w-[1400px] flex-col gap-2 px-5 text-center sm:px-8 ${compact ? "mb-5" : "mb-6 sm:mb-8"}`}>
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        whileInView={{ opacity: 1, y: 0 }}
+        viewport={{ once: true }}
+        transition={{ duration: 0.5 }}
+        className={`mx-auto flex max-w-[1400px] flex-col gap-2 px-5 text-center sm:px-8 ${compact ? "mb-5" : "mb-6 sm:mb-8"}`}
+      >
         <p className="text-xs font-bold uppercase tracking-[0.24em] text-primary">{eyebrow}</p>
         <h2 className={`font-display font-bold tracking-tight text-foreground ${compact ? "text-xl sm:text-2xl" : "text-2xl sm:text-3xl md:text-4xl"}`}>
           {title}
         </h2>
-      </div>
+      </motion.div>
 
       <div className="relative">
         <div className="pointer-events-none absolute inset-y-0 left-0 z-10 w-20 bg-gradient-to-r from-background to-transparent" />

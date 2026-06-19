@@ -7,6 +7,7 @@ import { absoluteUrl } from "@/lib/seo";
 
 // Lazy load below-the-fold components
 const CategoryStrip = lazy(() => import("@/components/CategoryStrip"));
+const GearShowcase = lazy(() => import("@/components/GearShowcase"));
 const FeaturedProducts = lazy(() => import("@/components/FeaturedProducts"));
 const DealsBanner = lazy(() => import("@/components/DealsBanner"));
 const PromoBanner = lazy(() => import("@/components/PromoBanner"));
@@ -58,6 +59,7 @@ const Index = () => {
           title="Compatible picks for OPPO, Vivo, Huawei, Realme, OnePlus, Tecno, Google, Motorola and Nokia devices."
           compact
         />
+        <GearShowcase />
         <DealsBanner />
         <PromoBanner />
         <LimitedEdition />

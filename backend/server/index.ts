@@ -11,9 +11,11 @@ import { existsSync } from 'fs';
 import { fileURLToPath } from 'url';
 import { initializeMongoDB } from './db/mongodb';
 import { createProductDocument, createCategoryDocument } from './models/mongo-models';
+import { validateBlogPostInput } from './models/blog-models';
 import { globalRateLimiter, requireSafeContentType, sanitizeRequestBody, securityHeaders } from './middleware/security';
 import { createWooCommerceProxyRoutes } from './routes/woocommerce-proxy';
 import WooCommerceSync from './services/woocommerce-sync';
+import { BlogService } from './services/blog-service';
 
 // ── Load env vars using absolute paths so tsx watch always finds them ─────────
 const __selfDir = path.dirname(fileURLToPath(import.meta.url));
@@ -130,6 +132,7 @@ export async function setupServer(config: ServerConfig = {}): Promise<Express> {
   let mongoError: string | null = null;
   let productService: any = null;
   let categoryService: any = null;
+  let blogService: BlogService | null = null;
   const analyticsEvents: any[] = [];
   const liveVisitors = new Map<string, any>();
   const liveRetentionMs = 10 * 60 * 1000;
@@ -419,6 +422,86 @@ export async function setupServer(config: ServerConfig = {}): Promise<Express> {
     return res.status(503).json({ success: false, error: 'Unable to load categories' });
   });
 
+  // ── GET /api/blogs ───────────────────────────────────────────────────────────
+  app.get('/api/blogs', async (req, res) => {
+    if (!mongoReady || !blogService) {
+      return res.status(503).json({ success: false, error: 'Blog service is not ready' });
+    }
+    try {
+      const tag = req.query.tag as string | undefined;
+      const posts = await blogService.listPosts(tag);
+      res.set('Cache-Control', 'public, max-age=60, stale-while-revalidate=300');
+      return res.json({ success: true, data: posts });
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      return res.status(500).json({ success: false, error: 'Unable to load blog posts', details: msg });
+    }
+  });
+
+  // ── GET /api/blogs/slug/:slug ────────────────────────────────────────────────
+  app.get('/api/blogs/slug/:slug', async (req, res) => {
+    if (!mongoReady || !blogService) {
+      return res.status(503).json({ success: false, error: 'Blog service is not ready' });
+    }
+    try {
+      const post = await blogService.getPostBySlug(req.params.slug);
+      if (!post) return res.status(404).json({ success: false, error: 'Blog post not found' });
+      res.set('Cache-Control', 'public, max-age=300');
+      return res.json({ success: true, data: post });
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      return res.status(500).json({ success: false, error: 'Unable to load blog post', details: msg });
+    }
+  });
+
+  // ── POST /api/blogs ───────────────────────────────────────────────────────────
+  app.post('/api/blogs', async (req, res) => {
+    if (!mongoReady || !blogService) {
+      return res.status(503).json({ success: false, error: 'Blog service is not ready' });
+    }
+    const errors = validateBlogPostInput(req.body || {});
+    if (errors.length > 0) {
+      return res.status(400).json({ success: false, error: errors.join(', ') });
+    }
+    try {
+      const post = await blogService.createPost(req.body);
+      return res.status(201).json({ success: true, data: post });
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      return res.status(500).json({ success: false, error: 'Unable to create blog post', details: msg });
+    }
+  });
+
+  // ── PUT /api/blogs/:id ─────────────────────────────────────────────────────────
+  app.put('/api/blogs/:id', async (req, res) => {
+    if (!mongoReady || !blogService) {
+      return res.status(503).json({ success: false, error: 'Blog service is not ready' });
+    }
+    try {
+      const post = await blogService.updatePost(req.params.id, req.body || {});
+      if (!post) return res.status(404).json({ success: false, error: 'Blog post not found' });
+      return res.json({ success: true, data: post });
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      return res.status(500).json({ success: false, error: 'Unable to update blog post', details: msg });
+    }
+  });
+
+  // ── DELETE /api/blogs/:id ──────────────────────────────────────────────────────
+  app.delete('/api/blogs/:id', async (req, res) => {
+    if (!mongoReady || !blogService) {
+      return res.status(503).json({ success: false, error: 'Blog service is not ready' });
+    }
+    try {
+      const deleted = await blogService.deletePost(req.params.id);
+      if (!deleted) return res.status(404).json({ success: false, error: 'Blog post not found' });
+      return res.json({ success: true });
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      return res.status(500).json({ success: false, error: 'Unable to delete blog post', details: msg });
+    }
+  });
+
   // ── POST /api/orders ────────────────────────────────────────────────────────
   app.post('/api/orders', async (req, res) => {
     const { line_items, billing, shipping } = req.body;
@@ -606,6 +689,22 @@ export async function setupServer(config: ServerConfig = {}): Promise<Express> {
       }
     }
 
+    if (mongoReady && blogService) {
+      try {
+        const posts = await blogService.listPosts();
+        for (const post of posts) {
+          urls.push(sitemapUrl({
+            loc: `${baseUrl}/blog/${encodeURIComponent(post.slug)}`,
+            lastmod: post.updatedAt ? new Date(post.updatedAt).toISOString() : now,
+            changefreq: 'monthly',
+            priority: '0.6',
+          }));
+        }
+      } catch (err) {
+        console.error('Sitemap blog URL generation failed:', err);
+      }
+    }
+
     res.type('application/xml').send([
       '<?xml version="1.0" encoding="UTF-8"?>',
       '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">',
@@ -628,6 +727,8 @@ export async function setupServer(config: ServerConfig = {}): Promise<Express> {
       const { ProductService } = await import('./services/product-service');
       productService = new ProductService(db);
       categoryService = productService; // ProductService has getAllCategories
+      blogService = new BlogService(db);
+      await blogService.createIndexes();
       mongoReady = true;
       mongoError = null;
       console.log('✅ MongoDB ready — using cached data');

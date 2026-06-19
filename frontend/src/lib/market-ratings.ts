@@ -207,13 +207,38 @@ const CATEGORY_DEFAULTS: Array<{ match: string; rating: number; reviews: number 
   { match: "accessories", rating: 4.0, reviews: 6200  },
 ];
 
+// djb2 string hash — far fewer collisions than a char-code sum, so similarly
+// named SKUs (e.g. ten boAt earphone variants) don't all land on the same
+// handful of jittered values.
+function hashSeed(input: string): number {
+  let hash = 5381;
+  for (let i = 0; i < input.length; i++) {
+    hash = (hash * 33) ^ input.charCodeAt(i);
+  }
+  return Math.abs(hash);
+}
+
+function jitteredRating(base: number, seed: number, spread = 0.4): number {
+  // spread of 0.4 over 41 steps of 0.01 gives far more distinct values than
+  // the old +/-0.2 over 5 steps.
+  const steps = Math.round(spread * 100);
+  const jitter = (((seed % (steps * 2 + 1)) - steps) / 100);
+  return Math.round(Math.min(5, Math.max(3.5, base + jitter)) * 10) / 10;
+}
+
+function jitteredReviews(base: number, seed: number, spread: number, floor: number): number {
+  const range = Math.round(spread * 2);
+  const jitter = (seed % range) - spread;
+  return Math.max(floor, Math.round((base + jitter) / 50) * 50);
+}
+
 /**
  * Returns a realistic market rating for a product.
  * Returns null if WooCommerce already has a real rating (> 0).
  */
 export function getMarketRating(
   productName: string,
-  _slug: string,
+  slug: string,
   categoryName: string,
   wooRating: number
 ): MarketRating | null {
@@ -222,24 +247,26 @@ export function getMarketRating(
 
   const name = productName.toLowerCase();
   const cat  = categoryName.toLowerCase();
+  // Hash the slug too — it usually carries the model/SKU distinction that
+  // the display name alone may not (e.g. color/storage variants).
+  const seed = hashSeed(`${productName}::${slug}`);
 
   // 1. Model-level match (most specific)
   for (const rule of MODEL_RULES) {
     if (rule.fragments.every(f => name.includes(f))) {
-      return { rating: rule.rating, reviews: rule.reviews };
+      return {
+        rating: jitteredRating(rule.rating, seed, 0.1),
+        reviews: jitteredReviews(rule.reviews, seed, rule.reviews * 0.08, 500),
+      };
     }
   }
 
   // 2. Brand match
   for (const brand of BRAND_RATINGS) {
     if (name.includes(brand.match)) {
-      // Add slight variation based on product name length to avoid identical numbers
-      const seed = productName.split("").reduce((a, c) => a + c.charCodeAt(0), 0);
-      const jitter = ((seed % 5) - 2) * 0.1; // -0.2 to +0.2
-      const jitterReviews = ((seed % 7) - 3) * 400; // ±1200
       return {
-        rating: Math.round(Math.min(5, Math.max(3.5, brand.rating + jitter)) * 10) / 10,
-        reviews: Math.max(1000, brand.reviews + jitterReviews),
+        rating: jitteredRating(brand.rating, seed, 0.4),
+        reviews: jitteredReviews(brand.reviews, seed, 4000, 1000),
       };
     }
   }
@@ -247,20 +274,16 @@ export function getMarketRating(
   // 3. Category match
   for (const cat_rule of CATEGORY_DEFAULTS) {
     if (cat.includes(cat_rule.match) || name.includes(cat_rule.match)) {
-      const seed = productName.split("").reduce((a, c) => a + c.charCodeAt(0), 0);
-      const jitter = ((seed % 5) - 2) * 0.1;
-      const jitterReviews = ((seed % 7) - 3) * 300;
       return {
-        rating: Math.round(Math.min(5, Math.max(3.5, cat_rule.rating + jitter)) * 10) / 10,
-        reviews: Math.max(800, cat_rule.reviews + jitterReviews),
+        rating: jitteredRating(cat_rule.rating, seed, 0.4),
+        reviews: jitteredReviews(cat_rule.reviews, seed, 3000, 800),
       };
     }
   }
 
   // 4. Absolute fallback with variation
-  const seed = productName.split("").reduce((a, c) => a + c.charCodeAt(0), 0);
   return {
-    rating: Math.round((3.8 + (seed % 5) * 0.1) * 10) / 10,
-    reviews: 2400 + (seed % 8) * 600,
+    rating: jitteredRating(4.0, seed, 0.4),
+    reviews: jitteredReviews(3600, seed, 3200, 800),
   };
 }

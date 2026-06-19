@@ -35,13 +35,18 @@ const PromoBanner = () => {
     <section className="w-full py-12 sm:py-16 md:py-20 lg:py-24 px-4 sm:px-6 md:px-8 lg:px-12 xl:px-16 grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-5 md:gap-6" ref={ref}>
       {/* Left Promo Card */}
       
-      <motion.div 
+      <motion.div
         className="relative overflow-hidden rounded-xl sm:rounded-2xl md:rounded-3xl bg-cover bg-center bg-gradient-card border border-border dark:border-border light:border-black/8 p-6 sm:p-8 md:p-10 lg:p-12 min-h-[240px] sm:min-h-[320px] md:min-h-[380px] flex flex-col justify-between group hover:border-primary/40 transition-all duration-500"
         style={{
           backgroundImage: `url(${isMobile ? storeBgMobile : storeBgDesktop})`,
           backgroundPosition: 'center',
           backgroundSize: 'cover',
+          y,
         }}
+        initial={{ opacity: 0 }}
+        whileInView={{ opacity: 1 }}
+        viewport={{ once: true }}
+        transition={{ duration: 0.5 }}
         whileHover={{ scale: 1.02 }}
       >
         {/* Dark overlay for better text readability */}
@@ -92,7 +97,7 @@ const PromoBanner = () => {
       </motion.div>
 
       {/* Right Promo Card */}
-      <motion.div 
+      <motion.div
         className="relative overflow-hidden rounded-xl sm:rounded-2xl md:rounded-3xl bg-cover bg-center bg-gradient-card border border-border dark:border-border light:border-black/8 p-6 sm:p-8 md:p-10 lg:p-12 min-h-[240px] sm:min-h-[320px] md:min-h-[380px] flex flex-col justify-between group hover:border-accent/40 transition-all duration-500"
         style={{
           backgroundImage: `url(${isMobile ? storeBgMobile : storeBgDesktop})`,

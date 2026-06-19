@@ -4,6 +4,7 @@ import { Link } from "react-router-dom";
 import {
   Activity,
   BarChart3,
+  BookOpen,
   Clock,
   Crosshair,
   Eye,
@@ -308,6 +309,12 @@ export default function AdminDashboard() {
               <Button variant="outline" className="gap-2">
                 <ReceiptText className="h-4 w-4" />
                 Invoices
+              </Button>
+            </Link>
+            <Link to="/admin/blogs">
+              <Button variant="outline" className="gap-2">
+                <BookOpen className="h-4 w-4" />
+                Blogs
               </Button>
             </Link>
             <Button variant="destructive" className="gap-2" onClick={handleClear} disabled={events.length === 0}>

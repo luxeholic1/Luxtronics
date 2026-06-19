@@ -114,6 +114,10 @@ export default {
           from: { opacity: "0" },
           to: { opacity: "1" },
         },
+        "spotlight": {
+          "0%": { opacity: "0", transform: "translate(-72%, -62%) scale(0.5)" },
+          "100%": { opacity: "1", transform: "translate(-50%, -40%) scale(1)" },
+        },
       },
       animation: {
         "accordion-down": "accordion-down 0.2s ease-out",
@@ -123,6 +127,7 @@ export default {
         "marquee": "marquee 30s linear infinite",
         "fade-up": "fade-up 0.7s cubic-bezier(0.4, 0, 0.2, 1) both",
         "fade-in": "fade-in 0.3s ease-out both",
+        "spotlight": "spotlight 2s ease .75s 1 forwards",
       },
     },
   },

@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import type { ComponentType } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import {
   ArrowRight,
@@ -37,6 +37,7 @@ import { scoreTextMatch } from "@/lib/smart-search";
 import { filterVisibleCategories } from "@/lib/visible-categories";
 import { fetchStoreCategories } from "@/services/store-api";
 import type { StoreCategory } from "@/services/store-api";
+import { PortfolioGallery } from "@/components/ui/portfolio-gallery";
 
 type ParentGroup = {
   name: string;
@@ -369,6 +370,7 @@ const CompactCategoryBrowser = ({
 };
 
 const Categories = () => {
+  const navigate = useNavigate();
   const [search, setSearch] = useState("");
   const [view, setView] = useState<"grid" | "list">("grid");
   const [categorySort, setCategorySort] = useState<"popular" | "az">("popular");
@@ -431,6 +433,14 @@ const Categories = () => {
     () => [...allCategories]
       .sort(sortCategories)
       .slice(0, 8),
+    [allCategories],
+  );
+  const galleryCategories = useMemo(
+    () =>
+      [...allCategories]
+        .sort(sortCategories)
+        .filter((category) => category.sampleImage || category.image?.src)
+        .slice(0, 10),
     [allCategories],
   );
 
@@ -564,6 +574,23 @@ const Categories = () => {
             </div>
             </div>
           </div>
+
+          {!isLoading && !search && galleryCategories.length > 0 && (
+            <PortfolioGallery
+              title="Shop by Category"
+              archiveButton={{ text: "Browse all categories", href: "/shop" }}
+              className="!min-h-0 !py-0 mb-5"
+              images={galleryCategories.map((category) => ({
+                src: category.sampleImage || category.image?.src || "",
+                alt: category.name,
+                title: category.name,
+              }))}
+              onImageClick={(index) => {
+                const category = galleryCategories[index];
+                if (category) navigate(`/shop?cat=${encodeURIComponent(category.slug)}`);
+              }}
+            />
+          )}
 
           {!isLoading && !search && displayGroups.length > 0 && (
             <CompactCategoryBrowser groups={displayGroups} allCategories={allCategories} />

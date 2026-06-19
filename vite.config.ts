@@ -57,6 +57,8 @@ export default defineConfig(async ({ mode }) => {
           "vendor-query": ["@tanstack/react-query"],
           "vendor-firebase": ["firebase/app", "firebase/auth"],
           "vendor-icons": ["lucide-react"],
+          "vendor-gsap": ["gsap", "@gsap/react"],
+          "vendor-spline": ["@splinetool/react-spline", "@splinetool/runtime"],
         },
       },
     },
