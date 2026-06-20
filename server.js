@@ -225,16 +225,26 @@ function getMongoUriFingerprint() {
     const afterAt = atIndex >= 0 ? withoutScheme.slice(atIndex + 1) : withoutScheme;
     const [hostAndDb, query = ''] = afterAt.split('?');
     const userPart = atIndex >= 0 ? withoutScheme.slice(0, atIndex) : '';
-    const username = userPart.split(':')[0] || null;
+    const colonIndex = userPart.indexOf(':');
+    const username = colonIndex >= 0 ? userPart.slice(0, colonIndex) : userPart || null;
+    const password = colonIndex >= 0 ? userPart.slice(colonIndex + 1) : '';
+    const queryParamLengths = {};
+    for (const pair of query.split('&')) {
+      const eq = pair.indexOf('=');
+      if (eq < 0) continue;
+      queryParamLengths[pair.slice(0, eq)] = pair.slice(eq + 1).length;
+    }
     return {
       set: true,
       rawLength: raw.length,
       sanitizedLength: uri.length,
       wasSanitized: raw !== uri,
       username,
+      usernameLength: username ? username.length : 0,
+      passwordLength: password.length,
       hostAndDb,
       hasAuthSourceAdmin: /authSource=admin/i.test(query),
-      queryParamKeys: query.split('&').map((p) => p.split('=')[0]).filter(Boolean),
+      queryParamLengths,
     };
   } catch {
     return { set: true, rawLength: raw.length, sanitizedLength: uri.length, parseError: true };
