@@ -2,9 +2,20 @@ import { useEffect, useState } from "react";
 import Layout from "@/components/Layout";
 import SEO from "@/components/SEO";
 import { ArrowRight, BookOpen, Calendar, Loader2, Tag } from "lucide-react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import FlowArt, { FlowSection } from "@/components/ui/story-scroll";
 import { fallbackBlogPosts, type BlogPost } from "@/data/blog-posts";
+
+const playOnHover: React.MouseEventHandler<HTMLElement> = (e) => {
+  e.currentTarget.querySelector("video")?.play().catch(() => {});
+};
+const pauseOnLeave: React.MouseEventHandler<HTMLElement> = (e) => {
+  const video = e.currentTarget.querySelector("video");
+  if (video) {
+    video.pause();
+    video.currentTime = 0;
+  }
+};
 
 const PALETTE = [
   { background: "#fd5200", foreground: "#ffffff" },
@@ -14,6 +25,7 @@ const PALETTE = [
 ];
 
 const Blog = () => {
+  const navigate = useNavigate();
   const [posts, setPosts] = useState<BlogPost[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -87,25 +99,33 @@ const Blog = () => {
                 key={post._id}
                 aria-label={post.title}
                 style={{ backgroundColor: background, color: foreground }}
+                className="group cursor-pointer"
+                onClick={() => navigate(`/blog/${post.slug}`)}
+                onMouseEnter={playOnHover}
+                onMouseLeave={pauseOnLeave}
               >
                 {(post.video || post.image) && (
                   <div className="absolute inset-0">
                     {post.video ? (
                       <video
                         src={post.video}
-                        autoPlay
                         muted
                         loop
                         playsInline
                         preload="none"
                         poster={post.image}
-                        className="h-full w-full object-cover opacity-25"
+                        className="h-full w-full object-cover opacity-70 transition-transform duration-700 group-hover:scale-105"
                         aria-hidden="true"
                       />
                     ) : (
-                      <img src={post.image} alt="" className="h-full w-full object-cover opacity-25" />
+                      <img
+                        src={post.image}
+                        alt=""
+                        className="h-full w-full object-cover opacity-70 transition-transform duration-700 group-hover:scale-105"
+                      />
                     )}
-                    <div className="absolute inset-0" style={{ backgroundColor: background, opacity: 0.72 }} />
+                    <div className="absolute inset-0" style={{ backgroundColor: background, opacity: 0.38 }} />
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/65 via-black/10 to-transparent" />
                   </div>
                 )}
 
@@ -136,7 +156,8 @@ const Blog = () => {
                   </span>
                   <Link
                     to={`/blog/${post.slug}`}
-                    className="group inline-flex items-center gap-2 rounded-full border border-current/30 bg-black/10 px-5 py-2.5 text-sm font-bold backdrop-blur-sm transition hover:bg-black/20"
+                    onClick={(e) => e.stopPropagation()}
+                    className="inline-flex items-center gap-2 rounded-full border border-current/30 bg-black/10 px-5 py-2.5 text-sm font-bold backdrop-blur-sm transition hover:bg-black/20"
                   >
                     Read full article
                     <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />

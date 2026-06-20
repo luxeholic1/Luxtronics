@@ -11,6 +11,9 @@ export interface FlowSectionProps {
   style?: React.CSSProperties;
   children: React.ReactNode;
   "aria-label"?: string;
+  onClick?: React.MouseEventHandler<HTMLElement>;
+  onMouseEnter?: React.MouseEventHandler<HTMLElement>;
+  onMouseLeave?: React.MouseEventHandler<HTMLElement>;
 }
 
 export const FlowSection: React.FC<FlowSectionProps> = ({
@@ -18,10 +21,16 @@ export const FlowSection: React.FC<FlowSectionProps> = ({
   style = {},
   children,
   "aria-label": ariaLabel,
+  onClick,
+  onMouseEnter,
+  onMouseLeave,
 }) => (
   <section
     data-flow-section
     aria-label={ariaLabel}
+    onClick={onClick}
+    onMouseEnter={onMouseEnter}
+    onMouseLeave={onMouseLeave}
     className={cn("relative min-h-screen w-full overflow-hidden", className)}
   >
     <div
