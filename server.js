@@ -198,6 +198,31 @@ async function initMongo() {
 }
 mongoInitPromise = initMongo();
 
+// Safe, password-free fingerprint of the URI actually loaded on this server —
+// lets us verify Hostinger's live env var without ever exposing the secret.
+function getMongoUriFingerprint() {
+  const uri = process.env.MONGODB_URI;
+  if (!uri) return { set: false };
+  try {
+    const withoutScheme = uri.replace(/^mongodb(\+srv)?:\/\//, '');
+    const atIndex = withoutScheme.lastIndexOf('@');
+    const afterAt = atIndex >= 0 ? withoutScheme.slice(atIndex + 1) : withoutScheme;
+    const [hostAndDb, query = ''] = afterAt.split('?');
+    const userPart = atIndex >= 0 ? withoutScheme.slice(0, atIndex) : '';
+    const username = userPart.split(':')[0] || null;
+    return {
+      set: true,
+      length: uri.length,
+      username,
+      hostAndDb,
+      hasAuthSourceAdmin: /authSource=admin/i.test(query),
+      queryParamKeys: query.split('&').map((p) => p.split('=')[0]).filter(Boolean),
+    };
+  } catch {
+    return { set: true, length: uri.length, parseError: true };
+  }
+}
+
 async function waitForMongoReady(maxMs = 9000) {
   if (mongoReady) return true;
   if (!mongoInitPromise) return false;
@@ -1388,7 +1413,7 @@ app.get('/api/categories', async (req, res) => {
 app.get('/api/blogs', async (req, res) => {
   await waitForMongoReady();
   if (!mongoReady || !blogPostsCol) {
-    return res.status(503).json({ success: false, error: 'Blog service is not ready', mongoLastError });
+    return res.status(503).json({ success: false, error: 'Blog service is not ready', mongoLastError, mongoUriFingerprint: getMongoUriFingerprint() });
   }
   try {
     const filter = req.query.tag ? { tag: req.query.tag } : {};
@@ -1403,7 +1428,7 @@ app.get('/api/blogs', async (req, res) => {
 app.get('/api/blogs/slug/:slug', async (req, res) => {
   await waitForMongoReady();
   if (!mongoReady || !blogPostsCol) {
-    return res.status(503).json({ success: false, error: 'Blog service is not ready', mongoLastError });
+    return res.status(503).json({ success: false, error: 'Blog service is not ready', mongoLastError, mongoUriFingerprint: getMongoUriFingerprint() });
   }
   try {
     const post = await blogPostsCol.findOne({ slug: req.params.slug });
@@ -1418,7 +1443,7 @@ app.get('/api/blogs/slug/:slug', async (req, res) => {
 app.post('/api/blogs', async (req, res) => {
   await waitForMongoReady();
   if (!mongoReady || !blogPostsCol) {
-    return res.status(503).json({ success: false, error: 'Blog service is not ready', mongoLastError });
+    return res.status(503).json({ success: false, error: 'Blog service is not ready', mongoLastError, mongoUriFingerprint: getMongoUriFingerprint() });
   }
   const body = req.body || {};
   const content = Array.isArray(body.content) ? body.content.map((p) => String(p || '').trim()).filter(Boolean) : [];
@@ -1453,7 +1478,7 @@ app.post('/api/blogs', async (req, res) => {
 app.put('/api/blogs/:id', async (req, res) => {
   await waitForMongoReady();
   if (!mongoReady || !blogPostsCol) {
-    return res.status(503).json({ success: false, error: 'Blog service is not ready', mongoLastError });
+    return res.status(503).json({ success: false, error: 'Blog service is not ready', mongoLastError, mongoUriFingerprint: getMongoUriFingerprint() });
   }
   const { id } = req.params;
   if (!ObjectId.isValid(id)) return res.status(404).json({ success: false, error: 'Blog post not found' });
@@ -1492,7 +1517,7 @@ app.put('/api/blogs/:id', async (req, res) => {
 app.delete('/api/blogs/:id', async (req, res) => {
   await waitForMongoReady();
   if (!mongoReady || !blogPostsCol) {
-    return res.status(503).json({ success: false, error: 'Blog service is not ready', mongoLastError });
+    return res.status(503).json({ success: false, error: 'Blog service is not ready', mongoLastError, mongoUriFingerprint: getMongoUriFingerprint() });
   }
   const { id } = req.params;
   if (!ObjectId.isValid(id)) return res.status(404).json({ success: false, error: 'Blog post not found' });
