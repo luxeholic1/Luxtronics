@@ -3,7 +3,7 @@
  * Production-ready setup for MongoDB Atlas
  */
 
-import { MongoClient, Db, MongoError } from 'mongodb';
+import { Collection, CreateIndexesOptions, Db, IndexSpecification, MongoClient, MongoClientOptions } from 'mongodb';
 
 interface MongoDBConfig {
   uri: string;
@@ -12,6 +12,10 @@ interface MongoDBConfig {
   w?: string;
   journal?: boolean;
 }
+
+type SafeIndexOptions = CreateIndexesOptions & {
+  ignoreDuplicateKeyError?: boolean;
+};
 
 class MongoDBConnection {
   private client: MongoClient | null = null;
@@ -45,7 +49,7 @@ class MongoDBConnection {
       const uriLower = this.uri.toLowerCase();
       const useTls = uriLower.startsWith('mongodb+srv') || uriLower.includes('ssl=true') || uriLower.includes('tls=true');
 
-      const clientOptions: any = {
+      const clientOptions: MongoClientOptions = {
         retryWrites: true,
         w: 'majority',
         journal: true,
@@ -113,6 +117,39 @@ class MongoDBConnection {
     return this.isConnected;
   }
 
+  private async createIndexIfPossible(
+    collection: Collection,
+    keys: IndexSpecification,
+    options: SafeIndexOptions = {}
+  ): Promise<void> {
+    const { ignoreDuplicateKeyError = false, ...indexOptions } = options;
+
+    try {
+      await collection.createIndex(keys, indexOptions);
+    } catch (err: unknown) {
+      const details = err && typeof err === 'object' ? err as { codeName?: string; code?: number; message?: string } : {};
+      const codeName = details.codeName || '';
+      const code = details.code;
+      const message = details.message || String(err);
+
+      if (
+        codeName === 'IndexOptionsConflict' ||
+        codeName === 'IndexKeySpecsConflict' ||
+        /equivalent index already exists|already exists with a different name|same name as the requested index/i.test(message)
+      ) {
+        console.warn(`⚠️ Reusing existing MongoDB index on ${collection.collectionName}: ${message}`);
+        return;
+      }
+
+      if (ignoreDuplicateKeyError && (code === 11000 || /duplicate key/i.test(message))) {
+        console.warn(`⚠️ Skipping MongoDB index on ${collection.collectionName}: existing duplicate values found. ${message}`);
+        return;
+      }
+
+      throw err;
+    }
+  }
+
   /**
    * Create indexes for collections
    */
@@ -123,36 +160,36 @@ class MongoDBConnection {
     const productsCollection = db.collection('products');
     
     await Promise.all([
-      productsCollection.createIndex({ id: 1 }, { unique: true }),
-      productsCollection.createIndex({ slug: 1 }), // Non-unique: WooCommerce can have duplicate slugs
-      productsCollection.createIndex({ category: 1 }),
-      productsCollection.createIndex({ price: 1 }),
-      productsCollection.createIndex({ rating: -1 }),
-      productsCollection.createIndex({ createdAt: -1 }),
-      productsCollection.createIndex({ updatedAt: -1 }),
-      productsCollection.createIndex({ syncedAt: -1 }),
-      productsCollection.createIndex({ name: 'text', description: 'text' }), // Text search
+      this.createIndexIfPossible(productsCollection, { id: 1 }, { unique: true, ignoreDuplicateKeyError: true }),
+      this.createIndexIfPossible(productsCollection, { slug: 1 }), // Non-unique: WooCommerce can have duplicate slugs
+      this.createIndexIfPossible(productsCollection, { category: 1 }),
+      this.createIndexIfPossible(productsCollection, { price: 1 }),
+      this.createIndexIfPossible(productsCollection, { rating: -1 }),
+      this.createIndexIfPossible(productsCollection, { createdAt: -1 }),
+      this.createIndexIfPossible(productsCollection, { updatedAt: -1 }),
+      this.createIndexIfPossible(productsCollection, { syncedAt: -1 }),
+      this.createIndexIfPossible(productsCollection, { name: 'text', description: 'text' }), // Text search
     ]);
 
     // Categories collection indexes
     const categoriesCollection = db.collection('categories');
-    await categoriesCollection.createIndex({ slug: 1 }, { unique: true });
+    await this.createIndexIfPossible(categoriesCollection, { slug: 1 }, { unique: true, ignoreDuplicateKeyError: true });
 
     // Cache metadata indexes
     const cacheCollection = db.collection('cache_metadata');
     await Promise.all([
-      cacheCollection.createIndex({ key: 1 }, { unique: true }),
-      cacheCollection.createIndex({ expiresAt: 1 }, { expireAfterSeconds: 0 }), // TTL index
+      this.createIndexIfPossible(cacheCollection, { key: 1 }, { unique: true, ignoreDuplicateKeyError: true }),
+      this.createIndexIfPossible(cacheCollection, { expiresAt: 1 }, { expireAfterSeconds: 0 }), // TTL index
     ]);
 
     // Users and sessions indexes
     const usersCollection = db.collection('users');
-    await usersCollection.createIndex({ email: 1 }, { unique: true });
+    await this.createIndexIfPossible(usersCollection, { email: 1 }, { unique: true, ignoreDuplicateKeyError: true });
 
     const sessionsCollection = db.collection('user_sessions');
     await Promise.all([
-      sessionsCollection.createIndex({ token: 1 }, { unique: true }),
-      sessionsCollection.createIndex({ expiresAt: 1 }, { expireAfterSeconds: 0 }),
+      this.createIndexIfPossible(sessionsCollection, { token: 1 }, { unique: true, ignoreDuplicateKeyError: true }),
+      this.createIndexIfPossible(sessionsCollection, { expiresAt: 1 }, { expireAfterSeconds: 0 }),
     ]);
 
     console.log('✅ Indexes created successfully!');

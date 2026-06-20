@@ -464,7 +464,7 @@ export async function setupServer(config: ServerConfig = {}): Promise<Express> {
   // ── GET /api/blogs ───────────────────────────────────────────────────────────
   app.get('/api/blogs', async (req, res) => {
     if (!mongoReady || !blogService) {
-      return res.status(503).json({ success: false, error: 'Blog service is not ready' });
+      return res.status(503).json({ success: false, error: 'Blog service is not ready', mongoError });
     }
     try {
       const tag = req.query.tag as string | undefined;
@@ -480,7 +480,7 @@ export async function setupServer(config: ServerConfig = {}): Promise<Express> {
   // ── GET /api/blogs/slug/:slug ────────────────────────────────────────────────
   app.get('/api/blogs/slug/:slug', async (req, res) => {
     if (!mongoReady || !blogService) {
-      return res.status(503).json({ success: false, error: 'Blog service is not ready' });
+      return res.status(503).json({ success: false, error: 'Blog service is not ready', mongoError });
     }
     try {
       const post = await blogService.getPostBySlug(req.params.slug);
@@ -496,7 +496,7 @@ export async function setupServer(config: ServerConfig = {}): Promise<Express> {
   // ── POST /api/blogs ───────────────────────────────────────────────────────────
   app.post('/api/blogs', async (req, res) => {
     if (!mongoReady || !blogService) {
-      return res.status(503).json({ success: false, error: 'Blog service is not ready' });
+      return res.status(503).json({ success: false, error: 'Blog service is not ready', mongoError });
     }
     const errors = validateBlogPostInput(req.body || {});
     if (errors.length > 0) {
@@ -514,7 +514,7 @@ export async function setupServer(config: ServerConfig = {}): Promise<Express> {
   // ── PUT /api/blogs/:id ─────────────────────────────────────────────────────────
   app.put('/api/blogs/:id', async (req, res) => {
     if (!mongoReady || !blogService) {
-      return res.status(503).json({ success: false, error: 'Blog service is not ready' });
+      return res.status(503).json({ success: false, error: 'Blog service is not ready', mongoError });
     }
     try {
       const post = await blogService.updatePost(req.params.id, req.body || {});
@@ -529,7 +529,7 @@ export async function setupServer(config: ServerConfig = {}): Promise<Express> {
   // ── DELETE /api/blogs/:id ──────────────────────────────────────────────────────
   app.delete('/api/blogs/:id', async (req, res) => {
     if (!mongoReady || !blogService) {
-      return res.status(503).json({ success: false, error: 'Blog service is not ready' });
+      return res.status(503).json({ success: false, error: 'Blog service is not ready', mongoError });
     }
     try {
       const deleted = await blogService.deletePost(req.params.id);
