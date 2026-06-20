@@ -3,8 +3,12 @@
  * CRUD operations for blog posts
  */
 
-import { Db, ObjectId } from 'mongodb';
+import { CreateIndexesOptions, Db, IndexSpecification, ObjectId } from 'mongodb';
 import { BlogPostInput, MongoBlogPost, slugifyBlogTitle } from '../models/blog-models';
+
+type BlogIndexOptions = CreateIndexesOptions & {
+  ignoreDuplicateKeyError?: boolean;
+};
 
 export class BlogService {
   private db: Db;
@@ -18,10 +22,47 @@ export class BlogService {
     return this.db.collection<MongoBlogPost>(this.COLLECTION);
   }
 
+  private async createIndexIfPossible(keys: IndexSpecification, options: BlogIndexOptions = {}): Promise<void> {
+    const { ignoreDuplicateKeyError = false, ...indexOptions } = options;
+    try {
+      await this.collection().createIndex(keys, indexOptions);
+    } catch (err: unknown) {
+      const details = err && typeof err === 'object' ? err as { codeName?: string; code?: number; message?: string } : {};
+      const codeName = details.codeName || '';
+      const code = details.code;
+      const message = details.message || String(err);
+
+      if (
+        codeName === 'IndexOptionsConflict' ||
+        codeName === 'IndexKeySpecsConflict' ||
+        /equivalent index already exists|already exists with a different name/i.test(message)
+      ) {
+        console.warn(`⚠️ Reusing existing MongoDB blog index: ${message}`);
+        return;
+      }
+
+      if (ignoreDuplicateKeyError && (code === 11000 || /duplicate key/i.test(message))) {
+        console.warn(`⚠️ Skipping MongoDB blog index: existing duplicate values found. ${message}`);
+        return;
+      }
+
+      throw err;
+    }
+  }
+
   async createIndexes(): Promise<void> {
-    await this.collection().createIndex({ slug: 1 }, { unique: true });
-    await this.collection().createIndex({ tag: 1 });
-    await this.collection().createIndex({ createdAt: -1 });
+    await Promise.all([
+      this.createIndexIfPossible(
+        { slug: 1 },
+        {
+          unique: true,
+          partialFilterExpression: { slug: { $type: 'string' } },
+          ignoreDuplicateKeyError: true,
+        }
+      ),
+      this.createIndexIfPossible({ tag: 1 }),
+      this.createIndexIfPossible({ createdAt: -1 }),
+    ]);
   }
 
   async listPosts(tag?: string): Promise<MongoBlogPost[]> {

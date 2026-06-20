@@ -236,10 +236,12 @@ async function waitForMongoReady(maxMs = 9000) {
 }
 
 async function createIndexIfPossible(collection, keys, options = {}) {
+  const { ignoreDuplicateKeyError = false, ...indexOptions } = options;
   try {
-    await collection.createIndex(keys, options);
+    await collection.createIndex(keys, indexOptions);
   } catch (err) {
     const codeName = err?.codeName || '';
+    const code = err?.code;
     const message = err?.message || String(err);
     if (
       codeName === 'IndexOptionsConflict' ||
@@ -247,6 +249,11 @@ async function createIndexIfPossible(collection, keys, options = {}) {
       /equivalent index already exists|already exists with a different name/i.test(message)
     ) {
       console.warn(`⚠️ Reusing existing MongoDB index on ${collection.collectionName}: ${message}`);
+      return;
+    }
+
+    if (ignoreDuplicateKeyError && (code === 11000 || /duplicate key/i.test(message))) {
+      console.warn(`⚠️ Skipping MongoDB index on ${collection.collectionName}: existing duplicate values found. ${message}`);
       return;
     }
 
@@ -264,7 +271,15 @@ async function ensureMongoIndexes() {
     createIndexIfPossible(productsCol, { name: 'text', description: 'text', searchText: 'text' }),
     createIndexIfPossible(categoriesCol, { slug: 1 }, { unique: true }),
     createIndexIfPossible(categoriesCol, { count: -1, name: 1 }),
-    createIndexIfPossible(blogPostsCol, { slug: 1 }, { unique: true }),
+    createIndexIfPossible(
+      blogPostsCol,
+      { slug: 1 },
+      {
+        unique: true,
+        partialFilterExpression: { slug: { $type: 'string' } },
+        ignoreDuplicateKeyError: true,
+      }
+    ),
     createIndexIfPossible(blogPostsCol, { tag: 1 }),
     createIndexIfPossible(blogPostsCol, { createdAt: -1 }),
   ]);
