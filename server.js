@@ -183,6 +183,11 @@ function sanitizeMongoUri(raw) {
   // panel textareas/copy-paste can silently inject them mid-string (e.g. a
   // regular space or non-breaking space right before the "@").
   let uri = raw.replace(/[\s\u200B\u200C\u200D\uFEFF\u00A0]+/g, '').trim();
+  // Un-escape stray backslashes before "%" (e.g. "\%40" -> "%40") \u2014 a hosting
+  // panel or shell-style copy/paste can inject these before percent-encoded
+  // password characters, which silently breaks auth without changing length
+  // in any whitespace-detectable way.
+  uri = uri.replace(/\\(%)/g, '$1');
   if (uri.length >= 2) {
     const first = uri[0];
     const last = uri[uri.length - 1];
@@ -949,17 +954,6 @@ app.post('/api/blogs/parse-pdf', (req, res) => {
     } catch (parseErr) {
       return res.status(500).json({ success: false, error: 'Unable to parse PDF', details: parseErr.message });
     }
-  });
-});
-
-// ── TEMP: one-time Mongo URI diagnostic, hardcoded one-time secret. Remove after use. ──
-app.get('/api/_debug-mongo-uri', (req, res) => {
-  if (req.query.token !== '85cc533fc599804cb8b5fdcc39a3759fbb032fa80b95e4de') {
-    return res.status(404).json({ success: false, error: 'Not found' });
-  }
-  return res.json({
-    raw: process.env.MONGODB_URI || null,
-    rawCharCodes: process.env.MONGODB_URI ? Array.from(process.env.MONGODB_URI).map((c) => c.charCodeAt(0)) : null,
   });
 });
 
