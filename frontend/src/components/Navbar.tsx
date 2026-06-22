@@ -14,6 +14,7 @@ import { products as fallbackProducts } from "@/data/products";
 import { motion, AnimatePresence } from "framer-motion";
 import { normalizeSmartQuery as normalizeQuerySmart, scoreTextMatch } from "@/lib/smart-search";
 import { filterVisibleCategories } from "@/lib/visible-categories";
+import { SearchBar } from "@/components/ui/search-bar";
 
 // ─── Store domains ─────────────────────────────────────────────────────────────
 const STORES = [
@@ -842,35 +843,24 @@ const Navbar = () => {
             >
               <div className="mx-auto max-w-3xl px-4 py-2 sm:px-6">
                 <div className="relative">
-                  <form
-                    onSubmit={handleSearch}
-                    className="flex items-center gap-2 rounded-lg border border-gray-200 bg-gray-50 px-3 py-1.5 shadow-sm dark:border-gray-700 dark:bg-gray-900"
-                  >
-                    <Search className="h-4 w-4 text-gray-400 shrink-0" />
-                    <input
+                  <div className="flex items-center gap-2">
+                    <SearchBar
                       ref={searchInputRef}
-                      type="search"
                       value={searchQuery}
                       onChange={(e) => setSearchQuery(e.target.value)}
+                      onSubmit={handleSearch}
+                      onClear={() => setSearchQuery("")}
                       placeholder="Search for products, brands…"
-                      className="flex-1 bg-transparent text-sm text-gray-900 dark:text-white placeholder:text-gray-400 focus:outline-none"
                     />
-                    {searchQuery && (
-                      <button
-                        type="submit"
-                        className="shrink-0 rounded-md bg-gradient-to-r from-primary to-accent px-3 py-1.5 text-xs font-semibold text-white shadow hover:shadow-md transition-all"
-                      >
-                        Search
-                      </button>
-                    )}
                     <button
                       type="button"
                       onClick={() => { setSearchOpen(false); setSearchQuery(""); setDebouncedQuery(""); }}
                       className="shrink-0 text-gray-400 hover:text-gray-600 transition-colors"
+                      aria-label="Close search"
                     >
                       <X className="h-4 w-4" />
                     </button>
-                  </form>
+                  </div>
 
                   {/* Search suggestions */}
                   <AnimatePresence>

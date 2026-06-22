@@ -1,5 +1,6 @@
 import { Link } from "react-router-dom";
 import { Instagram, Twitter, Youtube, Facebook } from "lucide-react";
+import { TextHoverEffect } from "@/components/ui/hover-footer";
 
 // ── Update these URLs to your real social media pages ──────────────────────────
 const SOCIAL_LINKS = [
@@ -88,11 +89,6 @@ const Footer = () => {
       
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(organizationSchema) }} />
       
-      <div
-        className="absolute inset-0 bg-cover bg-center"
-        style={{ backgroundImage: `url("/footer.jpg")` }}
-      />
-      <div className="absolute inset-0 bg-black/68" />
       <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/30 to-transparent" />
 
       <div className="relative z-10 w-full py-12 sm:py-16 md:py-20 lg:py-24 px-4 sm:px-6 md:px-8 lg:px-12 xl:px-16 max-w-[1920px] mx-auto">
@@ -205,7 +201,7 @@ const Footer = () => {
       <div className="relative z-10 border-t border-white/12 bg-black/14 backdrop-blur-md">
         <div className="mx-auto flex w-full max-w-[1920px] flex-col items-center justify-between gap-4 px-4 py-6 text-center text-xs font-medium text-white/62 sm:flex-row sm:gap-6 sm:px-6 sm:py-8 sm:text-left md:px-8 lg:px-12 xl:px-16">
           <p>© {currentYear} Luxtronics. All rights reserved. Premium electronics for creators.</p>
-          
+
           <div className="flex flex-wrap justify-center gap-4 sm:gap-6">
             <Link to="/privacy" className="hover:text-white transition-colors">Privacy</Link>
             <Link to="/terms" className="hover:text-white transition-colors">Terms</Link>
@@ -213,6 +209,10 @@ const Footer = () => {
             <Link to="/faq" className="hover:text-white transition-colors">Help</Link>
           </div>
         </div>
+      </div>
+
+      <div className="relative z-10 hidden h-[18rem] items-center justify-center lg:flex">
+        <TextHoverEffect text="Luxtronics" />
       </div>
     </footer>
   );
