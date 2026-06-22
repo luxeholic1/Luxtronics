@@ -10,6 +10,7 @@ import { CartProvider } from "./context/CartContext.tsx";
 import { AuthProvider } from "./context/AuthContext.tsx";
 import { StoreProvider } from "./context/StoreContext.tsx";
 import AppPreloader from "./components/AppPreloader.tsx";
+import FootballCursor from "./components/FootballCursor.tsx";
 
 // Eager load critical pages
 import Index from "./pages/Index.tsx";
@@ -73,6 +74,7 @@ const App = () => {
               <CartProvider>
                 <TooltipProvider>
                   <AppPreloader />
+                  <FootballCursor />
                   <Toaster />
                   <Sonner />
                   <BrowserRouter>
