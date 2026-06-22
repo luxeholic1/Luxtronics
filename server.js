@@ -1556,6 +1556,7 @@ app.post('/api/blogs', async (req, res) => {
   }
   const body = req.body || {};
   const content = Array.isArray(body.content) ? body.content.map((p) => String(p || '').trim()).filter(Boolean) : [];
+  const images = Array.isArray(body.images) ? body.images.map((src) => String(src || '').trim()).filter(Boolean) : [];
   if (!body.title?.trim() || !body.excerpt?.trim() || !body.tag?.trim() || content.length === 0) {
     return res.status(400).json({ success: false, error: 'Title, excerpt, tag and content are required' });
   }
@@ -1571,6 +1572,7 @@ app.post('/api/blogs', async (req, res) => {
       date: body.date || now.toLocaleDateString('en-US', { month: 'short', day: '2-digit', year: 'numeric' }),
       image: body.image?.trim() || undefined,
       video: body.video?.trim() || undefined,
+      images,
       background: body.background?.trim() || undefined,
       foreground: body.foreground?.trim() || undefined,
       content,
@@ -1609,6 +1611,9 @@ app.put('/api/blogs/:id', async (req, res) => {
     if (body.date !== undefined) update.date = body.date;
     if (body.image !== undefined) update.image = body.image.trim() || undefined;
     if (body.video !== undefined) update.video = body.video.trim() || undefined;
+    if (body.images !== undefined) {
+      update.images = Array.isArray(body.images) ? body.images.map((src) => String(src || '').trim()).filter(Boolean) : [];
+    }
     if (body.background !== undefined) update.background = body.background.trim() || undefined;
     if (body.foreground !== undefined) update.foreground = body.foreground.trim() || undefined;
     if (body.content !== undefined) {

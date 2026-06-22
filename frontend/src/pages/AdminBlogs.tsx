@@ -32,6 +32,7 @@ type BlogPost = {
   date: string;
   image?: string;
   video?: string;
+  images?: string[];
   background?: string;
   foreground?: string;
   content: string[];
@@ -44,6 +45,7 @@ type FormState = {
   date: string;
   image: string;
   video: string;
+  images: string[];
   background: string;
   foreground: string;
   content: string;
@@ -63,6 +65,7 @@ const EMPTY_FORM: FormState = {
   date: "",
   image: "",
   video: "",
+  images: [],
   background: SWATCHES[0].background,
   foreground: SWATCHES[0].foreground,
   content: "",
@@ -75,6 +78,7 @@ const toFormState = (post: BlogPost): FormState => ({
   date: post.date,
   image: post.image || "",
   video: post.video || "",
+  images: post.images || [],
   background: post.background || SWATCHES[0].background,
   foreground: post.foreground || SWATCHES[0].foreground,
   content: post.content.join("\n\n"),
@@ -88,10 +92,12 @@ export default function AdminBlogs() {
   const [form, setForm] = useState<FormState>(EMPTY_FORM);
   const [uploadingImage, setUploadingImage] = useState(false);
   const [uploadingVideo, setUploadingVideo] = useState(false);
+  const [uploadingGalleryImage, setUploadingGalleryImage] = useState(false);
   const [importingPdf, setImportingPdf] = useState(false);
   const [importingHtml, setImportingHtml] = useState(false);
   const { toast } = useToast();
 
+  const galleryInputRef = useRef<HTMLInputElement>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
   const videoInputRef = useRef<HTMLInputElement>(null);
   const pdfInputRef = useRef<HTMLInputElement>(null);
@@ -140,6 +146,31 @@ export default function AdminBlogs() {
     } finally {
       setUploading(false);
     }
+  };
+
+  const handleGalleryUpload = async (files: FileList) => {
+    setUploadingGalleryImage(true);
+    try {
+      const uploaded: string[] = [];
+      for (const file of Array.from(files)) {
+        const body = new FormData();
+        body.append("file", file);
+        const response = await fetch("/api/blogs/upload", { method: "POST", body });
+        const json = await response.json();
+        if (!response.ok || !json.success) throw new Error(json.error || "Upload failed");
+        uploaded.push(json.data.url);
+      }
+      setForm((f) => ({ ...f, images: [...f.images, ...uploaded] }));
+      toast({ title: `${uploaded.length} image(s) added to gallery` });
+    } catch (err) {
+      toast({ title: err instanceof Error ? err.message : "Upload failed", variant: "destructive" });
+    } finally {
+      setUploadingGalleryImage(false);
+    }
+  };
+
+  const handleRemoveGalleryImage = (index: number) => {
+    setForm((f) => ({ ...f, images: f.images.filter((_, i) => i !== index) }));
   };
 
   const handlePdfImport = async (file: File) => {
@@ -212,6 +243,7 @@ export default function AdminBlogs() {
         date: form.date.trim() || undefined,
         image: form.image.trim() || undefined,
         video: form.video.trim() || undefined,
+        images: form.images,
         background: form.background,
         foreground: form.foreground,
         content,
@@ -470,6 +502,50 @@ export default function AdminBlogs() {
                     Remove video
                   </button>
                 )}
+              </div>
+
+              <div>
+                <Label>Gallery images (optional)</Label>
+                <p className="text-xs text-muted-foreground">
+                  Upload as many as you need — used as backgrounds for the content sections on the post page.
+                </p>
+                <div className="mt-2 flex flex-wrap gap-3">
+                  {form.images.map((src, index) => (
+                    <div key={src + index} className="group relative h-20 w-20 overflow-hidden rounded-lg border border-border">
+                      <img src={src} alt={`Gallery ${index + 1}`} className="h-full w-full object-cover" />
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveGalleryImage(index)}
+                        className="absolute right-1 top-1 flex h-5 w-5 items-center justify-center rounded-full bg-black/70 text-white opacity-0 transition-opacity group-hover:opacity-100"
+                        title="Remove"
+                      >
+                        <X className="h-3 w-3" />
+                      </button>
+                    </div>
+                  ))}
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="h-20 w-20 flex-col gap-1 text-xs"
+                    disabled={uploadingGalleryImage}
+                    onClick={() => galleryInputRef.current?.click()}
+                  >
+                    {uploadingGalleryImage ? <Loader2 className="h-4 w-4 animate-spin" /> : <ImagePlus className="h-4 w-4" />}
+                    Add
+                  </Button>
+                  <input
+                    ref={galleryInputRef}
+                    type="file"
+                    accept="image/*"
+                    multiple
+                    className="hidden"
+                    onChange={(e) => {
+                      const files = e.target.files;
+                      if (files && files.length > 0) handleGalleryUpload(files);
+                      e.target.value = "";
+                    }}
+                  />
+                </div>
               </div>
 
               <div>
