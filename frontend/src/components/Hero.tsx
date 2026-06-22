@@ -202,13 +202,13 @@ const Hero = () => {
         >
           <div
             className={cn(
-              "absolute inset-0 rounded-3xl",
+              "pointer-events-none absolute inset-0 rounded-3xl",
               isDark
                 ? "bg-[radial-gradient(circle_at_50%_50%,rgba(56,189,248,0.14),transparent_65%)]"
                 : "bg-[radial-gradient(circle_at_50%_50%,rgba(37,99,235,0.10),transparent_65%)]",
             )}
           />
-          <SplineScene scene={SPLINE_SCENE_URL} className="h-full w-full" />
+          <SplineScene scene={SPLINE_SCENE_URL} className="relative h-full w-full" />
         </motion.div>
       </motion.div>
 
