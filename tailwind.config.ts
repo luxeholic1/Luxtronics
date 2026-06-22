@@ -58,6 +58,7 @@ export default {
           border: "hsl(var(--sidebar-border))",
           ring: "hsl(var(--sidebar-ring))",
         },
+        skeleton: "hsl(var(--skeleton))",
       },
       borderRadius: {
         lg: "var(--radius)",
@@ -80,6 +81,11 @@ export default {
         'glow-pink': 'var(--shadow-glow-pink)',
         elegant: 'var(--shadow-elegant)',
         card: 'var(--shadow-card)',
+        input: [
+          '0px 2px 3px -1px rgba(0, 0, 0, 0.1)',
+          '0px 1px 0px 0px rgba(25, 28, 33, 0.02)',
+          '0px 0px 0px 1px rgba(25, 28, 33, 0.08)',
+        ].join(', '),
       },
       transitionTimingFunction: {
         smooth: 'cubic-bezier(0.4, 0, 0.2, 1)',
@@ -118,6 +124,20 @@ export default {
           "0%": { opacity: "0", transform: "translate(-72%, -62%) scale(0.5)" },
           "100%": { opacity: "1", transform: "translate(-50%, -40%) scale(1)" },
         },
+        "ripple": {
+          "0%, 100%": { transform: "translate(-50%, -50%) scale(1)" },
+          "50%": { transform: "translate(-50%, -50%) scale(0.9)" },
+        },
+        "orbit": {
+          "0%": {
+            transform:
+              "rotate(0deg) translateY(calc(var(--radius) * 1px)) rotate(0deg)",
+          },
+          "100%": {
+            transform:
+              "rotate(360deg) translateY(calc(var(--radius) * 1px)) rotate(-360deg)",
+          },
+        },
       },
       animation: {
         "accordion-down": "accordion-down 0.2s ease-out",
@@ -128,6 +148,8 @@ export default {
         "fade-up": "fade-up 0.7s cubic-bezier(0.4, 0, 0.2, 1) both",
         "fade-in": "fade-in 0.3s ease-out both",
         "spotlight": "spotlight 2s ease .75s 1 forwards",
+        "ripple": "ripple 2s ease calc(var(--i, 0) * 0.2s) infinite",
+        "orbit": "orbit calc(var(--duration) * 1s) linear infinite",
       },
     },
   },
