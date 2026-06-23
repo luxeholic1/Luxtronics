@@ -82,6 +82,23 @@ export type LiveVisitor = {
   status: "active" | "idle";
 };
 
+const COOKIE_CONSENT_KEY = "luxtronics_cookie_consent_v1";
+
+// Shared gate so every call site (not just AnalyticsTracker) skips tracking
+// without consent and on /admin routes. Without this, e.g. a page-level
+// useEffect calling trackAnalyticsEvent directly fires for every visitor
+// including crawlers (Googlebot/GoogleOther render pages with JS enabled),
+// regardless of cookie consent.
+export function isAnalyticsAllowed(): boolean {
+  if (typeof window === "undefined") return false;
+  if (window.location.pathname.startsWith("/admin")) return false;
+  try {
+    return localStorage.getItem(COOKIE_CONSENT_KEY) === "accepted";
+  } catch {
+    return false;
+  }
+}
+
 const STORAGE_KEY = "lux_admin_analytics_events";
 const LIVE_STORAGE_KEY = "lux_admin_live_visitors";
 const SESSION_KEY = "lux_session_id";
@@ -386,7 +403,7 @@ export function clearAnalyticsEvents() {
 }
 
 export function updateLiveVisitor(input: Partial<LiveVisitor> = {}) {
-  if (typeof window === "undefined") return;
+  if (typeof window === "undefined" || !isAnalyticsAllowed()) return;
 
   const traffic = getTrafficSource();
   const location = getApproxLocation();
@@ -471,7 +488,7 @@ export function trackAnalyticsEvent(
   input: Partial<AnalyticsEvent> & { type: AnalyticsEventType },
   liveOverrides?: Partial<LiveVisitor>,
 ) {
-  if (typeof window === "undefined") return;
+  if (typeof window === "undefined" || !isAnalyticsAllowed()) return;
 
   const traffic = getTrafficSource();
   const location = getApproxLocation();

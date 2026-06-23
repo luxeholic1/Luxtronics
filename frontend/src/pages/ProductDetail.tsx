@@ -9,7 +9,7 @@ import { useCart } from "@/context/CartContext";
 import { fetchStoreProduct, fetchStoreProducts, mapStoreProductToLocalProduct } from "@/services/store-api";
 import { sanitizeHtml } from "@/lib/sanitize";
 import { redirectToWooCheckout } from "@/lib/woo-checkout";
-import { trackAnalyticsEvent, updateLiveVisitor } from "@/lib/analytics";
+import { trackAnalyticsEvent } from "@/lib/analytics";
 import {
   absoluteUrl,
   breadcrumbSchema,
@@ -146,27 +146,24 @@ const ProductDetail = () => {
 
   useEffect(() => {
     if (!product) return;
-    trackAnalyticsEvent({
-      type: "product_view",
-      path: `/product/${product.slug}`,
-      title: product.name,
-      label: product.name,
-      productId: product.id,
-      productName: product.name,
-      productSlug: product.slug,
-      productCategory: product.category,
-      productPrice: product.price,
-    });
-    updateLiveVisitor({
-      path: `/product/${product.slug}`,
-      title: product.name,
-      section: "Product detail",
-      lastAction: `Viewing ${product.name}`,
-      currentProductId: product.id,
-      currentProductName: product.name,
-      currentProductSlug: product.slug,
-      currentProductCategory: product.category,
-    });
+    // trackAnalyticsEvent() itself checks cookie consent and skips /admin —
+    // it's the only call needed; a separate updateLiveVisitor() call here
+    // used to fire unconditionally with no consent check at all, which is
+    // also what let Googlebot/GoogleOther rendering this page trigger it.
+    trackAnalyticsEvent(
+      {
+        type: "product_view",
+        path: `/product/${product.slug}`,
+        title: product.name,
+        label: product.name,
+        productId: product.id,
+        productName: product.name,
+        productSlug: product.slug,
+        productCategory: product.category,
+        productPrice: product.price,
+      },
+      { section: "Product detail", lastAction: `Viewing ${product.name}` },
+    );
   }, [product]);
 
   // ─── Unique attribute names ──────────────────────────────────────────────
