@@ -97,15 +97,34 @@ const AnalyticsTracker = () => {
       }
     };
 
-    heartbeat();
-    const interval = window.setInterval(heartbeat, 5000);
+    // Heartbeat keeps the visitor "active" (LIVE_ACTIVE_WINDOW is 30s server-side),
+    // so 20s gives margin without hammering /api/analytics/live every 5s per open tab.
+    let interval: number | undefined;
+    const startHeartbeat = () => {
+      if (interval) return;
+      heartbeat();
+      interval = window.setInterval(heartbeat, 20000);
+    };
+    const stopHeartbeat = () => {
+      if (!interval) return;
+      window.clearInterval(interval);
+      interval = undefined;
+    };
+    const onVisibilityChange = () => {
+      if (document.visibilityState === "hidden") stopHeartbeat();
+      else startHeartbeat();
+    };
+
+    startHeartbeat();
     window.addEventListener("scroll", onScroll, { passive: true });
     window.addEventListener("focus", heartbeat);
+    document.addEventListener("visibilitychange", onVisibilityChange);
 
     return () => {
-      window.clearInterval(interval);
+      stopHeartbeat();
       window.removeEventListener("scroll", onScroll);
       window.removeEventListener("focus", heartbeat);
+      document.removeEventListener("visibilitychange", onVisibilityChange);
     };
   }, [analyticsAllowed, location.pathname, location.search]);
 
@@ -168,20 +187,15 @@ const AnalyticsTracker = () => {
           ? "product_intent"
           : "click";
 
+      // trackAnalyticsEvent already forwards label/path/productMeta into its own
+      // internal updateLiveVisitor call — a second explicit call here just sent
+      // the exact same values as a duplicate POST to /api/analytics/live.
       trackAnalyticsEvent({
         type,
         label,
         href,
         path: `${window.location.pathname}${window.location.search}`,
         ...productMeta,
-      });
-      updateLiveVisitor({
-        lastAction: label,
-        path: `${window.location.pathname}${window.location.search}`,
-        currentProductId: productMeta.productId,
-        currentProductName: productMeta.productName,
-        currentProductSlug: productMeta.productSlug,
-        currentProductCategory: productMeta.productCategory,
       });
     };
 
