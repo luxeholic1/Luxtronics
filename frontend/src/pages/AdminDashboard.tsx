@@ -137,13 +137,37 @@ export default function AdminDashboard() {
       const remoteVisitors = await fetchRemoteLiveVisitors();
       setLiveVisitors(remoteVisitors.length > 0 ? remoteVisitors : readLiveVisitors());
     };
-    const interval = window.setInterval(refresh, 2500);
+
+    // Polling at 2.5s indefinitely (even with the tab backgrounded for hours,
+    // which is exactly how this dashboard tends to be left open) was a steady
+    // background load of 2 requests every cycle. 8s is still effectively
+    // "live" for a human glancing at a dashboard, and pausing while hidden
+    // removes the load entirely when nobody's looking.
+    let interval: number | undefined;
+    const start = () => {
+      if (interval) return;
+      refresh();
+      interval = window.setInterval(refresh, 8000);
+    };
+    const stop = () => {
+      if (!interval) return;
+      window.clearInterval(interval);
+      interval = undefined;
+    };
+    const onVisibilityChange = () => {
+      if (document.visibilityState === "hidden") stop();
+      else start();
+    };
+
+    start();
     window.addEventListener("lux-analytics-event", refresh);
     window.addEventListener("lux-live-visitor", refresh);
+    document.addEventListener("visibilitychange", onVisibilityChange);
     return () => {
-      window.clearInterval(interval);
+      stop();
       window.removeEventListener("lux-analytics-event", refresh);
       window.removeEventListener("lux-live-visitor", refresh);
+      document.removeEventListener("visibilitychange", onVisibilityChange);
     };
   }, []);
 

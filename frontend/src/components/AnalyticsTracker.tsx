@@ -47,7 +47,7 @@ const AnalyticsTracker = () => {
   }, []);
 
   useEffect(() => {
-    if (!analyticsAllowed) return;
+    if (!analyticsAllowed || window.location.pathname.startsWith("/admin")) return;
 
     trackAnalyticsEvent({
       type: "page_view",
@@ -64,7 +64,7 @@ const AnalyticsTracker = () => {
   }, [analyticsAllowed, location.pathname, location.search]);
 
   useEffect(() => {
-    if (!analyticsAllowed) return;
+    if (!analyticsAllowed || window.location.pathname.startsWith("/admin")) return;
 
     let lastScrollDepth = 0;
 
@@ -129,7 +129,7 @@ const AnalyticsTracker = () => {
   }, [analyticsAllowed, location.pathname, location.search]);
 
   useEffect(() => {
-    if (!analyticsAllowed) return;
+    if (!analyticsAllowed || window.location.pathname.startsWith("/admin")) return;
 
     const seenSections = new Set<string>();
     const observer = new IntersectionObserver(
@@ -171,7 +171,7 @@ const AnalyticsTracker = () => {
   }, [analyticsAllowed, location.pathname, location.search]);
 
   useEffect(() => {
-    if (!analyticsAllowed) return;
+    if (!analyticsAllowed || window.location.pathname.startsWith("/admin")) return;
 
     const onClick = (event: MouseEvent) => {
       const target = event.target as HTMLElement | null;
