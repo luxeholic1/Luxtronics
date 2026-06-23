@@ -1,8 +1,12 @@
 import CustomerServiceLayout from "@/components/CustomerServiceLayout";
 import Layout from "@/components/Layout";
 import SEO from "@/components/SEO";
+import { getCountryFromDomain } from "@/lib/domain-config";
 
 const ShippingReturns = () => {
+  const domainCountry = getCountryFromDomain(window.location.hostname);
+  const hideIndiaTimeline = domainCountry === "AU" || domainCountry === "NZ";
+
   return (
     <Layout>
       <SEO
@@ -26,10 +30,12 @@ const ShippingReturns = () => {
           <div className="overflow-x-auto border-y border-neutral-200">
             <table className="w-full min-w-[620px] text-left text-sm sm:text-base">
               <tbody className="divide-y divide-neutral-200">
-                <tr>
-                  <th className="w-56 py-4 pr-6 font-medium text-neutral-950">India</th>
-                  <td className="py-4">Standard: 3-7 business days. Express: 1-3 business days in select cities.</td>
-                </tr>
+                {!hideIndiaTimeline && (
+                  <tr>
+                    <th className="w-56 py-4 pr-6 font-medium text-neutral-950">India</th>
+                    <td className="py-4">Standard: 3-7 business days. Express: 1-3 business days in select cities.</td>
+                  </tr>
+                )}
                 <tr>
                   <th className="py-4 pr-6 font-medium text-neutral-950">Australia</th>
                   <td className="py-4">International standard: 3-5 working days.</td>
