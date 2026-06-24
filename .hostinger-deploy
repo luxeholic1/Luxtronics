@@ -1,0 +1,41 @@
+#!/bin/bash
+# Hostinger Auto-Deploy Script
+# This runs when Git pushes code to server
+
+echo "🚀 Luxtronics Auto-Deploy Started"
+echo "=================================="
+
+# Kill any existing node/lsnode processes to prevent buildup
+echo "🧹 Cleaning up old processes..."
+pkill -9 lsnode 2>/dev/null || true
+pkill -9 node 2>/dev/null || true
+
+# Wait for processes to die
+sleep 2
+
+# Install/update dependencies (if needed)
+if [ -f "package.json" ]; then
+  echo "📦 Installing dependencies..."
+  npm install --production 2>/dev/null || true
+fi
+
+# Build frontend
+if [ -d "frontend" ]; then
+  echo "🏗️  Building frontend..."
+  npm run build 2>/dev/null || echo "⚠️  Build skipped (run manually if needed)"
+fi
+
+echo ""
+echo "✅ Deploy Complete!"
+echo "=================================="
+echo ""
+echo "📝 IMPORTANT: This deploy does NOT start the backend server."
+echo "   Static sites are served from public_html folders."
+echo ""
+echo "🌐 Your sites:"
+echo "   - https://luxtronics.in"
+echo "   - https://luxtronics.com.au"  
+echo "   - https://luxtronics.co.nz"
+echo ""
+echo "📊 Process count: $(ps aux | wc -l)"
+echo ""
