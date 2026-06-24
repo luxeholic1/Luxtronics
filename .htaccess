@@ -6,13 +6,28 @@ Options -Indexes
   RewriteEngine On
   RewriteBase /
 
+  # Proxy API requests to Node.js backend (if mod_proxy is available)
+  RewriteCond %{REQUEST_URI} ^/api/(.*)$ [NC]
+  RewriteCond %{HTTP:Upgrade} !=websocket [NC]
+  RewriteRule ^api/(.*)$ http://localhost:3001/api/$1 [P,L,QSA]
+
+  # Proxy health check to Node.js backend
+  RewriteCond %{REQUEST_URI} ^/health$ [NC]
+  RewriteRule ^health$ http://localhost:3001/health [P,L]
+
+  # Skip rewrite for index.html
   RewriteRule ^index\.html$ - [L]
+  
+  # Skip rewrite for API routes (if proxy didn't work, let them 404)
   RewriteRule ^api(/.*)?$ - [L]
+  
+  # Skip rewrite for existing files, directories, or symlinks
   RewriteCond %{REQUEST_FILENAME} -f [OR]
   RewriteCond %{REQUEST_FILENAME} -d [OR]
   RewriteCond %{REQUEST_FILENAME} -l
   RewriteRule ^ - [L]
 
+  # Send everything else to index.html (SPA routing)
   RewriteRule . /index.html [L]
 </IfModule>
 

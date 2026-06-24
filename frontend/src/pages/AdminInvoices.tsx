@@ -596,6 +596,12 @@ export default function AdminInvoices() {
                 Cancel editing
               </Button>
             )}
+            {!currentEditingId && (
+              <Button variant="outline" className="gap-2" onClick={cancelEditing}>
+                <Plus className="h-4 w-4" />
+                New invoice
+              </Button>
+            )}
             <Button
               variant="outline"
               className="gap-2"
@@ -892,57 +898,63 @@ export default function AdminInvoices() {
                   : "The PDF opens in the browser print dialog. Choose Save as PDF as the destination."
                 }
               </p>
-              {savedInvoices.length > 0 && (
-                <div className="rounded-lg border border-border bg-background p-4">
-                  <p className="text-xs font-black uppercase tracking-widest text-muted-foreground">Saved invoices</p>
-                  <div className="mt-3 space-y-3">
-                    {savedInvoices.slice(0, 5).map((invoice) => (
-                      <div key={invoice.id} className="rounded-md border border-border/70 p-3 text-sm hover:border-primary/50 transition-colors">
-                        <div className="flex items-start justify-between gap-3">
-                          <div className="flex-1">
+            </CardContent>
+          </Card>
+
+          {/* Saved Invoices List - Always visible */}
+          {savedInvoices.length > 0 && (
+            <Card className="h-fit border-border/80 bg-card/90">
+              <CardHeader>
+                <CardTitle className="text-lg">Saved Invoices ({savedInvoices.length})</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-3 max-h-[600px] overflow-y-auto">
+                  {savedInvoices.map((invoice) => (
+                    <div key={invoice.id} className="rounded-md border border-border/70 p-3 text-sm hover:border-primary/50 transition-colors">
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2">
                             <p className="font-bold">{invoice.invoiceNumber}</p>
-                            <p className="text-xs text-muted-foreground">
-                              {invoice.customerCompanyName || invoice.customerName || "Customer"}
-                            </p>
-                            <p className="mt-1 text-[11px] text-muted-foreground">
-                              {new Date(invoice.savedAt).toLocaleString("en-IN")}
-                            </p>
+                            <span className="text-[10px] px-2 py-0.5 rounded-full bg-primary/10 text-primary">
+                              {invoice.invoiceType === "tax" ? "TAX" : "PROFORMA"}
+                            </span>
                           </div>
-                          <div className="flex flex-col items-end gap-2">
-                            <strong className="text-right">{formatMoney(invoice.total, invoice.currency)}</strong>
-                            <div className="flex gap-1">
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                className="h-7 gap-1 text-xs"
-                                onClick={() => loadInvoiceForEditing(invoice)}
-                              >
-                                <ReceiptText className="h-3 w-3" />
-                                Edit
-                              </Button>
-                              <Button
-                                size="sm"
-                                variant="ghost"
-                                className="h-7 text-xs text-destructive hover:text-destructive"
-                                onClick={() => deleteInvoice(invoice.id)}
-                              >
-                                <Trash2 className="h-3 w-3" />
-                              </Button>
-                            </div>
+                          <p className="text-xs text-muted-foreground mt-1">
+                            {invoice.customerCompanyName || invoice.customerName || "Customer"}
+                          </p>
+                          <p className="mt-1 text-[11px] text-muted-foreground">
+                            {new Date(invoice.savedAt).toLocaleString("en-IN")}
+                          </p>
+                        </div>
+                        <div className="flex flex-col items-end gap-2">
+                          <strong className="text-right">{formatMoney(invoice.total, invoice.currency)}</strong>
+                          <div className="flex gap-1">
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="h-7 gap-1 text-xs"
+                              onClick={() => loadInvoiceForEditing(invoice)}
+                            >
+                              <ReceiptText className="h-3 w-3" />
+                              Edit
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              className="h-7 text-xs text-destructive hover:text-destructive"
+                              onClick={() => deleteInvoice(invoice.id)}
+                            >
+                              <Trash2 className="h-3 w-3" />
+                            </Button>
                           </div>
                         </div>
                       </div>
-                    ))}
-                  </div>
-                  {savedInvoices.length > 5 && (
-                    <p className="mt-3 text-xs text-muted-foreground text-center">
-                      Showing 5 of {savedInvoices.length} saved invoices
-                    </p>
-                  )}
+                    </div>
+                  ))}
                 </div>
-              )}
-            </CardContent>
-          </Card>
+              </CardContent>
+            </Card>
+          )}
         </div>
       </section>
     </Layout>
