@@ -1,17 +1,35 @@
 /**
  * WooCommerce API Service
- * Fetches products from the backend proxy (/api/woo/*) to avoid CORS issues.
- * The backend proxy forwards requests to luxtronics.luxtronics.in securely.
+ * Calls WooCommerce REST API directly using consumer key/secret in query params.
+ * No backend proxy needed - WooCommerce REST API supports public access.
  */
 
-// Backend API URL. In production, same-origin keeps parked domains working and
-// avoids accidentally shipping localhost from .env.local into the browser.
-const configuredBackendUrl = (import.meta.env.VITE_BACKEND_URL || '').replace(/\/$/, '');
-const isLocalBackendUrl = /^https?:\/\/(?:localhost|127\.0\.0\.1)(?::\d+)?$/i.test(configuredBackendUrl);
-const isBrowserOnLocalhost =
-  typeof window !== 'undefined' && /^(localhost|127\.0\.0\.1)$/.test(window.location.hostname);
-const BACKEND_URL = isLocalBackendUrl && !isBrowserOnLocalhost ? '' : configuredBackendUrl;
-const API_BASE = `${BACKEND_URL}/api/woo`;
+import { storeConfig } from '../config/storeConfig';
+
+// Get WooCommerce credentials from environment based on domain
+function getWooConfig() {
+  const hostname = typeof window !== 'undefined' ? window.location.hostname : 'luxtronics.in';
+  const domain = hostname.replace(/^www\./, '');
+  
+  let url = import.meta.env.VITE_WOOCOMMERCE_URL_INDIA || '';
+  let key = import.meta.env.VITE_WOOCOMMERCE_KEY_INDIA || '';
+  let secret = import.meta.env.VITE_WOOCOMMERCE_SECRET_INDIA || '';
+  
+  if (domain === 'luxtronics.com.au') {
+    url = import.meta.env.VITE_WOOCOMMERCE_URL_AUSTRALIA || url;
+    key = import.meta.env.VITE_WOOCOMMERCE_KEY_AUSTRALIA || key;
+    secret = import.meta.env.VITE_WOOCOMMERCE_SECRET_AUSTRALIA || secret;
+  } else if (domain === 'luxtronics.co.nz') {
+    url = import.meta.env.VITE_WOOCOMMERCE_URL_NEWZEALAND || url;
+    key = import.meta.env.VITE_WOOCOMMERCE_KEY_NEWZEALAND || key;
+    secret = import.meta.env.VITE_WOOCOMMERCE_SECRET_NEWZEALAND || secret;
+  }
+  
+  return { url, key, secret };
+}
+
+const { url: WOO_URL, key: WOO_KEY, secret: WOO_SECRET } = getWooConfig();
+const API_BASE = `${WOO_URL}/wp-json/wc/v3`;
 
 export interface WooProduct {
   id: number;
@@ -38,7 +56,7 @@ export interface WooProduct {
 }
 
 /**
- * Fetch products via backend proxy
+ * Fetch products directly from WooCommerce REST API
  */
 export async function fetchWooProducts(
   page = 1,
@@ -51,6 +69,9 @@ export async function fetchWooProducts(
     page: page.toString(),
     orderby: 'date',
     order: 'desc',
+    status: 'publish',
+    consumer_key: WOO_KEY,
+    consumer_secret: WOO_SECRET,
   });
 
   if (category) params.append('category', category);
@@ -60,7 +81,7 @@ export async function fetchWooProducts(
 
   if (!response.ok) {
     const err = await response.json().catch(() => ({}));
-    throw new Error(err?.error || `Failed to fetch products: ${response.statusText}`);
+    throw new Error(err?.message || `Failed to fetch products: ${response.statusText}`);
   }
 
   const products: WooProduct[] = await response.json();
@@ -70,28 +91,40 @@ export async function fetchWooProducts(
 }
 
 /**
- * Fetch single product by ID via backend proxy
+ * Fetch single product by ID directly from WooCommerce REST API
  */
 export async function fetchWooProduct(productId: number): Promise<WooProduct> {
-  const response = await fetch(`${API_BASE}/products/${productId}`);
+  const params = new URLSearchParams({
+    consumer_key: WOO_KEY,
+    consumer_secret: WOO_SECRET,
+  });
+  
+  const response = await fetch(`${API_BASE}/products/${productId}?${params}`);
 
   if (!response.ok) {
     const err = await response.json().catch(() => ({}));
-    throw new Error(err?.error || `Failed to fetch product: ${response.statusText}`);
+    throw new Error(err?.message || `Failed to fetch product: ${response.statusText}`);
   }
 
   return response.json();
 }
 
 /**
- * Fetch WooCommerce categories via backend proxy
+ * Fetch WooCommerce categories directly from REST API
  */
 export async function fetchWooCategories() {
-  const response = await fetch(`${API_BASE}/categories`);
+  const params = new URLSearchParams({
+    per_page: '100',
+    hide_empty: 'true',
+    consumer_key: WOO_KEY,
+    consumer_secret: WOO_SECRET,
+  });
+  
+  const response = await fetch(`${API_BASE}/products/categories?${params}`);
 
   if (!response.ok) {
     const err = await response.json().catch(() => ({}));
-    throw new Error(err?.error || `Failed to fetch categories: ${response.statusText}`);
+    throw new Error(err?.message || `Failed to fetch categories: ${response.statusText}`);
   }
 
   return response.json();
