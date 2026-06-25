@@ -46,7 +46,7 @@ const CategoryShowcase = () => {
       color: "from-violet-500 to-pink-600",
       bgColor: "bg-violet-500/10",
       borderColor: "border-violet-500/20",
-      link: "/shop?cat=smartphones&sort=featured",
+      link: "/shop?cat=smart-phones&sort=featured",
     },
     {
       id: 5,

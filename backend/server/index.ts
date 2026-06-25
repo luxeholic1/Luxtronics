@@ -7,10 +7,12 @@ import express, { Express } from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import path from 'path';
-import { existsSync, mkdirSync, readFileSync } from 'fs';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs';
 import { fileURLToPath } from 'url';
 import multer from 'multer';
 import { PDFParse } from 'pdf-parse';
+import { initializeApp as initFirebaseApp, cert, getApps } from 'firebase-admin/app';
+import { getStorage } from 'firebase-admin/storage';
 import { initializeMongoDB } from './db/mongodb';
 import { createProductDocument, createCategoryDocument } from './models/mongo-models';
 import { validateBlogPostInput } from './models/blog-models';
@@ -129,19 +131,35 @@ export async function setupServer(config: ServerConfig = {}): Promise<Express> {
   // ── Register WooCommerce Proxy Routes ─────────────────────────────────────
   app.use('/api', createWooCommerceProxyRoutes());
 
-  // ── Blog media uploads (local disk, served statically) ───────────────────
+  // ── Blog media uploads ────────────────────────────────────────────────────
+  // Primary storage is Firebase Cloud Storage: Hostinger's nodejs/ directory is
+  // wiped on every redeploy, so anything saved to local disk eventually
+  // vanishes along with its still-live MongoDB reference. Local disk is kept
+  // only as a fallback for environments without Firebase creds (e.g. local dev).
   const uploadsDir = path.join(projectRoot, 'uploads', 'blog');
   mkdirSync(uploadsDir, { recursive: true });
   app.use('/uploads', express.static(path.join(projectRoot, 'uploads'), { maxAge: '7d' }));
 
+  let blogBucket: ReturnType<typeof getStorage>['bucket'] extends (...args: any[]) => infer R ? R : never;
+  function getBlogBucket() {
+    if (blogBucket) return blogBucket;
+    const rawKey = process.env.FIREBASE_SERVICE_ACCOUNT_KEY;
+    const bucketName = process.env.VITE_FIREBASE_STORAGE_BUCKET;
+    if (!rawKey || !bucketName) return null;
+    try {
+      if (getApps().length === 0) {
+        initFirebaseApp({ credential: cert(JSON.parse(rawKey)), storageBucket: bucketName });
+      }
+      blogBucket = getStorage().bucket(bucketName);
+      return blogBucket;
+    } catch (err) {
+      console.error('Firebase Storage init failed, blog uploads will use local disk:', err);
+      return null;
+    }
+  }
+
   const blogMediaUpload = multer({
-    storage: multer.diskStorage({
-      destination: (_req, _file, cb) => cb(null, uploadsDir),
-      filename: (_req, file, cb) => {
-        const safeName = file.originalname.replace(/[^a-zA-Z0-9.\-_]/g, '_').slice(-80);
-        cb(null, `${Date.now()}-${safeName}`);
-      },
-    }),
+    storage: multer.memoryStorage(),
     limits: { fileSize: 80 * 1024 * 1024 }, // 80MB, generous enough for short background videos
     fileFilter: (_req, file, cb) => {
       if (/^image\/|^video\//.test(file.mimetype)) return cb(null, true);
@@ -555,12 +573,38 @@ export async function setupServer(config: ServerConfig = {}): Promise<Express> {
 
   // ── POST /api/blogs/upload (image or video file) ──────────────────────────────
   app.post('/api/blogs/upload', (req, res) => {
-    blogMediaUpload.single('file')(req, res, (err: any) => {
+    blogMediaUpload.single('file')(req, res, async (err: any) => {
       if (err) return res.status(400).json({ success: false, error: err.message || 'Upload failed' });
       if (!req.file) return res.status(400).json({ success: false, error: 'No file uploaded' });
-      const url = `/uploads/blog/${req.file.filename}`;
+
+      const safeName = req.file.originalname.replace(/[^a-zA-Z0-9.\-_]/g, '_').slice(-80);
       const kind = req.file.mimetype.startsWith('video/') ? 'video' : 'image';
-      return res.status(201).json({ success: true, data: { url, kind } });
+
+      const bucket = getBlogBucket();
+      if (bucket) {
+        try {
+          const objectName = `blog/${Date.now()}-${safeName}`;
+          const fileRef = bucket.file(objectName);
+          await fileRef.save(req.file.buffer, {
+            contentType: req.file.mimetype,
+            metadata: { cacheControl: 'public, max-age=31536000' },
+          });
+          const [url] = await fileRef.getSignedUrl({ action: 'read', expires: '03-01-2500' });
+          return res.status(201).json({ success: true, data: { url, kind } });
+        } catch (uploadErr) {
+          console.error('Firebase Storage upload failed, falling back to local disk:', uploadErr);
+        }
+      }
+
+      try {
+        const filename = `${Date.now()}-${safeName}`;
+        writeFileSync(path.join(uploadsDir, filename), req.file.buffer);
+        const url = `/uploads/blog/${filename}`;
+        return res.status(201).json({ success: true, data: { url, kind } });
+      } catch (fallbackErr) {
+        console.error('Local fallback upload failed:', fallbackErr);
+        return res.status(500).json({ success: false, error: 'Upload failed' });
+      }
     });
   });
 

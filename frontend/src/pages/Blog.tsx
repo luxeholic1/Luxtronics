@@ -137,14 +137,14 @@ const Blog = () => {
                 </div>
 
                 <div className="relative">
-                  <h1 className="text-[clamp(2.5rem,9vw,8rem)] font-bold uppercase leading-[0.92] tracking-tight font-display">
+                  <h1 className="text-[clamp(1.75rem,5vw,3.75rem)] font-bold uppercase leading-[0.96] tracking-tight font-display">
                     {post.title}
                   </h1>
                 </div>
 
                 <div className="relative">
                   <hr className={`my-[2vw] border-none border-t ${dividerClass}`} />
-                  <p className="max-w-[60ch] text-[clamp(1rem,2.2vw,1.6rem)] font-normal leading-relaxed">
+                  <p className="max-w-[60ch] text-[clamp(0.9rem,1.3vw,1.05rem)] font-normal leading-relaxed">
                     {post.excerpt}
                   </p>
                 </div>
@@ -170,7 +170,7 @@ const Blog = () => {
           <FlowSection aria-label="More from Luxtronics" style={{ backgroundColor: "#0a0a0a", color: "#fff" }}>
             <p className="text-xs font-bold uppercase tracking-[0.2em]">{String(posts.length + 1).padStart(2, "0")} — Keep exploring</p>
             <hr className="my-[2vw] border-none border-t border-white/30" />
-            <h2 className="text-[clamp(2.5rem,9vw,8rem)] font-bold uppercase leading-[0.92] tracking-tight font-display">
+            <h2 className="text-[clamp(1.75rem,5vw,3.75rem)] font-bold uppercase leading-[0.96] tracking-tight font-display">
               Find Your
               <br />
               Next Gear

@@ -113,7 +113,7 @@ export interface WooCommerceOrder {
 }
 
 const CATEGORY_RULES = [
-  { name: 'Smartphones', slug: 'smartphones', patterns: [/phone/i, /iphone/i, /mobile/i, /smartphone/i, /handset/i] },
+  { name: 'Smart Phones', slug: 'smart-phones', patterns: [/phone/i, /iphone/i, /mobile/i, /smartphone/i, /handset/i] },
   { name: 'Laptops', slug: 'laptops', patterns: [/laptop/i, /macbook/i, /notebook/i, /ultrabook/i] },
   { name: 'Audio', slug: 'audio', patterns: [/headphone/i, /earbud/i, /speaker/i, /audio/i, /sound/i, /buds?/i] },
   { name: 'Wearables', slug: 'wearables', patterns: [/watch/i, /smartwatch/i, /wearable/i, /fitness band/i, /band/i] },

@@ -32,10 +32,10 @@ const stats = [
 ];
 
 const categoryPills = [
-  { icon: Smartphone, label: "Phones", to: "/shop?category=smartphones" },
-  { icon: Headphones, label: "Audio", to: "/shop?category=audio" },
-  { icon: Watch, label: "Wearables", to: "/shop?category=wearables" },
-  { icon: Gamepad2, label: "Gaming", to: "/shop?category=gaming" },
+  { icon: Smartphone, label: "Phones", to: "/shop?cat=smart-phones" },
+  { icon: Headphones, label: "Audio", to: "/shop?cat=audio" },
+  { icon: Watch, label: "Wearables", to: "/shop?cat=wearables" },
+  { icon: Gamepad2, label: "Gaming", to: "/shop?cat=gaming" },
 ];
 
 // Public Spline demo scene — swap for a Luxtronics-branded export from spline.design

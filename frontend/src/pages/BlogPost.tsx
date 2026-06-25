@@ -199,13 +199,35 @@ const BlogPost = () => {
 
       {/* ── Rich HTML content (imported from the team's own HTML/CSS) ────── */}
       {post.bodyHtml ? (
-        <section className="container py-16 sm:py-24">
-          <div
-            className="prose prose-lg dark:prose-invert mx-auto max-w-3xl prose-headings:font-display prose-img:rounded-2xl"
-            style={{ "--tw-prose-links": accent } as React.CSSProperties}
-            dangerouslySetInnerHTML={{ __html: sanitizeHtml(post.bodyHtml) }}
-          />
-        </section>
+        <>
+          <section className="container py-16 sm:py-24">
+            <div
+              className="prose prose-lg dark:prose-invert mx-auto max-w-3xl prose-headings:font-display prose-img:rounded-2xl"
+              style={{ "--tw-prose-links": accent } as React.CSSProperties}
+              dangerouslySetInnerHTML={{ __html: sanitizeHtml(post.bodyHtml) }}
+            />
+          </section>
+
+          {post.images && post.images.length > 0 && (
+            <section className="container pb-16 sm:pb-24">
+              <div className="mx-auto grid max-w-5xl gap-4 sm:grid-cols-2">
+                {post.images.map((src, index) => (
+                  <div key={src} className="overflow-hidden rounded-2xl">
+                    <img
+                      src={src}
+                      alt={`${post.title} — illustration ${index + 1}`}
+                      className="h-full w-full object-cover"
+                      loading="lazy"
+                      decoding="async"
+                      width={1200}
+                      height={900}
+                    />
+                  </div>
+                ))}
+              </div>
+            </section>
+          )}
+        </>
       ) : (
         chapters.map((chapter, index) => {
         const tinted = index % 2 === 1;
