@@ -110,7 +110,10 @@ export default function AdminBlogs() {
   const fetchPosts = async () => {
     setLoading(true);
     try {
-      const response = await fetch("/api/blogs");
+      // no-store: the public /api/blogs response is cached for 60s for shoppers,
+      // but the admin list must reflect deletes/edits immediately or a delete
+      // can look like it silently failed when it actually succeeded.
+      const response = await fetch("/api/blogs", { cache: "no-store" });
       const json = await response.json();
       setPosts(json.success ? json.data : []);
     } catch {
@@ -279,13 +282,18 @@ export default function AdminBlogs() {
   };
 
   const handleDelete = async (post: BlogPost) => {
-    if (!window.confirm(`Delete "${post.title}"? This cannot be undone.`)) return;
+    if (!window.confirm(`Delete "${post.title || "Untitled post"}"? This cannot be undone.`)) return;
     try {
       const response = await fetch(`/api/blogs/${post._id}`, { method: "DELETE" });
       const json = await response.json();
-      if (!response.ok || !json.success) throw new Error(json.error || "Failed to delete post");
+      // A 404 here means the post is already gone (e.g. a previous delete
+      // succeeded but this list was showing a stale cached copy) — that's
+      // the outcome the admin wanted, so treat it as success, not an error.
+      if (!response.ok && response.status !== 404) throw new Error(json.error || "Failed to delete post");
+      if (!json.success && response.status !== 404) throw new Error(json.error || "Failed to delete post");
       toast({ title: "Post deleted" });
       if (editingId === post._id) startCreate();
+      setPosts((prev) => prev.filter((p) => p._id !== post._id));
       fetchPosts();
     } catch (err) {
       toast({ title: err instanceof Error ? err.message : "Failed to delete post", variant: "destructive" });

@@ -11,8 +11,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs';
 import { fileURLToPath } from 'url';
 import multer from 'multer';
 import { PDFParse } from 'pdf-parse';
-import { initializeApp as initFirebaseApp, cert, getApps } from 'firebase-admin/app';
-import { getStorage } from 'firebase-admin/storage';
+import { GridFSBucket, ObjectId } from 'mongodb';
 import { initializeMongoDB } from './db/mongodb';
 import { createProductDocument, createCategoryDocument } from './models/mongo-models';
 import { validateBlogPostInput } from './models/blog-models';
@@ -132,31 +131,14 @@ export async function setupServer(config: ServerConfig = {}): Promise<Express> {
   app.use('/api', createWooCommerceProxyRoutes());
 
   // ── Blog media uploads ────────────────────────────────────────────────────
-  // Primary storage is Firebase Cloud Storage: Hostinger's nodejs/ directory is
-  // wiped on every redeploy, so anything saved to local disk eventually
-  // vanishes along with its still-live MongoDB reference. Local disk is kept
-  // only as a fallback for environments without Firebase creds (e.g. local dev).
+  // Primary storage is MongoDB GridFS (same database the rest of the app
+  // already depends on). Hostinger's nodejs/ directory is wiped on every
+  // redeploy/restart, so anything saved to local disk eventually vanishes
+  // along with its still-live blog post reference. Local disk is kept only
+  // as a fallback for the brief window before Mongo finishes connecting.
   const uploadsDir = path.join(projectRoot, 'uploads', 'blog');
   mkdirSync(uploadsDir, { recursive: true });
   app.use('/uploads', express.static(path.join(projectRoot, 'uploads'), { maxAge: '7d' }));
-
-  let blogBucket: ReturnType<typeof getStorage>['bucket'] extends (...args: any[]) => infer R ? R : never;
-  function getBlogBucket() {
-    if (blogBucket) return blogBucket;
-    const rawKey = process.env.FIREBASE_SERVICE_ACCOUNT_KEY;
-    const bucketName = process.env.VITE_FIREBASE_STORAGE_BUCKET;
-    if (!rawKey || !bucketName) return null;
-    try {
-      if (getApps().length === 0) {
-        initFirebaseApp({ credential: cert(JSON.parse(rawKey)), storageBucket: bucketName });
-      }
-      blogBucket = getStorage().bucket(bucketName);
-      return blogBucket;
-    } catch (err) {
-      console.error('Firebase Storage init failed, blog uploads will use local disk:', err);
-      return null;
-    }
-  }
 
   const blogMediaUpload = multer({
     storage: multer.memoryStorage(),
@@ -190,6 +172,7 @@ export async function setupServer(config: ServerConfig = {}): Promise<Express> {
   let productService: any = null;
   let categoryService: any = null;
   let blogService: BlogService | null = null;
+  let blogMediaBucket: GridFSBucket | null = null;
   const analyticsEvents: any[] = [];
   const liveVisitors = new Map<string, any>();
   const liveRetentionMs = 10 * 60 * 1000;
@@ -580,19 +563,20 @@ export async function setupServer(config: ServerConfig = {}): Promise<Express> {
       const safeName = req.file.originalname.replace(/[^a-zA-Z0-9.\-_]/g, '_').slice(-80);
       const kind = req.file.mimetype.startsWith('video/') ? 'video' : 'image';
 
-      const bucket = getBlogBucket();
-      if (bucket) {
+      if (blogMediaBucket) {
         try {
-          const objectName = `blog/${Date.now()}-${safeName}`;
-          const fileRef = bucket.file(objectName);
-          await fileRef.save(req.file.buffer, {
-            contentType: req.file.mimetype,
-            metadata: { cacheControl: 'public, max-age=31536000' },
+          const uploadStream = blogMediaBucket.openUploadStream(safeName, {
+            metadata: { contentType: req.file.mimetype },
           });
-          const [url] = await fileRef.getSignedUrl({ action: 'read', expires: '03-01-2500' });
+          await new Promise<void>((resolve, reject) => {
+            uploadStream.on('error', reject);
+            uploadStream.on('finish', () => resolve());
+            uploadStream.end(req.file!.buffer);
+          });
+          const url = `/api/blogs/media/${uploadStream.id.toString()}`;
           return res.status(201).json({ success: true, data: { url, kind } });
         } catch (uploadErr) {
-          console.error('Firebase Storage upload failed, falling back to local disk:', uploadErr);
+          console.error('GridFS upload failed, falling back to local disk:', uploadErr);
         }
       }
 
@@ -606,6 +590,26 @@ export async function setupServer(config: ServerConfig = {}): Promise<Express> {
         return res.status(500).json({ success: false, error: 'Upload failed' });
       }
     });
+  });
+
+  // ── GET /api/blogs/media/:id (stream image/video stored in GridFS) ────────────
+  app.get('/api/blogs/media/:id', async (req, res) => {
+    if (!blogMediaBucket || !ObjectId.isValid(req.params.id)) {
+      return res.status(404).json({ success: false, error: 'Media not found' });
+    }
+    try {
+      const fileId = new ObjectId(req.params.id);
+      const [file] = await blogMediaBucket.find({ _id: fileId }).toArray();
+      if (!file) return res.status(404).json({ success: false, error: 'Media not found' });
+
+      res.set('Content-Type', file.metadata?.contentType || 'application/octet-stream');
+      res.set('Cache-Control', 'public, max-age=31536000, immutable');
+      const downloadStream = blogMediaBucket.openDownloadStream(fileId);
+      downloadStream.on('error', () => res.status(404).end());
+      downloadStream.pipe(res);
+    } catch {
+      return res.status(404).json({ success: false, error: 'Media not found' });
+    }
   });
 
   // ── POST /api/blogs/parse-pdf (text extraction only) ──────────────────────────
@@ -863,6 +867,7 @@ export async function setupServer(config: ServerConfig = {}): Promise<Express> {
       categoryService = productService; // ProductService has getAllCategories
       blogService = new BlogService(db);
       await blogService.createIndexes();
+      blogMediaBucket = new GridFSBucket(db, { bucketName: 'blog_media' });
       mongoReady = true;
       mongoError = null;
       console.log('✅ MongoDB ready — using cached data');

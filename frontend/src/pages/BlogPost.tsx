@@ -1,12 +1,13 @@
 import { useEffect, useState } from "react";
 import Layout from "@/components/Layout";
-import { Calendar, ArrowLeft, ArrowRight, ChevronDown, Loader2 } from "lucide-react";
+import { Calendar, ArrowLeft, ArrowRight, ChevronDown, Loader2, Tag } from "lucide-react";
 import { Link, useParams } from "react-router-dom";
 import { motion, useScroll } from "framer-motion";
 import SEO from "@/components/SEO";
 import { absoluteUrl, breadcrumbSchema } from "@/lib/seo";
 import { sanitizeHtml } from "@/lib/sanitize";
-import { getFallbackBlogPost, type BlogPost } from "@/data/blog-posts";
+import { getFallbackBlogPost, fallbackBlogPosts, type BlogPost } from "@/data/blog-posts";
+import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious } from "@/components/ui/carousel";
 
 const toIsoDate = (date: string) => {
   const parsed = new Date(date);
@@ -39,6 +40,7 @@ const BlogPost = () => {
   const { slug = "" } = useParams();
   const [post, setPost] = useState<BlogPost | null>(null);
   const [loading, setLoading] = useState(true);
+  const [otherPosts, setOtherPosts] = useState<BlogPost[]>([]);
 
   useEffect(() => {
     let active = true;
@@ -59,6 +61,22 @@ const BlogPost = () => {
       active = false;
     };
   }, [slug]);
+
+  useEffect(() => {
+    let active = true;
+    (async () => {
+      try {
+        const response = await fetch("/api/blogs");
+        const json = await response.json();
+        if (active) setOtherPosts(json.success && json.data?.length > 0 ? json.data : fallbackBlogPosts);
+      } catch {
+        if (active) setOtherPosts(fallbackBlogPosts);
+      }
+    })();
+    return () => {
+      active = false;
+    };
+  }, []);
 
   if (loading) {
     return (
@@ -94,6 +112,8 @@ const BlogPost = () => {
   const chapters = chunkParagraphs(post.content);
   const articleBody = post.bodyHtml ? stripHtml(post.bodyHtml) : post.content.join(" ");
   const wordCount = articleBody ? articleBody.split(/\s+/).filter(Boolean).length : 0;
+  const readMinutes = Math.max(1, Math.round(wordCount / 200));
+  const relatedPosts = otherPosts.filter((p) => p.slug !== post.slug).slice(0, 4);
 
   return (
     <Layout hideBreadcrumb>
@@ -199,35 +219,105 @@ const BlogPost = () => {
 
       {/* ── Rich HTML content (imported from the team's own HTML/CSS) ────── */}
       {post.bodyHtml ? (
-        <>
-          <section className="container py-16 sm:py-24">
-            <div
-              className="prose prose-lg dark:prose-invert mx-auto max-w-3xl prose-headings:font-display prose-img:rounded-2xl"
-              style={{ "--tw-prose-links": accent } as React.CSSProperties}
-              dangerouslySetInnerHTML={{ __html: sanitizeHtml(post.bodyHtml) }}
-            />
-          </section>
+        <section className="container py-16 sm:py-24">
+          <div className="grid grid-cols-1 gap-12 lg:grid-cols-[minmax(0,1fr)_320px]">
+            <article className="max-w-none">
+              <div
+                className="prose prose-lg dark:prose-invert w-full max-w-none prose-headings:font-display prose-img:rounded-2xl"
+                style={{ "--tw-prose-links": accent } as React.CSSProperties}
+                dangerouslySetInnerHTML={{ __html: sanitizeHtml(post.bodyHtml) }}
+              />
 
-          {post.images && post.images.length > 0 && (
-            <section className="container pb-16 sm:pb-24">
-              <div className="mx-auto grid max-w-5xl gap-4 sm:grid-cols-2">
-                {post.images.map((src, index) => (
-                  <div key={src} className="overflow-hidden rounded-2xl">
-                    <img
-                      src={src}
-                      alt={`${post.title} — illustration ${index + 1}`}
-                      className="h-full w-full object-cover"
-                      loading="lazy"
-                      decoding="async"
-                      width={1200}
-                      height={900}
-                    />
-                  </div>
-                ))}
+              {post.images && post.images.length > 0 && (
+                <div className="mt-12">
+                  <h3 className="mb-4 font-display text-lg font-bold tracking-tight">Gallery</h3>
+                  <Carousel opts={{ loop: post.images.length > 1, align: "start" }} className="w-full">
+                    <CarouselContent>
+                      {post.images.map((src, index) => (
+                        <CarouselItem key={src} className="sm:basis-1/2">
+                          <div className="aspect-[4/3] overflow-hidden rounded-2xl">
+                            <img
+                              src={src}
+                              alt={`${post.title} — illustration ${index + 1}`}
+                              className="h-full w-full object-cover"
+                              loading="lazy"
+                              decoding="async"
+                              width={1200}
+                              height={900}
+                            />
+                          </div>
+                        </CarouselItem>
+                      ))}
+                    </CarouselContent>
+                    {post.images.length > 1 && (
+                      <>
+                        <CarouselPrevious className="-left-4" />
+                        <CarouselNext className="-right-4" />
+                      </>
+                    )}
+                  </Carousel>
+                </div>
+              )}
+            </article>
+
+            <aside className="space-y-6 lg:sticky lg:top-24 lg:self-start">
+              <div className="rounded-2xl border border-border p-5">
+                <span
+                  className="inline-flex items-center gap-1.5 text-xs font-black uppercase tracking-[0.2em]"
+                  style={{ color: accent }}
+                >
+                  <Tag className="h-3.5 w-3.5" />
+                  {post.tag}
+                </span>
+                <div className="mt-4 flex items-center gap-2 text-sm text-muted-foreground">
+                  <Calendar className="h-4 w-4" />
+                  {post.date}
+                </div>
+                <p className="mt-2 text-sm text-muted-foreground">{readMinutes} min read</p>
               </div>
-            </section>
-          )}
-        </>
+
+              {relatedPosts.length > 0 && (
+                <div className="rounded-2xl border border-border p-5">
+                  <h3 className="font-display text-xs font-black uppercase tracking-[0.2em] text-muted-foreground">
+                    More from the blog
+                  </h3>
+                  <div className="mt-4 space-y-4">
+                    {relatedPosts.map((related) => (
+                      <Link
+                        key={related._id}
+                        to={`/blog/${related.slug}`}
+                        className="group flex gap-3"
+                      >
+                        {related.image && (
+                          <img
+                            src={related.image}
+                            alt=""
+                            className="h-14 w-14 shrink-0 rounded-lg object-cover"
+                            loading="lazy"
+                          />
+                        )}
+                        <div>
+                          <p className="text-sm font-semibold leading-snug transition-colors group-hover:text-primary">
+                            {related.title}
+                          </p>
+                          <p className="mt-1 text-xs text-muted-foreground">{related.date}</p>
+                        </div>
+                      </Link>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              <Link
+                to="/shop"
+                className="block rounded-2xl px-5 py-4 text-center text-sm font-bold transition-transform hover:-translate-y-0.5"
+                style={{ backgroundColor: accent, color: accentForeground }}
+              >
+                Shop related gear
+              </Link>
+            </aside>
+          </div>
+        </section>
       ) : (
         chapters.map((chapter, index) => {
         const tinted = index % 2 === 1;

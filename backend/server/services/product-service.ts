@@ -22,6 +22,11 @@ function decodeHtmlEntities(value: string): string {
     .trim();
 }
 
+// Matches genuine phone listings (iPhone, or brand + phone-spec keywords
+// close together) without catching tablets/laptops from the same brands.
+const PHONE_NAME_PATTERN =
+  /\b(iphone|smartphone|rugged[\s-]*phone)\b|\b(xiaomi|redmi|poco|ulefone|oukitel|hotwav|infinix|tecno|oppo|vivo|realme|oneplus|motorola|huawei|honor|nokia|samsung|galaxy|blackview)\b.{0,40}\b(\d+gb|5g|4g network|octa[\s-]*core|snapdragon|dimensity|unlocked)\b/i;
+
 function categorySearchVariants(value: string): string[] {
   const raw = String(value || '').trim();
   const decoded = decodeHtmlEntities(raw);
@@ -173,14 +178,27 @@ export class ProductService {
   ): Promise<{ products: MongoProduct[]; total: number }> {
     const variants = categorySearchVariants(category);
     const regexes = categoryRegexes(category);
-    return this.getProducts(page, perPage, {
+    const categoryQuery: any = {
       $or: [
         { 'categories.slug': { $in: variants } },
         { 'categories.name': { $in: regexes } },
         { category: { $in: regexes } },
         { categorySlug: { $in: variants } },
       ],
-    } as any);
+    };
+
+    // The WooCommerce "Smart Phones" category is heavily mistagged with
+    // gaming accessories and other electronics (a supplier import issue).
+    // Narrow what this one category shows by product name so shoppers
+    // filtering for phones actually see phones, without touching the
+    // underlying WooCommerce category data.
+    if (/^smart[\s-]*phones?$/i.test(String(category || '').trim())) {
+      return this.getProducts(page, perPage, {
+        $and: [categoryQuery, { name: { $regex: PHONE_NAME_PATTERN } }],
+      } as any);
+    }
+
+    return this.getProducts(page, perPage, categoryQuery as any);
   }
 
   /**
