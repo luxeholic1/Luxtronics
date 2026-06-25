@@ -55,8 +55,8 @@ class MongoDBConnection {
         journal: true,
         serverSelectionTimeoutMS: 10000, // Increased timeout
         socketTimeoutMS: 45000,
-        maxPoolSize: 10,
-        minPoolSize: 5,
+        maxPoolSize: 5,
+        minPoolSize: 1,
       };
 
       if (useTls) {

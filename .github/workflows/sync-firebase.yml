@@ -1,20 +1,15 @@
 name: Sync Products to Firebase
 
 on:
-  # Run every 15 minutes
-  schedule:
-    - cron: '*/15 * * * *'
-  
+  # Disabled: the live storefront reads from MongoDB, not Firestore, so this
+  # was hitting the Hostinger-hosted WooCommerce REST API every 15 minutes
+  # (96x/day) for a sync nothing consumes — a likely contributor to the
+  # account's CPU resource-limit hits. Kept as manual-trigger-only.
+  # schedule:
+  #   - cron: '*/15 * * * *'
+
   # Allow manual trigger
   workflow_dispatch:
-  
-  # Run on push to main (for testing)
-  push:
-    branches:
-      - main
-    paths:
-      - 'backend/scripts/sync-to-firebase.ts'
-      - '.github/workflows/sync-firebase.yml'
 
 jobs:
   sync:
