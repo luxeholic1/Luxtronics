@@ -9,7 +9,6 @@ import { useCart } from "@/context/CartContext";
 import { fetchStoreProduct, fetchStoreProducts, mapStoreProductToLocalProduct } from "@/services/store-api";
 import { sanitizeHtml } from "@/lib/sanitize";
 import { redirectToWooCheckout } from "@/lib/woo-checkout";
-import { trackAnalyticsEvent } from "@/lib/analytics";
 import {
   absoluteUrl,
   breadcrumbSchema,
@@ -143,28 +142,6 @@ const ProductDetail = () => {
   };
 
   const related = useMemo(() => relatedProducts, [relatedProducts]);
-
-  useEffect(() => {
-    if (!product) return;
-    // trackAnalyticsEvent() itself checks cookie consent and skips /admin —
-    // it's the only call needed; a separate updateLiveVisitor() call here
-    // used to fire unconditionally with no consent check at all, which is
-    // also what let Googlebot/GoogleOther rendering this page trigger it.
-    trackAnalyticsEvent(
-      {
-        type: "product_view",
-        path: `/product/${product.slug}`,
-        title: product.name,
-        label: product.name,
-        productId: product.id,
-        productName: product.name,
-        productSlug: product.slug,
-        productCategory: product.category,
-        productPrice: product.price,
-      },
-      { section: "Product detail", lastAction: `Viewing ${product.name}` },
-    );
-  }, [product]);
 
   // ─── Unique attribute names ──────────────────────────────────────────────
   const attributeNames: string[] = useMemo(() => {
@@ -522,16 +499,6 @@ const ProductDetail = () => {
             <div className="mt-5 flex flex-col sm:flex-row gap-3">
               <button
                 onClick={() => {
-                  trackAnalyticsEvent({
-                    type: "product_intent",
-                    label: `Buy now ${product.name}`,
-                    path: `/product/${product.slug}`,
-                    productId: product.id,
-                    productName: product.name,
-                    productSlug: product.slug,
-                    productCategory: product.category,
-                    productPrice: currentPrice,
-                  });
                   // Buy Now - Direct to WooCommerce checkout
                   redirectToWooCheckout(
                     [{

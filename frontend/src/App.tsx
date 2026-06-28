@@ -17,7 +17,6 @@ import Index from "./pages/Index.tsx";
 import Shop from "./pages/Shop.tsx";
 import ProductDetail from "./pages/ProductDetail.tsx";
 import GeoRedirectPopup from "./components/GeoRedirectPopup.tsx";
-import AnalyticsTracker from "./components/AnalyticsTracker.tsx";
 import CookieConsent from "./components/CookieConsent.tsx";
 
 // Lazy load non-critical pages
@@ -79,7 +78,6 @@ const App = () => {
                   <Sonner />
                   <BrowserRouter>
                     <GeoRedirectPopup />
-                    <AnalyticsTracker />
                     <CookieConsent />
                     <Suspense fallback={<PageLoader />}>
                       <Routes>
