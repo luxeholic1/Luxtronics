@@ -114,6 +114,16 @@ const CENTRAL_ANALYTICS_ORIGIN = "https://luxtronics.in";
 let ipLocationRequestStarted = false;
 let preciseLocationRequestStarted = false;
 
+// Every click/section-view/search calls updateLiveVisitor, which used to POST
+// immediately and unconditionally. A burst of interaction (rapid clicks,
+// several sections crossing the viewport at once) turned into one proxied
+// request per event with no ceiling, each tying up an Apache process via
+// mod_proxy on shared hosting. Throttle the network leg so a burst costs at
+// most ~2 requests per window instead of one per interaction.
+const LIVE_VISITOR_POST_INTERVAL_MS = 4000;
+let liveVisitorPostTimer: number | null = null;
+let pendingLiveVisitorPost: LiveVisitor | null = null;
+
 const nowId = () => `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
 
 function getSiteHost() {
@@ -451,11 +461,34 @@ export function updateLiveVisitor(input: Partial<LiveVisitor> = {}) {
   localStorage.setItem(LIVE_STORAGE_KEY, JSON.stringify(visitors));
   window.dispatchEvent(new CustomEvent("lux-live-visitor", { detail: visitor }));
 
-  const endpoint = getAnalyticsEndpoint("/api/analytics/live", import.meta.env.VITE_ANALYTICS_LIVE_ENDPOINT);
-  const body = JSON.stringify(visitor);
-  fetch(endpoint, { method: "POST", headers: { "Content-Type": "application/json" }, body, keepalive: true }).catch(() => {});
+  scheduleLiveVisitorPost(visitor);
   requestIpLocation();
   requestPreciseLocation();
+}
+
+function postLiveVisitor(visitor: LiveVisitor) {
+  const endpoint = getAnalyticsEndpoint("/api/analytics/live", import.meta.env.VITE_ANALYTICS_LIVE_ENDPOINT);
+  fetch(endpoint, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(visitor),
+    keepalive: true,
+  }).catch(() => {});
+}
+
+function scheduleLiveVisitorPost(visitor: LiveVisitor) {
+  pendingLiveVisitorPost = visitor;
+  if (liveVisitorPostTimer) return;
+
+  postLiveVisitor(visitor);
+  pendingLiveVisitorPost = null;
+  liveVisitorPostTimer = window.setTimeout(() => {
+    liveVisitorPostTimer = null;
+    if (pendingLiveVisitorPost) {
+      postLiveVisitor(pendingLiveVisitorPost);
+      pendingLiveVisitorPost = null;
+    }
+  }, LIVE_VISITOR_POST_INTERVAL_MS);
 }
 
 export async function fetchRemoteLiveVisitors(): Promise<LiveVisitor[]> {
