@@ -1,3 +1,11 @@
+// Must run before any async I/O (dns/fs/crypto) touches libuv's threadpool —
+// this account's host caps total OS threads low enough that Node's own
+// startup threads plus a couple of these were enough to hit the cap and
+// crash with "uv_thread_create failed". --v8-pool-size can't be set from
+// here (V8 is already initialized by the time this file runs); set it via
+// NODE_OPTIONS in the hosting environment instead.
+process.env.UV_THREADPOOL_SIZE = process.env.UV_THREADPOOL_SIZE || '1';
+
 import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
